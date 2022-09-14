@@ -1,0 +1,23 @@
+{
+    "2020-08-04_AZ_R": [{
+        "office": "S",
+        "states": ["AZ"],
+        "geographic_unit_types": ["precinct"],
+        "baseline_results_year": 2018,
+        "historical_election": [],
+        "features": ["age_le_30", "age_geq_30_le_45", "age_geq_45_le_65", 
+            "age_geq_65", "ethnicity_east_and_south_asian",
+            "ethnicity_european", "ethnicity_hispanic_and_portuguese",
+            "ethnicity_likely_african_american", "ethnicity_other",
+            "gender_f", "gender_m", "median_household_income", 
+            "percent_bachelor_or_higher"],
+        "aggregates": ["postal_code", "county_classification"],
+        "fixed_effect": ["county_classification"],
+        "baseline_pointer": {
+            "mcsally_61631": "mcsally_61631",
+            "mccarthy_68879": "mcsally_61631",
+            "turnout": "turnout"
+        },
+        "__comment": "Not enough counties for a county model. This is a test election."
+    }]
+}

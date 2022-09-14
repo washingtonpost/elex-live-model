@@ -1,0 +1,20 @@
+{
+    "2018-03-06_TX_R": [{
+        "office": "G",
+        "states": ["TX"],
+        "geographic_unit_types": ["county"],
+        "baseline_results_year": 2014,
+        "historical_election": [],
+        "features": ["age_le_30", "age_geq_30_le_45", "age_geq_35_le_65", "age_geq_65",
+            "ethnicity_east_and_south_asian", "ethnicity_hispanic_and_portuguese", "ethnicity_european", "ethnicity_likely_african_american", "ethnicity_other", "ethnicity_unknown",
+            "median_household_income", "percent_bachelor_or_higher"],
+        "aggregates": ["postal_code", "county_classification"],
+        "fixed_effect": [],
+        "baseline_pointer": {
+            "abbott_41404": "abbott_41404",
+            "krueger_66077": "abbott_41404",
+            "kilgore_57793": "abbott_41404",
+            "turnout": "turnout"
+        }
+    }]
+}

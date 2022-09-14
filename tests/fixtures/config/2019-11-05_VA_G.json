@@ -1,0 +1,18 @@
+{
+    "2019-11-05_VA_G": [{
+        "office": "Y",
+        "states": ["VA"],
+        "geographic_unit_types": ["precinct-district", "county-district"],
+        "baseline_results_year": 2017,
+        "historical_election": ["2017-11-07_VA_G"],
+        "features": ["age_le_30", "age_geq_30_le_45", "age_geq_45_le_65", 
+            "age_geq_65", "ethnicity_east_and_south_asian",
+            "ethnicity_european", "ethnicity_hispanic_and_portuguese",
+            "ethnicity_likely_african_american", "ethnicity_other",
+            "gender_f", "gender_m",
+            "median_household_income", "percent_bachelor_or_higher"],
+        "aggregates": ["unit", "postal_code", "county_classification", "district", "county_fips"],
+        "fixed_effect": ["postal_code",  "county_fips", "county_classification", "district"],
+        "__comment": "Fips codes are of the format {district_num}_51{county_fips}_{precinct_id} to account for any split precincts"
+    }]
+}

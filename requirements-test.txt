@@ -1,0 +1,7 @@
+autopep8
+pylint
+tox
+pytest
+pytest-cov
+pylint
+moto

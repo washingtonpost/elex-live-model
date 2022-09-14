@@ -1,0 +1,9 @@
+jupyter
+matplotlib
+black
+isort
+pre-commit
+wheel
+twine
+boto
+-r requirements-test.txt
