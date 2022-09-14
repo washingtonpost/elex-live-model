@@ -170,3 +170,4 @@ We have published multiple resources to share our progress.
 * February 21, 2021: ["How The Washington Post Estimates Outstanding Votes for the 2020 Presidential Election"](https://washpost.engineering/how-the-washington-post-estimates-outstanding-votes-for-the-2020-presidential-election-3f82f8415eda)
 * November 2, 2021: ["How The Washington Post will model possible outcomes in the Virginia governor’s race"](https://www.washingtonpost.com/elections/2021/11/02/election-model-explained/)
 * May 17, 2022: ["How the Washington Post’s election night model works"](https://www.washingtonpost.com/politics/2022/05/17/post-election-night-model/)
+* September 14, 2022: ["We're open sourcing our live election night model"](https://washpost.engineering/were-open-sourcing-our-live-election-night-model-a21bcb2a46c6)
