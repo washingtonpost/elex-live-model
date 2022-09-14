@@ -33,6 +33,7 @@ setup(
     ],
     description="A package for optimization solvers",
     long_description=LONG_DESCRIPTION,
+    long_description_content_type="text/markdown",
     license="MIT",
     packages=find_packages("src", exclude=["docs", "tests"]),
     package_dir={"": "src"},
