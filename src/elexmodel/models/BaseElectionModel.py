@@ -111,6 +111,15 @@ class BaseElectionModel(object):
 
         return aggregate_votes
 
+    def _get_nonreporting_aggregate_votes(self, nonreporting_units, unexpected_units, aggregate, estimand):
+        """
+        Aggregate reporting votes by aggregate (ie. postal_code, county_fips etc.). This function
+        adds reporting data and reporting unexpected data by aggregate.
+        """
+        aggregate_nonreporting_units_known_votes = nonreporting_units.groupby(aggregate).sum().reset_index(drop=False)        
+
+        return  aggregate_nonreporting_units_known_votes
+    
     def get_aggregate_predictions(self, reporting_units, nonreporting_units, unexpected_units, aggregate, estimand):
         """
         Aggregate predictions and results by aggregate (ie. postal_code, county_fips etc.). Add results from reporting
