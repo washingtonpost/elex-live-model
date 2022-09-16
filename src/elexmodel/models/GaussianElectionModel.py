@@ -101,7 +101,7 @@ class GaussianElectionModel(BaseElectionModel):
 
         #get non reporting votes by aggregate (votes cast in units that haven't met reporting threshold
         #yet, but still have returns)
-        aggregate_nonreporting_votes = self._get_nonreporting_aggregate_votes(nonreporting_units, unexpected_units, aggregate, estimand)
+        aggregate_nonreporting_votes = self._get_nonreporting_aggregate_votes(nonreporting_units,aggregate)
         
         # get last election results by aggregate (for un-residualizing later)
         last_election = (
@@ -205,8 +205,7 @@ class GaussianElectionModel(BaseElectionModel):
         quantile = (3 + alpha) / 4
         modeled_bounds = modeled_bounds.assign(
             lb_mean=lambda x: x.nonreporting_weight_sum * x.mu_lower_bound,
-            lb_sd=lambda x: x.sigma_lower_bound
-            * np.sqrt(x.nonreporting_weight_ssum + x.var_inflate * np.power(x.nonreporting_weight_sum, 2)),
+            lb_sd=lambda x: x.sigma_lower_bound            * np.sqrt(x.nonreporting_weight_ssum + x.var_inflate * np.power(x.nonreporting_weight_sum, 2)),
             ub_mean=lambda x: x.nonreporting_weight_sum * x.mu_upper_bound,
             ub_sd=lambda x: x.sigma_upper_bound
             * np.sqrt(x.nonreporting_weight_ssum + x.var_inflate * np.power(x.nonreporting_weight_sum, 2)),
