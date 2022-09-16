@@ -220,7 +220,10 @@ class GaussianElectionModel(BaseElectionModel):
         ]
 
         # un-residualize bounds by adding last election results
-        # elementwise maximum with zero to avoid adding negative vote count in nonreporting units
+        # elementwise maximum with votes from nonreporting units to avoid adding negative vote count in nonreporting units
+        # Note, gaussian interval aggregation can result in  a lower bound that is less than the votes
+        # already returned in non-reporting units. If that is the case we correct by assigning the number of votes
+        # already returned in nonreporting units.
         aggregate_prediction_intervals = (
             last_election.merge(modeled_bounds, how="inner", on=aggregate)
             .assign(

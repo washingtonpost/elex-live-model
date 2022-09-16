@@ -71,7 +71,8 @@ class BaseElectionModel(object):
     def _get_reporting_aggregate_votes(self, reporting_units, unexpected_units, aggregate, estimand):
         """
         Aggregate reporting votes by aggregate (ie. postal_code, county_fips etc.). This function
-        adds reporting data and reporting unexpected data by aggregate.
+        adds reporting data and reporting unexpected data by aggregate. Note that all unexpected units -
+        whether or not they are fully reporting - are included in this function.
         """
         reporting_units_known_votes = reporting_units.groupby(aggregate).sum().reset_index(drop=False)
 
@@ -111,10 +112,10 @@ class BaseElectionModel(object):
 
         return aggregate_votes
 
-    def _get_nonreporting_aggregate_votes(self, nonreporting_units, unexpected_units, aggregate, estimand):
+    def _get_nonreporting_aggregate_votes(self, nonreporting_units, aggregate):
         """
-        Aggregate reporting votes by aggregate (ie. postal_code, county_fips etc.). This function
-        adds reporting data and reporting unexpected data by aggregate.
+        Aggregate nonreporting votes by aggregate (ie. postal_code, county_fips etc.). Note that all unexpected
+        units - whether or not they are fully reporting - are handled in "_get_reporting_aggregate_votes" above
         """
         aggregate_nonreporting_units_known_votes = nonreporting_units.groupby(aggregate).sum().reset_index(drop=False)        
 
