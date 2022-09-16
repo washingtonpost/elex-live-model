@@ -101,7 +101,7 @@ class GaussianElectionModel(BaseElectionModel):
 
         #get non reporting votes by aggregate (votes cast in units that haven't met reporting threshold
         #yet, but still have returns)
-        aggregate_nonreporting_votes = self._get_nonreporting_aggregate_votes(nonreporting_units, unexpected_units, aggregate, estimand)
+        aggregate_nonreporting_votes = self._get_nonreporting_aggregate_votes(nonreporting_units, aggregate)
         
         # get last election results by aggregate (for un-residualizing later)
         last_election = (
