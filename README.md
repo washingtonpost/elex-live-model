@@ -4,7 +4,7 @@ The Washington Post uses this live election model to generate estimates of the n
 
 Generally, the model works by comparing the current results to a historical baseline and regressing on the difference using demographic features. We use [quantile regression](https://en.wikipedia.org/wiki/Quantile_regression) as the underlying model and [conformal prediction](https://arxiv.org/abs/2107.07511) to produce our uncertainty estimates.
 
-The first iteration of this model is written in R in [this repo](https://github.com/WPMedia/elex-live-model-general).
+The first iteration of this model is written in R in [this repo](https://github.com/washingtonpost/2020-election-night-model).
 
 ## Installation
 
