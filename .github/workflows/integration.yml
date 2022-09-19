@@ -1,5 +1,12 @@
 name: Integration Test
-on: [push, pull_request]
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+  push:
+    branches:
+      - main
 jobs:
   test:
     name: Run integration test
