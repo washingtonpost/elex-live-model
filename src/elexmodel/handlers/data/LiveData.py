@@ -40,6 +40,7 @@ class MockLiveDataHandler(object):
             "postal_code",
             "county_classification",
             "county_fips",
+            "geographic_unit_type"            
         ]  # columns we may want to sample by
         self.shuffle_dataframe = None
 
@@ -99,9 +100,9 @@ class MockLiveDataHandler(object):
                 raise MockLiveDataHandlerException("This is missing results data for estimand: ", estimand)
             columns_to_return.append(f"results_{estimand}")
         self.shuffle_dataframe = data[self.shuffle_columns].copy()
-        return data[columns_to_return].copy()
+        return data[columns_to_return +['geographic_unit_type']].copy() #data[columns_to_return].copy()
 
-    def shuffle(self, seed=None, upweight={}, enforce=[]):
+    def shuffle(self, seed=None, upweight={}, enforce=[], perc_town = None, perc_report = None):
         """
         Function that allows for random shuffling of geographic units with upweights for certain types of counties
         this makes those geographic units more likely to be picked. Also allows a specific ordering by enforcing which geographic units
@@ -120,7 +121,19 @@ class MockLiveDataHandler(object):
             for value in weight:  # e.g. value == "AL"
                 indices = self.data[self.shuffle_dataframe[category] == value].index
                 probabilities[indices] = probabilities[indices] * weight[value]
-        self.data = self.data.sample(frac=1, random_state=seed, weights=probabilities)
+
+        if perc_town is not None:
+            total_towns = len(self.data[self.data['geographic_unit_type'] == 'Town'])
+            num_town_report = round(min(len(self.data)*(perc_report/100)*(perc_town/100), total_towns))
+            print("TOWN REPORT", perc_report, perc_town, len(self.data), num_town_report)
+            self.data = self.data.sample(frac=1, random_state=seed, weights=np.ones((self.data.shape[0],)))
+            self.town_report_rows = self.data[self.data['geographic_unit_type'] == 'Town'][:num_town_report].copy()
+            self.town_nonreport_rows = self.data[self.data['geographic_unit_type'] == 'Town'][num_town_report:].copy()
+            self.non_town_rows = self.data[self.data['geographic_unit_type'] != 'Town'].copy()
+            self.data = pd.concat([self.town_report_rows, self.non_town_rows, self.town_nonreport_rows])
+            self.data.to_csv('shuffle_test_{}_{}.csv'.format(perc_town, perc_report), index = False)
+        else:    
+            self.data = self.data.sample(frac=1, random_state=seed, weights=probabilities)
 
         # get indices of units that must come first
         mask = self.data.geographic_unit_fips.isin(enforce)

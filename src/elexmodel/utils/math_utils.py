@@ -30,7 +30,12 @@ def weighted_median(x, weights):
 
     # find index of largest x_i where weights are less than or equal 0.5
     weights_cumulative = np.cumsum(weights_sorted)
-    median_index = np.where(weights_cumulative <= 0.5)[0][-1]
+    #median_index = np.where(weights_cumulative <= 0.5)[0][-1]
+    median_index = np.where(weights_cumulative <= 0.5)[0]
+    if median_index.shape[0] == 0:
+        median_index = 0
+    else:
+        median_index = median_index[-1]
 
     # if there is one element where weights are exactly 0.5, median is average
     # otherwise weighted median is the next largest element
@@ -60,14 +65,14 @@ def compute_error(true, pred, type_="mae"):
         return np.mean(np.abs(true - pred)).round(decimals=0)
     elif type_ == "mape":
         mask = true != 0
-        return np.mean((np.abs(true - pred) / true)[mask]).round(decimals=2)
+        return np.mean((np.abs(true - pred) / true)[mask]).round(decimals=3)
 
 
 def compute_frac_within_pi(lower, upper, results):
     """
     computes coverage of prediction intervals.
     """
-    return np.mean((upper >= results) & (lower <= results)).round(decimals=2)
+    return np.mean((upper >= results) & (lower <= results)).round(decimals=3)
 
 
 def compute_mean_pi_length(lower, upper, pred):
@@ -75,4 +80,4 @@ def compute_mean_pi_length(lower, upper, pred):
     computes average relative length of prediction interval
     """
     # we add 1 since pred can be literally zero
-    return np.mean((upper - lower) / (pred + 1)).round(decimals=2)
+    return np.mean((upper - lower) / (pred + 1)).round(decimals=3)
