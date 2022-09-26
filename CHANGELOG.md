@@ -1,5 +1,8 @@
 # Changelog
 
+### 1.0.5 (09/20/2022)
+- fix: Update README link to 2020 model [#2](https://github.com/washingtonpost/elex-live-model/pull/2)
+- chore: set up repository [#4](https://github.com/washingtonpost/elex-live-model/pull/4)
 
 ### 1.0.4 (09/12/2022)
 - chore: update codeowners to public news engineering group [#101](https://github.com/WPMedia/elex-live-model/pull/101)
