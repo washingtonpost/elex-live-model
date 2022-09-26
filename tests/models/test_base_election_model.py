@@ -188,10 +188,11 @@ def test_aggregation_simple():
         }
     ).equals(df3)
 
+
 def test_aggregation_nonreporting_simple():
     """
     This test is a basic test for aggregating votes from nonreporting units.These are votes
-    that have been counted from units that haven't met our reporting threshold. 
+    that have been counted from units that haven't met our reporting threshold.
     """
     model_settings = {}
     model = BaseElectionModel.BaseElectionModel(model_settings)
@@ -208,6 +209,7 @@ def test_aggregation_nonreporting_simple():
     df2 = model._get_nonreporting_aggregate_votes(df1, aggregate=["c1"])
 
     assert pd.DataFrame({"c1": ["a", "b", "c"], f"results_{estimand}": [4, 16, 6], "reporting": [0, 0, 0]}).equals(df2)
+
 
 def test_aggregation(va_governor_precinct_data):
     """
@@ -241,6 +243,7 @@ def test_aggregation(va_governor_precinct_data):
         == df3[f"results_{estimand}"].values[0]
     )
 
+
 def test_aggregation_nonreporting(va_governor_precinct_data):
     """
     Testing nonreporting aggregation using the 2017 Virginia governor precinct results as test data.
@@ -264,8 +267,8 @@ def test_aggregation_nonreporting(va_governor_precinct_data):
 
     df3 = model._get_nonreporting_aggregate_votes(df1, aggregate=["county_fips"])
     assert 10664.0 == df3[f"results_{estimand}"].values[0]  # first county based on summing csv
-    
-    
+
+
 def test_get_aggregate_predictions_simple():
     """
     This is a basic test for our prediction aggregation. We sum the results of the reporting and reporting

@@ -153,7 +153,7 @@ class CombinedDataHandler(object):
 
     def get_unexpected_units(self, percent_reporting_threshold, aggregates):
         """
-        Gets reporting but unexpected data. These are units that are may or may not be fully 
+        Gets reporting but unexpected data. These are units that are may or may not be fully
         reporting, but we have no preprocessed data for them.
         """
         expected_geographic_units = self._get_expected_geographic_unit_fips().tolist()
