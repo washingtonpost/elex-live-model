@@ -99,10 +99,10 @@ class GaussianElectionModel(BaseElectionModel):
         # get reporting votes by aggregate
         aggregate_votes = self._get_reporting_aggregate_votes(reporting_units, unexpected_units, aggregate, estimand)
 
-        #get non reporting votes by aggregate (votes cast in units that haven't met reporting threshold
-        #yet, but still have returns)
-        aggregate_nonreporting_votes = self._get_nonreporting_aggregate_votes(nonreporting_units,aggregate)
-        
+        # get non reporting votes by aggregate (votes cast in units that haven't met reporting threshold
+        # yet, but still have returns)
+        aggregate_nonreporting_votes = self._get_nonreporting_aggregate_votes(nonreporting_units, aggregate)
+
         # get last election results by aggregate (for un-residualizing later)
         last_election = (
             nonreporting_units.groupby(aggregate)
@@ -194,10 +194,9 @@ class GaussianElectionModel(BaseElectionModel):
             )
             remaining_bounds = bounds.iloc[remaining_bounds_idx].reset_index(drop=True)
 
-
             # First step is to assign to merge the remaining models onto the remaining bounds
-            # In the case where aggregate == 1, next_aggregate is only an empty list and we 
-            # 
+            # In the case where aggregate == 1, next_aggregate is only an empty list and we
+            #
 
             # Merge the remaining bounds onto the remaining models. Remaining bounds are the bounds without
             # a model abd and remaining model are the model for the higher aggregates.
@@ -209,14 +208,9 @@ class GaussianElectionModel(BaseElectionModel):
             else:
                 remaining_bounds_w_models = remaining_bounds.merge(remaining_models, how="inner", on=next_aggregate)
 
-            # combine bounds for groups that have already been matched and groups that had not been matched 
+            # combine bounds for groups that have already been matched and groups that had not been matched
             # (so they received the higher level aggregate model)
-            modeled_bounds = pd.concat(
-                [modeled_bounds, remaining_bounds_w_models]
-            )
-
-
-
+            modeled_bounds = pd.concat([modeled_bounds, remaining_bounds_w_models])
 
         # construction conformal corrections using Gaussian models
         # get means and standard deviations for for aggregates
@@ -224,7 +218,8 @@ class GaussianElectionModel(BaseElectionModel):
         quantile = (3 + alpha) / 4
         modeled_bounds = modeled_bounds.assign(
             lb_mean=lambda x: x.nonreporting_weight_sum * x.mu_lower_bound,
-            lb_sd=lambda x: x.sigma_lower_bound            * np.sqrt(x.nonreporting_weight_ssum + x.var_inflate * np.power(x.nonreporting_weight_sum, 2)),
+            lb_sd=lambda x: x.sigma_lower_bound
+            * np.sqrt(x.nonreporting_weight_ssum + x.var_inflate * np.power(x.nonreporting_weight_sum, 2)),
             ub_mean=lambda x: x.nonreporting_weight_sum * x.mu_upper_bound,
             ub_sd=lambda x: x.sigma_upper_bound
             * np.sqrt(x.nonreporting_weight_ssum + x.var_inflate * np.power(x.nonreporting_weight_sum, 2)),
@@ -245,8 +240,12 @@ class GaussianElectionModel(BaseElectionModel):
         aggregate_prediction_intervals = (
             last_election.merge(modeled_bounds, how="inner", on=aggregate)
             .assign(
-                predicted_lower=lambda x: np.maximum(x[f"last_election_results_{estimand}"] + x.lb, aggregate_nonreporting_votes[f"results_{estimand}"]),
-                predicted_upper=lambda x: np.maximum(x[f"last_election_results_{estimand}"] + x.ub, aggregate_nonreporting_votes[f"results_{estimand}"]),
+                predicted_lower=lambda x: np.maximum(
+                    x[f"last_election_results_{estimand}"] + x.lb, aggregate_nonreporting_votes[f"results_{estimand}"]
+                ),
+                predicted_upper=lambda x: np.maximum(
+                    x[f"last_election_results_{estimand}"] + x.ub, aggregate_nonreporting_votes[f"results_{estimand}"]
+                ),
             )
             .drop(columns=f"last_election_results_{estimand}")
         )
