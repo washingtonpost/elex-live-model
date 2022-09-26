@@ -99,6 +99,10 @@ class GaussianElectionModel(BaseElectionModel):
         # get reporting votes by aggregate
         aggregate_votes = self._get_reporting_aggregate_votes(reporting_units, unexpected_units, aggregate, estimand)
 
+        # get non reporting votes by aggregate (votes cast in units that haven't met reporting threshold
+        # yet, but still have returns)
+        aggregate_nonreporting_votes = self._get_nonreporting_aggregate_votes(nonreporting_units, aggregate)
+
         # get last election results by aggregate (for un-residualizing later)
         last_election = (
             nonreporting_units.groupby(aggregate)
@@ -216,12 +220,19 @@ class GaussianElectionModel(BaseElectionModel):
         ]
 
         # un-residualize bounds by adding last election results
-        # elementwise maximum with zero to avoid adding negative vote count in nonreporting units
+        # elementwise maximum with zero to avoid adding negative vote count in nonreporting units# elementwise maximum with votes from nonreporting units to avoid adding negative vote count in nonreporting units
+        # Note, gaussian interval aggregation can result in  a lower bound that is less than the votes
+        # already returned in non-reporting units. If that is the case we correct by assigning the number of votes
+        # already returned in nonreporting units.
         aggregate_prediction_intervals = (
             last_election.merge(modeled_bounds, how="inner", on=aggregate)
             .assign(
-                predicted_lower=lambda x: np.maximum(x[f"last_election_results_{estimand}"] + x.lb, 0),
-                predicted_upper=lambda x: np.maximum(x[f"last_election_results_{estimand}"] + x.ub, 0),
+                predicted_lower=lambda x: np.maximum(
+                    x[f"last_election_results_{estimand}"] + x.lb, aggregate_nonreporting_votes[f"results_{estimand}"]
+                ),
+                predicted_upper=lambda x: np.maximum(
+                    x[f"last_election_results_{estimand}"] + x.ub, aggregate_nonreporting_votes[f"results_{estimand}"]
+                ),
             )
             .drop(columns=f"last_election_results_{estimand}")
         )
