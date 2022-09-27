@@ -86,6 +86,7 @@ class GaussianModel:
         # fit gaussian model to conformalization data
         # use weighted median as center
         # bootstrap standard deviation
+        
         gaussian_fit = (
             conformalization_data.groupby(to_aggregate)
             .apply(
