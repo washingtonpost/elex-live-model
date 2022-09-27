@@ -169,7 +169,7 @@ class GaussianElectionModel(BaseElectionModel):
         # for groups that did not have enough examples, we want to join the models trained on larger aggregations
         # (ie. postal_code instead of postal_code, county_classification)
         # i: index of level of aggregation we are now trying to match models to
-        for i in range(1, len(aggregate)+1):
+        for i in range(1, len(aggregate) + 1):
             # last_i_aggregate is level of aggregation we are now trying to match (ie. county_fips)
             last_i_aggregate = aggregate[len(aggregate) - i :]  # noqa: E203
             # remaining models mean models for groups that have not been matched yet
@@ -204,11 +204,13 @@ class GaussianElectionModel(BaseElectionModel):
 
             merge_on = next_aggregate
             if len(next_aggregate) == 0:
-                    merge_on = 'merge_on'
-                    cols_to_use = list(remaining_bounds.columns.difference(remaining_models.columns))
-                    remaining_bounds['merge_on'] = 1
-                    remaining_models['merge_on'] = 1                   
-                    remaining_bounds_w_models = remaining_bounds[cols_to_use + [merge_on]].merge(remaining_models, how="inner", on=merge_on)
+                merge_on = "merge_on"
+                cols_to_use = list(remaining_bounds.columns.difference(remaining_models.columns))
+                remaining_bounds["merge_on"] = 1
+                remaining_models["merge_on"] = 1
+                remaining_bounds_w_models = remaining_bounds[cols_to_use + [merge_on]].merge(
+                    remaining_models, how="inner", on=merge_on
+                )
 
             else:
                 remaining_bounds_w_models = remaining_bounds.merge(remaining_models, how="inner", on=merge_on)
