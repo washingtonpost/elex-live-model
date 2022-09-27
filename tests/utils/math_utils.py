@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from elexmodel.utils import math_utils
 from elexmodel.client import ModelNotEnoughSubunitsException
+from elexmodel.utils import math_utils
 
 
 def test_var_inflate():
@@ -76,14 +76,15 @@ def test_weighted_median():
     median = math_utils.weighted_median(x, w)
     assert median == 4
 
+
 def test_weigted_median_error():
     x = np.array([0, 10, 20])
     w = np.array([60, 10, 30])
     w = w / np.sum(w)
     with pytest.raises(ModelNotEnoughSubunitsException):
         math_utils.weighted_median(x, w)
-    
-    
+
+
 def test_compute_mae():
     random_number_generator = np.random.RandomState(42)
     y_true = random_number_generator.exponential(size=100)

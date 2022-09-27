@@ -38,10 +38,10 @@ def weighted_median(x, weights):
 
     # find index of largest x_i where weights are less than or equal 0.5
     weights_cumulative = np.cumsum(weights_sorted)
-    #conformity scores are lined up in size order, but each is assigned a 
-    #weight based on unit population. The list is split in half according to
-    #cumulative weights. But if the first element in the list is already over
-    #50% of total weight, there will be nothing in one side of the list.
+    # conformity scores are lined up in size order, but each is assigned a
+    # weight based on unit population. The list is split in half according to
+    # cumulative weights. But if the first element in the list is already over
+    # 50% of total weight, there will be nothing in one side of the list.
     if weights_cumulative[0] > 0.5:
         raise ModelNotEnoughSubunitsException(
             "Lowest weight conformity unit is >50%. Need more data for conformity median."
