@@ -212,7 +212,7 @@ class GaussianElectionModel(BaseElectionModel):
                 remaining_bounds['merge_on'] = 1
                 remaining_models['merge_on'] = 1
                 remaining_bounds_w_models = remaining_bounds.merge(remaining_models, how="inner", on=merge_on)
-                remaining_bounds_w_models.drop(columns=['merge_on'], inplace=True)
+                remaining_bounds_w_models.drop(columns=['merge_on'], inplace=True, errors='ignore')
 
             # combine bounds for groups that have already been matched and groups that had not been matched
             # (so they received the higher level aggregate model)
