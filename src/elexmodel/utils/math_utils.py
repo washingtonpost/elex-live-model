@@ -1,13 +1,9 @@
+import logging
+
 import numpy as np
 from scipy.stats import bootstrap
 
-
-class ModelClientException(Exception):
-    pass
-
-
-class ModelNotEnoughSubunitsException(ModelClientException):
-    pass
+LOG = logging.getLogger()
 
 
 def compute_inflate(x):
@@ -41,12 +37,13 @@ def weighted_median(x, weights):
     # conformity scores are lined up in size order, but each is assigned a
     # weight based on unit population. The list is split in half according to
     # cumulative weights. But if the first element in the list is already over
-    # 50% of total weight, there will be nothing in one side of the list.
-    if weights_cumulative[0] > 0.5:
-        raise ModelNotEnoughSubunitsException(
-            "Lowest weight conformity unit is >50%. Need more data for conformity median."
-        )
-    median_index = np.where(weights_cumulative <= 0.5)[0][-1]
+    # 50% of total weight, there will be nothing in one side of the list.In
+    # that case return the first element
+    if weights_cumulative[0] >= 0.5:
+        LOG.warning("Warning: smallest conformity value is greater than or equal to half the weight")
+        return x_sorted[0]
+    else:
+        median_index = np.where(weights_cumulative <= 0.5)[0][-1]
 
     # if there is one element where weights are exactly 0.5, median is average
     # otherwise weighted median is the next largest element

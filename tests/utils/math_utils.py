@@ -1,8 +1,11 @@
+import logging
+
 import numpy as np
 import pytest
 
-from elexmodel.client import ModelNotEnoughSubunitsException
 from elexmodel.utils import math_utils
+
+LOG = logging.getLogger()
 
 
 def test_var_inflate():
@@ -77,12 +80,14 @@ def test_weighted_median():
     assert median == 4
 
 
-def test_weigted_median_error():
+def test_weighted_median_error():
     x = np.array([0, 10, 20])
     w = np.array([60, 10, 30])
     w = w / np.sum(w)
-    with pytest.raises(ModelNotEnoughSubunitsException):
-        math_utils.weighted_median(x, w)
+    weights_cumulative = np.cumsum(w)
+    if weights_cumulative[0] >= 0.5:
+        LOG.warning("Warning: smallest conformity value is greater than or equal to half the total weight")
+    assert math_utils.weighted_median(x, w) == 0
 
 
 def test_compute_mae():
