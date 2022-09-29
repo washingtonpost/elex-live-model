@@ -1,4 +1,5 @@
 import logging
+
 import numpy as np
 from scipy.stats import bootstrap
 
@@ -18,6 +19,7 @@ def sample_std(x, axis):
     """
     # ddof=1 to get unbiased sample estimate.
     return np.std(x, ddof=1, axis=-1)
+
 
 def weighted_median(x, weights):
     """

@@ -2,6 +2,7 @@ import logging
 
 import numpy as np
 import pytest
+
 from elexmodel.utils import math_utils
 
 LOG = logging.getLogger()
@@ -84,19 +85,19 @@ def test_weighted_median_error():
     w = np.array([60, 10, 30])
     w = w / np.sum(w)
     assert math_utils.weighted_median(x, w) == 0
-    
+
     x = np.array([10])
     w = np.array([100])
     w = w / np.sum(w)
     assert math_utils.weighted_median(x, w) == 10
-        
+
     x = np.array([10, 20, 30])
-    w = np.array([10,20,25])
+    w = np.array([10, 20, 25])
     w = w / np.sum(w)
     assert math_utils.weighted_median(x, w) == 20
-      
+
     x = np.array([10, 20])
-    w = np.array([50,50])
+    w = np.array([50, 50])
     w = w / np.sum(w)
     assert math_utils.weighted_median(x, w) == 15
 
