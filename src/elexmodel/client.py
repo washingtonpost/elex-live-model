@@ -253,6 +253,7 @@ class ModelClient(object):
             results_handler.add_unit_intervals(estimand, alpha_to_unit_prediction_intervals)
 
             for aggregate in results_handler.aggregates:
+                print('in client agg', aggregate)
                 aggregate_list = sorted(list(set(["postal_code", aggregate])), key=lambda x: AGGREGATE_ORDER.index(x))
                 estimates_df = model.get_aggregate_predictions(
                     results_handler.reporting_units,
