@@ -38,7 +38,7 @@ def weighted_median(x, weights):
     # x-values are lined up in size order, but each is assigned a
     # weight based on unit population. The list is split in half according to
     # cumulative weights. But if the first element in the list is already over
-    # 50% of total weight, there will be nothing in one side of the list.In
+    # 50% of total weight, there will be nothing in one side of the list. In
     # that case return the first element
     if weights_cumulative[0] > 0.5:
         LOG.warning("Warning: smallest x-value is greater than or equal to half the weight")
