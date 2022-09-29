@@ -123,7 +123,7 @@ class GaussianElectionModel(BaseElectionModel):
             beta=self.beta,
             top_level=True,
         )
-        gaussian_model.to_csv('GAUSS.csv', index=False)
+
         # if there are no nonreporting units, we can return just the aggregated votes
         if nonreporting_units.shape[0] == 0:
             return aggregate_votes[f"results_{estimand}"], aggregate_votes[f"results_{estimand}"]
@@ -154,63 +154,72 @@ class GaussianElectionModel(BaseElectionModel):
             )
             .reset_index(drop=False)
         )
-        bounds.to_csv('initial_bounds.csv', index = False)
+
         # Combine each group in aggregate with appriopriate Gaussian model. This is complicated :(
 
         # example with three levels [postal_code, county_classification, county_fips]
         # step 1: find all rows in g_model with NA in the most granular level (e.g. county_fips)
         # step 2: find all rows in bounds that do not have a match with the most granular level model (e.g. county_fips)
-        # step 3: match unmatched bounds (from step 2) to rows identified in step 1
+        # step 3: match unmatched bounds (from step 2) to available models one agg level above (identified in step 1)
         # step 4: go back to step one, but now for [postal_code, county_classification]
+        # IMPORTANT NOTE: the model is not currently using more than two-levels in this function.
+        # While the model AS A WHOLE can have any number of aggregation levels, this function at maximum
+        # takes in a list of two (the current agg level + 'postal_code') at a time.
 
         # first join gaussian model based on *all* aggregates (that is groups with enough units)
-
         modeled_bounds = bounds.merge(gaussian_model, how="inner", on=aggregate)
-        modeled_bounds.to_csv('modeled_bounds_pre_loop.csv', index=False)
         # for groups that did not have enough examples, we want to join the models trained on larger aggregations
         # (ie. postal_code instead of postal_code, county_classification)
         # i: index of level of aggregation we are now trying to match models to
 
         for i in range(1, len(aggregate) + 1):
+            # In each loop iteration we get the remaining bounds (those that need to be matched),
+            # the remaining models (those that are available to be matched) and merge the two.
+            # modeled_bounds is then appended with any bounds that have been newly matched.
+
             # last_i_aggregate is level of aggregation we are now trying to match (ie. county_fips)
             last_i_aggregate = aggregate[len(aggregate) - i :]  # noqa: E203
-            
-            # remaining models mean models for groups that have not been matched yet
-            # we get models where level of aggregation we are trying to match is null
-            # (ie. postal_code model if last_i_aggregate is county_fips)
+
+            # GET REMAINING MODELS
+            # We are interested in models at the next highest aggregation level
+            # after the level in this loop interation. Therefore we don't care about
+            # models in the gaussian df that are the current agg level.
+            # (ie. we want postal_code models if last_i_aggregate is county_fips)
             remaining_models_idx = pd.isnull(gaussian_model[last_i_aggregate]).all(axis=1)
             remaining_models = gaussian_model[remaining_models_idx].reset_index(drop=True)
-            remaining_models.to_csv('remaining_models_{}.csv'.format(i),index=False)
+
             # since remaining_models[last_i_aggregate] is null, we drop it
             remaining_models.drop(columns=last_i_aggregate, inplace=True)
-            
+
             # the aggregation level below (ie. full aggregation)
             previous_aggregate = aggregate[: len(aggregate) - i + 1]
             # the aggregation level above (ie. postal_code)
             next_aggregate = previous_aggregate[:-1]
-            print('in loop', i, aggregate, last_i_aggregate, previous_aggregate, next_aggregate)
-            # get bounds of groups that don't have a model yet
+
+            # GET REMAINING BOUNDS
+            # Get bounds of groups that don't have a model yet
             # that is get indices (and then elements) of groups that DON'T
             # appear in both bounds (all groups) and modeled bounds (groups that already have a model)
+            # These are therefore the remaining bounds we need to match.
             remaining_bounds_idx = (
-                bounds.merge(modeled_bounds, how="left", on=aggregate, indicator=True)#on=previous_aggregate, indicator=True)
+                bounds.merge(
+                    modeled_bounds, how="left", on=aggregate, indicator=True
+                )  # on=previous_aggregate, indicator=True)
                 .query("_merge != 'both'")
                 .index
             )
             remaining_bounds = bounds.iloc[remaining_bounds_idx].reset_index(drop=True)
-            remaining_bounds.to_csv("remaining_bounds_{}.csv".format(i), index =False)
             # First step is to assign to merge the remaining models onto the remaining bounds
             # In the case where aggregate == 1, next_aggregate is only an empty list and we
             #
 
-            # Merge the remaining bounds onto the remaining models. Remaining bounds are the bounds without
-            # a model abd and remaining model are the model for the higher aggregates.
-            # In the case where len(aggregate) == 1, next_aggregate is only an empty list, so we need to merge on True
-            # to make sure that all remaining bounds receive the remaining model. Since aggregate only has one element,
-            # we know that remaining bounds will just have one row (the model generated by *all* subunits)
-            print("remain_bounds_cols", remaining_bounds.columns)
-            print("remain models cols", remaining_models.columns)
-            print("merge on", next_aggregate)
+            # MERGE REMAINING BOUNDS AND REMAINING MODELS
+            # Merge the remaining bounds onto the available models. Remaining bounds are the bounds without
+            # a model and the available models are the models for next highest agg level.
+            # In the case where there is no higher level of aggregation (i.e. we reach the end
+            # of 'aggregate'), we want to use the model constructed from ALL combined reporting
+            # units. In this case, next_aggregate is an empty list, so we construct a one-time merge key.
+            # Note that the same model can be matched to multiple bounds at a more granular agg level!
             merge_on = next_aggregate
             if len(next_aggregate) == 0:
                 merge_on = "merge_on"
@@ -222,15 +231,12 @@ class GaussianElectionModel(BaseElectionModel):
                 )
 
             else:
-                #cols_to_use
+
                 remaining_bounds_w_models = remaining_bounds.merge(remaining_models, how="inner", on=merge_on)
-            remaining_bounds_w_models.to_csv('remaining_bounds_w_models_{}.csv'.format(i), index = False)       
-            modeled_bounds = pd.concat([modeled_bounds, remaining_bounds_w_models]) 
-            modeled_bounds.to_csv('modeled_bounds_post_loop_{}.csv'.format(i), index=False)
-        
-        
-        # combine bounds for groups that have already been matched and groups that had not been matched
-        # (so they received the higher level aggregate model)
+
+            # APPEND NEWLY MODELED BOUNDS TO modeled_bounds
+            modeled_bounds = pd.concat([modeled_bounds, remaining_bounds_w_models])
+
         # construction conformal corrections using Gaussian models
         # get means and standard deviations for for aggregates
         # and add correction (which is percentile of the Gaussian at the quantile we care about)

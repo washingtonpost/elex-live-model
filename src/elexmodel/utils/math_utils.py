@@ -1,7 +1,10 @@
+import logging
+
 import numpy as np
 from scipy.stats import bootstrap
-import logging
+
 LOG = logging.getLogger()
+
 
 def compute_inflate(x):
     """
@@ -31,12 +34,8 @@ def weighted_median(x, weights):
 
     # find index of largest x_i where weights are less than or equal 0.5
     weights_cumulative = np.cumsum(weights_sorted)
-    if weights_cumulative[0] > 0.5:
-        LOG.warning("Warning: smallest x-value is greater than or equal to half the weight")
-        return x_sorted[0]
-    else:
-        median_index = np.where(weights_cumulative <= 0.5)[0][-1]
 
+    median_index = np.where(weights_cumulative <= 0.5)[0][-1]
 
     # if there is one element where weights are exactly 0.5, median is average
     # otherwise weighted median is the next largest element
