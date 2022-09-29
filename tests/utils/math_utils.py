@@ -2,7 +2,7 @@ import logging
 
 import numpy as np
 import pytest
-
+import warnings
 from elexmodel.utils import math_utils
 
 LOG = logging.getLogger()
@@ -84,10 +84,25 @@ def test_weighted_median_error():
     x = np.array([0, 10, 20])
     w = np.array([60, 10, 30])
     w = w / np.sum(w)
-    weights_cumulative = np.cumsum(w)
-    if weights_cumulative[0] >= 0.5:
-        LOG.warning("Warning: smallest conformity value is greater than or equal to half the total weight")
     assert math_utils.weighted_median(x, w) == 0
+    with pytest.warns(UserWarning) as record:
+        warnings.warn("Warning: smallest x-value is greater than or equal to half the weight", RuntimeWarning)
+    
+    
+    x = np.array([10])
+    w = np.array([100])
+    w = w / np.sum(w)
+    assert math_utils.weighted_median(x, w) == 10
+        
+    x = np.array([10, 20, 30])
+    w = np.array([10,20,25])
+    w = w / np.sum(w)
+    assert math_utils.weighted_median(x, w) == 20
+      
+    x = np.array([10, 20])
+    w = np.array([50,50])
+    w = w / np.sum(w)
+    assert math_utils.weighted_median(x, w) == 15
 
 
 def test_compute_mae():

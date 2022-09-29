@@ -1,9 +1,9 @@
 import logging
-
+import warnings
 import numpy as np
 from scipy.stats import bootstrap
 
-LOG = logging.getLogger()
+#LOG = logging.getLogger()
 
 
 def compute_inflate(x):
@@ -34,13 +34,15 @@ def weighted_median(x, weights):
 
     # find index of largest x_i where weights are less than or equal 0.5
     weights_cumulative = np.cumsum(weights_sorted)
-    # conformity scores are lined up in size order, but each is assigned a
+
+    # x-values are lined up in size order, but each is assigned a
     # weight based on unit population. The list is split in half according to
     # cumulative weights. But if the first element in the list is already over
     # 50% of total weight, there will be nothing in one side of the list.In
     # that case return the first element
-    if weights_cumulative[0] >= 0.5:
-        LOG.warning("Warning: smallest conformity value is greater than or equal to half the weight")
+    if weights_cumulative[0] > 0.5:
+        warnings.warn("Warning: smallest x-value is greater than or equal to half the weight")
+       # LOG.warning("Warning: smallest x-value is greater than or equal to half the weight")
         return x_sorted[0]
     else:
         median_index = np.where(weights_cumulative <= 0.5)[0][-1]
