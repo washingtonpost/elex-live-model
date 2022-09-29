@@ -79,23 +79,19 @@ def test_weighted_median():
     median = math_utils.weighted_median(x, w)
     assert median == 4
 
-
-def test_weighted_median_error():
+    # unit unit is greater than 50% of the weights
     x = np.array([0, 10, 20])
     w = np.array([60, 10, 30])
     w = w / np.sum(w)
     assert math_utils.weighted_median(x, w) == 0
 
+    # testing one unit only
     x = np.array([10])
     w = np.array([100])
     w = w / np.sum(w)
     assert math_utils.weighted_median(x, w) == 10
 
-    x = np.array([10, 20, 30])
-    w = np.array([10, 20, 25])
-    w = w / np.sum(w)
-    assert math_utils.weighted_median(x, w) == 20
-
+    # testing two units at exactly 50%
     x = np.array([10, 20])
     w = np.array([50, 50])
     w = w / np.sum(w)
