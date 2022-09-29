@@ -122,7 +122,6 @@ def test_compute_frac_within_pi():
 def test_compute_mean_pi_length():
     random_number_generator = np.random.RandomState(42)
     lower = random_number_generator.normal(loc=5, scale=1, size=100)
-    length = random_number_generator.normal(loc=0, scale=1, size=100)
+    length = random_number_generator.lognormal(mean=1, sigma=5, size=100)
     upper = lower + length
-    assert math_utils.compute_mean_pi_length(lower, upper, 1) == np.mean(length).round(decimals=2)
-    assert math_utils.compute_mean_pi_length(lower, upper, length) == pytest.approx(1)
+    assert math_utils.compute_mean_pi_length(lower, upper, 0) == np.mean(length).round(decimals=2)
