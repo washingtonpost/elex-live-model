@@ -154,7 +154,7 @@ class GaussianElectionModel(BaseElectionModel):
             )
             .reset_index(drop=False)
         )
-
+        bounds.to_csv('initial_bounds.csv', index = False)
         # Combine each group in aggregate with appriopriate Gaussian model. This is complicated :(
 
         # example with three levels [postal_code, county_classification, county_fips]
@@ -193,7 +193,7 @@ class GaussianElectionModel(BaseElectionModel):
             # that is get indices (and then elements) of groups that DON'T
             # appear in both bounds (all groups) and modeled bounds (groups that already have a model)
             remaining_bounds_idx = (
-                bounds.merge(modeled_bounds, how="left", on=previous_aggregate, indicator=True)
+                bounds.merge(modeled_bounds, how="left", on=aggregate, indicator=True)#on=previous_aggregate, indicator=True)
                 .query("_merge != 'both'")
                 .index
             )
