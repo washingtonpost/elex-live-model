@@ -2,7 +2,6 @@ import logging
 
 import numpy as np
 import pytest
-import warnings
 from elexmodel.utils import math_utils
 
 LOG = logging.getLogger()
@@ -85,9 +84,6 @@ def test_weighted_median_error():
     w = np.array([60, 10, 30])
     w = w / np.sum(w)
     assert math_utils.weighted_median(x, w) == 0
-    with pytest.warns(UserWarning) as record:
-        warnings.warn("Warning: smallest x-value is greater than or equal to half the weight", RuntimeWarning)
-    
     
     x = np.array([10])
     w = np.array([100])

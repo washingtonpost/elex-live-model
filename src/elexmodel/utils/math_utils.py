@@ -1,9 +1,8 @@
 import logging
-import warnings
 import numpy as np
 from scipy.stats import bootstrap
 
-#LOG = logging.getLogger()
+LOG = logging.getLogger()
 
 
 def compute_inflate(x):
@@ -19,7 +18,6 @@ def sample_std(x, axis):
     """
     # ddof=1 to get unbiased sample estimate.
     return np.std(x, ddof=1, axis=-1)
-
 
 def weighted_median(x, weights):
     """
@@ -41,8 +39,7 @@ def weighted_median(x, weights):
     # 50% of total weight, there will be nothing in one side of the list.In
     # that case return the first element
     if weights_cumulative[0] > 0.5:
-        warnings.warn("Warning: smallest x-value is greater than or equal to half the weight")
-       # LOG.warning("Warning: smallest x-value is greater than or equal to half the weight")
+        LOG.warning("Warning: smallest x-value is greater than or equal to half the weight")
         return x_sorted[0]
     else:
         median_index = np.where(weights_cumulative <= 0.5)[0][-1]
