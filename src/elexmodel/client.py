@@ -434,7 +434,7 @@ class HistoricalModelClient(ModelClient):
         aggregates = [a for a in aggregates if a != "unit"]
         for estimand in estimands:
             results_unit = preprocessed_data[
-                set(aggregates + ["postal_code", "geographic_unit_fips", f"results_{estimand}"])
+                list(set(aggregates + ["postal_code", "geographic_unit_fips", f"results_{estimand}"]))
             ].rename(columns={f"results_{estimand}": f"raw_results_{estimand}"})
             evaluation = {}
             evaluation["unit_data"] = self.compute_evaluation(
