@@ -34,8 +34,10 @@ def weighted_median(x, weights):
 
     # find index of largest x_i where weights are less than or equal 0.5
     weights_cumulative = np.cumsum(weights_sorted)
-
-    median_index = np.where(weights_cumulative <= 0.5)[0][-1]
+    if weights_cumulative[0]> .5:
+        return x_sorted[0]
+    else:
+        median_index = np.where(weights_cumulative <= 0.5)[0][-1]
 
     # if there is one element where weights are exactly 0.5, median is average
     # otherwise weighted median is the next largest element

@@ -201,17 +201,18 @@ class GaussianElectionModel(BaseElectionModel):
             # that is get indices (and then elements) of groups that DON'T
             # appear in both bounds (all groups) and modeled bounds (groups that already have a model)
             # These are therefore the remaining bounds we need to match.
+
             remaining_bounds_idx = (
                 bounds.merge(
                     modeled_bounds, how="left", on=aggregate, indicator=True
-                )  # on=previous_aggregate, indicator=True)
+                ) 
                 .query("_merge != 'both'")
                 .index
             )
+
             remaining_bounds = bounds.iloc[remaining_bounds_idx].reset_index(drop=True)
             # First step is to assign to merge the remaining models onto the remaining bounds
             # In the case where aggregate == 1, next_aggregate is only an empty list and we
-            #
 
             # MERGE REMAINING BOUNDS AND REMAINING MODELS
             # Merge the remaining bounds onto the available models. Remaining bounds are the bounds without
