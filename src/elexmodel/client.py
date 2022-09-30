@@ -211,7 +211,9 @@ class ModelClient(object):
             minimum_reporting_units = model.get_minimum_reporting_units(alpha)
             if minimum_reporting_units > minimum_reporting_units_max:
                 minimum_reporting_units_max = minimum_reporting_units
-        # minimum_reporting_units_max += 1
+
+        if APP_ENV != "local" and save_results:
+            data.write_data(election_id, office)
 
         n_reporting_expected_units = reporting_units.shape[0]
         n_unexpected_units = unexpected_units.shape[0]
@@ -236,9 +238,6 @@ class ModelClient(object):
         results_handler = ModelResultsHandler(
             aggregates, prediction_intervals, reporting_units, nonreporting_units, unexpected_units
         )
-
-        if APP_ENV != "local" and save_results:
-            data.write_data(election_id, office)
 
         for estimand in estimands:
             unit_predictions = model.get_unit_predictions(reporting_units, nonreporting_units, estimand)
