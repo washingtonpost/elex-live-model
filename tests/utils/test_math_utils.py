@@ -1,11 +1,7 @@
-import logging
-
 import numpy as np
 import pytest
 
 from elexmodel.utils import math_utils
-
-LOG = logging.getLogger()
 
 
 def test_var_inflate():
