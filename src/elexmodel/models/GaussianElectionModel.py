@@ -203,11 +203,7 @@ class GaussianElectionModel(BaseElectionModel):
             # These are therefore the remaining bounds we need to match.
 
             remaining_bounds_idx = (
-                bounds.merge(
-                    modeled_bounds, how="left", on=aggregate, indicator=True
-                ) 
-                .query("_merge != 'both'")
-                .index
+                bounds.merge(modeled_bounds, how="left", on=aggregate, indicator=True).query("_merge != 'both'").index
             )
 
             remaining_bounds = bounds.iloc[remaining_bounds_idx].reset_index(drop=True)
