@@ -215,21 +215,15 @@ class GaussianElectionModel(BaseElectionModel):
             # a model and the available models are the models for next highest agg level.
             # In the case where there is no higher level of aggregation (i.e. we reach the end
             # of 'aggregate'), we want to use the model constructed from ALL combined reporting
-            # units. In this case, next_aggregate is an empty list, so we construct a one-time merge key.
+            # units. In this case, next_aggregate is an empty list, but remaining_models only has
+            # one element, so we can cross merge that element to all rows in remaining_bounds.
             # Note that the same model can be matched to multiple bounds at a more granular agg level!
-            merge_on = next_aggregate
             if len(next_aggregate) == 0:
-                merge_on = "merge_on"
-                cols_to_use = list(remaining_bounds.columns.difference(remaining_models.columns))
-                remaining_bounds["merge_on"] = 1
-                remaining_models["merge_on"] = 1
-                remaining_bounds_w_models = remaining_bounds[cols_to_use + [merge_on]].merge(
-                    remaining_models, how="inner", on=merge_on
-                )
-
+                assert remaining_models.shape[0] == 1
+                remaining_bounds_w_models = remaining_bounds.merge(remaining_models, how="cross")
             else:
 
-                remaining_bounds_w_models = remaining_bounds.merge(remaining_models, how="inner", on=merge_on)
+                remaining_bounds_w_models = remaining_bounds.merge(remaining_models, how="inner", on=next_aggregate)
 
             # APPEND NEWLY MODELED BOUNDS TO modeled_bounds
             modeled_bounds = pd.concat([modeled_bounds, remaining_bounds_w_models])
