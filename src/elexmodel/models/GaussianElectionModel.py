@@ -218,7 +218,6 @@ class GaussianElectionModel(BaseElectionModel):
             # one element, so we can cross merge that element to all rows in remaining_bounds.
             # Note that the same model can be matched to multiple bounds at a more granular agg level!
             if len(next_aggregate) == 0:
-                import pdb; pdb.set_trace()
                 assert remaining_models.shape[0] <= 1
                 remaining_bounds_w_models = remaining_bounds.merge(remaining_models, how="cross")
             else:
