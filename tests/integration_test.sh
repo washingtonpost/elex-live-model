@@ -28,12 +28,3 @@ elexmodel 2021-11-02_VA_G --estimands=dem --office_id=Y --geographic_unit_type=p
 
 echo "Running AZ 2021 Republican Senate primary precinct model"
 elexmodel 2020-08-04_AZ_R --estimands mcsally_61631 --office_id=S --geographic_unit_type=precinct --percent_reporting 20 --aggregates=postal_code
-
-echo "Running US 2016 Presidential election model with nonparametric model and two estimands and explicit aggregate"
-elexmodel 2016-11-08_USA_G --estimands=dem --estimands=gop --office_id=G --pi_method=nonparametric --geographic_unit_type=county --percent_reporting 50 --aggregates=postal_code
-
-echo "Running US 2016 Presidential election model with gaussian model and two estimands and explicit aggregate"
-elexmodel 2016-11-08_USA_G --estimands=dem --estimands=gop --office_id=G --pi_method=gaussian --geographic_unit_type=county --percent_reporting 50 --aggregates=postal_code
-
-echo "Running US 2016 Presidential election model with gaussian model and two estimands and two aggregates"
-elexmodel 2016-11-08_USA_G --estimands=dem --estimands=gop --office_id=G --pi_method=gaussian --geographic_unit_type=county --percent_reporting 50 --aggregates=postal_code --aggregates=county_classification
