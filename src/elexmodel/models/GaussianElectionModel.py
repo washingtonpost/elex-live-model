@@ -171,7 +171,9 @@ class GaussianElectionModel(BaseElectionModel):
         # for groups that did not have enough examples, we want to join the models trained on larger aggregations
         # (ie. postal_code instead of postal_code, county_classification)
         # i: index of level of aggregation we are now trying to match models to
-        import pdb; pdb.set_trace()
+        import pdb
+
+        pdb.set_trace()
         for i in range(1, len(aggregate) + 1):
             # In each loop iteration we get the remaining bounds (those that need to be matched),
             # the remaining models (those that are available to be matched) and merge the two.

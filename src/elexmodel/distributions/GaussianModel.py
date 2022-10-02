@@ -78,9 +78,10 @@ class GaussianModel:
         # pandas does not support grouping by an empty list
         # need to return true for all if we want to have everything in the same group
         to_aggregate = aggregate
-        drop_index=False
+        drop_index = False
         if not aggregate:
-            drop_index=True
+            drop_index = True
+
             def to_aggregate(x):
                 return True
 
