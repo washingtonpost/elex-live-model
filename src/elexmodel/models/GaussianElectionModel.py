@@ -42,7 +42,7 @@ class GaussianElectionModel(BaseElectionModel):
             alpha=alpha,
             beta=self.beta,
         )
-        
+
         # gaussian model for single unit prediction intervals
         quantile = (3 + alpha) / 4
         lower_correction = stats.norm.ppf(
@@ -123,7 +123,7 @@ class GaussianElectionModel(BaseElectionModel):
             beta=self.beta,
             top_level=True,
         )
-        
+
         # if there are no nonreporting units, we can return just the aggregated votes
         if nonreporting_units.shape[0] == 0:
             return aggregate_votes[f"results_{estimand}"], aggregate_votes[f"results_{estimand}"]
