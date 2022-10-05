@@ -31,7 +31,7 @@ setup(
         "Programming Language :: Python",
         "Programming Language :: Python :: 3.7",
     ],
-    description="A package for optimization solvers",
+    description="A package for the Washington Post's live election night model",
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/markdown",
     license="MIT",
