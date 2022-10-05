@@ -143,7 +143,7 @@ pre-commit run --all-files
 
 ### Release
 
-To release a new version:
+To release a new version manually: 
 - Decide what the next version will be per semantic versioning: `X.X.X`
 - Make a new branch from develop called `release/X.X.X`
 - Update the version in `setup.py`
@@ -152,11 +152,17 @@ To release a new version:
 - Once the PR is merged, tag main (or develop for a beta release) with the version's release number (`git tag X.X.X`) and push that tag to github (`git push --tags`)
 - Merge main into develop
 
-After this is done, we need to get the new release into jfrog:
-- Make sure `requirements-dev.txt` is installed
-- Run `python setup.py install bdist_wheel`
-- Check to make sure the correct version is installed in the `dist/` folder that should now exist at the base of the repo folder. If you've previously run these commands locally for an earlier version, you may need to delete the older files in `dist/` order to upload them correctly in the next step. You can just delete the entire `dist/` folder and run the above command again.
-- Run `twine upload dist/* --repository-url REPOSITORY_URL -u USERNAME -p PASSWORD`
+Then, we need to release this version to PyPi.This repository has a Github Action workflow that automatically builds and releases the latest version to TestPyPi and PyPi on pushes to `main`. However, to release to PyPi manually:
+- Generate a distribution archive:
+  - Make sure `requirements-dev.txt` is installed
+  - Run `python3 -m pip install --upgrade build` to install `build`
+  - Run `python3 -m build`. This should generate two files in the `dist/` directory.
+  - Check to make sure the correct version is installed in the `dist/` folder that should now exist at the base of the repo folder. If you've previously run these commands locally for an earlier version, you may need to delete the older files in `dist/` order to upload them correctly in the next step. You can just delete the entire `dist/` folder and run the above command again.
+- Upload the distribution archive:`
+  - Run `python3 -m pip install --upgrade twine`
+  - Upload to TestPyPi with `python3 -m twine upload --repository testpypi dist/*`
+  - Upload to PyPi `python3 -m twine upload dist/*`
+
 
 ## Further Reading
 
