@@ -6,12 +6,12 @@ The model needs two user-generated inputs before election night: [data at the un
 
 - create a `config` and a `data` directory at the root of the model repo
 - put the config json in the `config` directory. The json’s name should be the election id (e.g. `config/2016-11-08_USA_G.json`).
-- put the preprocessed data in the `data` directory. The path of the preprocessed data should be `data/{election_id}/{office_id}/data_{geographic_unit_type}.csv` (e.g. `data/2016-11-08_SA_G/P/data_county.json`). The format for `election_id``,` `office_i``d, and` `geographic_unit_type` are explained in the README.
+- put the preprocessed data in the `data` directory. The path of the preprocessed data should be `data/{election_id}/{office_id}/data_{geographic_unit_type}.csv` (e.g. `data/2016-11-08_SA_G/P/data_county.json`). The format for `election_id`, `office_id`, and `geographic_unit_type` are explained in the main README.
 
  
 ### Unit-Level Data
  
-The model can handle any set of geographic units, but is currently operationalized to work at the county or precinct level (if you’d like to use a different level, please reach out to the elections engineering team at elections@washpost.com for directions on what to change in the code). Unit-level data consists of **demographic data** and **baseline results** from a prior election. Sample data is in `t``ests/fixtures/data`. 
+The model can handle any set of geographic units, but is currently operationalized to work at the county or precinct level (if you’d like to use a different level, please reach out to the elections engineering team at elections@washpost.com for directions on what to change in the code). Unit-level data consists of **demographic data** and **baseline results** from a prior election. Sample data is in `tests/fixtures/data`.
  
 You can pick which demographic information — or covariates — are relevant for your case (age, income, ethnicity, education etc.) We typically get this data from the 5-year ACS using its [Census API](https://www.census.gov/data/developers/data-sets/acs-5year.html) when running the data on the county level, or the L2 national voter file when running the model on precincts. If the only data fields you need are included in the decennial census you can call from [its API](https://www.census.gov/data/developers/data-sets/decennial-census.html) instead. (It is also possible to run the mode without any covariates at all. This is equivalent to applying uniform swing on non-reporting units: the predicted change from the baseline in each *non-reporting* unit would be the median change over the *reporting* units in this case).
  
