@@ -17,6 +17,8 @@ We can run the model with a CLI or with Python.
 
 We can use the model to generate current estimates or for a historical evaluation. Historical evaluation means running the "current reporting" subunits with data from a previous election, and then calculating the error that the current set of reporting subunits would have given us. This allows to test how representative the currently reporting subunits are.
 
+**See more information on how to pass data to the model in the [data README](https://github.com/washingtonpost/elex-live-model/blob/develop/README-data.md).**
+
 ### CLI
 
 The CLI is for local development and testing purposes only. We cannot run a live election through the CLI because it pulls vote counts from data files located either in S3 or locally. It does not retrieve current data from the Dynamo database of election results.
