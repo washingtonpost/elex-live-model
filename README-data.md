@@ -2,7 +2,7 @@
 
 ## Overview
  
-The model needs two user-generated inputs before election night: [data at the unit level](#unit-level-data) and a config file, each of which are described below. Sample model inputs can be found in `[tests/fixtures/](https://github.com/washingtonpost/elex-live-model/tree/develop/tests/fixtures)`. Your column headers should match how they appear in our sample data, except when specifying your demographic fields and candidate names (more below). The model is set up to import data from S3, but you can also use locally stored files with these steps:
+The model needs two user-generated inputs before election night: [data at the unit level](#unit-level-data) and a [config file](#config-files). Sample model inputs can be found in `[tests/fixtures/](https://github.com/washingtonpost/elex-live-model/tree/develop/tests/fixtures)`. Your column headers should match how they appear in our sample data, except when specifying your demographic fields and candidate names (more below). The model is set up to import data from S3, but you can also use locally stored files with these steps:
 
 - create a `config` and a `data` directory at the root of the model repo
 - put the config json in the `config` directory. The json’s name should be the election id (e.g. `config/2016-11-08_USA_G.json`).
