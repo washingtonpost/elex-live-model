@@ -35,7 +35,7 @@ Use the sample configs in `tests/fixtures/configs`.
 | `features`             | demographic covariates, must exactly match the column headers in your data for your demographic fields                                               | list  |
 | `aggregates`           | unit that the model should aggregate to, must include `unit` and `postal_code`, can also include `county_classification`  | list | 
 | `fixed_effects`        | potential fixed effects (discrete features that the model can use). can be `county_classification` or `county_fips`, though `county_fips` makes less sense when `geographic_unit_type` is `county` since every row would have a different fixed effect. | list |
-| `baseline_pointer`     | map of candidate (or parties) to whatever candidate (or party) from the baseline election that has teh strongest relationship over subunits | dictionary
+| `baseline_pointer`     | map of candidate (or parties) to whatever candidate (or party) from the baseline election that has the strongest relationship over subunits | dictionary
 
 
  
