@@ -13,7 +13,7 @@ with open(os.path.join(THIS_FILE_DIR, "README.md"), encoding="utf-8") as f:
     LONG_DESCRIPTION = f.read()
 
 # The full version, including alpha/beta/rc tags
-RELEASE = "1.0.5"
+RELEASE = "1.0.6"
 # The short X.Y version
 VERSION = ".".join(RELEASE.split(".")[:2])
 
