@@ -13,7 +13,7 @@ with open(os.path.join(THIS_FILE_DIR, "README.md"), encoding="utf-8") as f:
     LONG_DESCRIPTION = f.read()
 
 # The full version, including alpha/beta/rc tags
-RELEASE = "1.0.5"
+RELEASE = "1.0.6"
 # The short X.Y version
 VERSION = ".".join(RELEASE.split(".")[:2])
 
@@ -31,7 +31,7 @@ setup(
         "Programming Language :: Python",
         "Programming Language :: Python :: 3.7",
     ],
-    description="A package for optimization solvers",
+    description="A package for the Washington Post's live election night model",
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/markdown",
     license="MIT",

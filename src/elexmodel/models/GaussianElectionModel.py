@@ -96,8 +96,13 @@ class GaussianElectionModel(BaseElectionModel):
         Get aggregate prediction intervals. Adjust aggregate prediction intervals based on Gaussian models
         that are fit to conformalization data per group.
         """
+
         # get reporting votes by aggregate
         aggregate_votes = self._get_reporting_aggregate_votes(reporting_units, unexpected_units, aggregate, estimand)
+
+        # get non reporting votes by aggregate (votes cast in units that haven't met reporting threshold
+        # yet, but still have returns)
+        aggregate_nonreporting_votes = self._get_nonreporting_aggregate_votes(nonreporting_units, aggregate)
 
         # get last election results by aggregate (for un-residualizing later)
         last_election = (
@@ -155,45 +160,74 @@ class GaussianElectionModel(BaseElectionModel):
         # example with three levels [postal_code, county_classification, county_fips]
         # step 1: find all rows in g_model with NA in the most granular level (e.g. county_fips)
         # step 2: find all rows in bounds that do not have a match with the most granular level model (e.g. county_fips)
-        # step 3: match unmatched bounds (from step 2) to rows identified in step 1
+        # step 3: match unmatched bounds (from step 2) to available models one agg level above (identified in step 1)
         # step 4: go back to step one, but now for [postal_code, county_classification]
+        # IMPORTANT NOTE: the model is not currently using more than two levels in this function.
+        # While the model AS A WHOLE can have any number of aggregation levels, this function at maximum
+        # takes in a list of two (the current agg level + 'postal_code') at a time.
 
         # first join gaussian model based on *all* aggregates (that is groups with enough units)
         modeled_bounds = bounds.merge(gaussian_model, how="inner", on=aggregate)
 
         # for groups that did not have enough examples, we want to join the models trained on larger aggregations
         # (ie. postal_code instead of postal_code, county_classification)
-        # i: index of level of aggregation we are now trying to match models to
-        for i in range(1, len(aggregate)):
+        # In loop below, i: index of level of aggregation we are now trying to match models to
+        # Note that i is not attached to the aggregation level in the whole MODEL we are currently
+        # working on. For a given aggregation level, i is looping over the list that includes that agg level
+        # AND higher agg levels so gaussians can be fit.
+        for i in range(1, len(aggregate) + 1):
+            # In each loop iteration we get the remaining bounds (those that need to be matched),
+            # the remaining models (those that are available to be matched) and merge the two.
+            # modeled_bounds is then appended with any bounds that have been newly matched.
+
             # last_i_aggregate is level of aggregation we are now trying to match (ie. county_fips)
             last_i_aggregate = aggregate[len(aggregate) - i :]  # noqa: E203
-            # remaining models mean models for groups that have not been matched yet
-            # we get models where level of aggregation we are trying to match is null
-            # (ie. postal_code model if last_i_aggregate is county_fips)
+
+            # GET REMAINING MODELS
+            # We are interested in models at the next highest aggregation level
+            # after the level in this loop interation. Therefore we don't care about
+            # models in the gaussian df that are the current agg level.
+            # (ie. we want postal_code models if last_i_aggregate is county_fips)
             remaining_models_idx = pd.isnull(gaussian_model[last_i_aggregate]).all(axis=1)
             remaining_models = gaussian_model[remaining_models_idx].reset_index(drop=True)
+
             # since remaining_models[last_i_aggregate] is null, we drop it
             remaining_models.drop(columns=last_i_aggregate, inplace=True)
+
             # the aggregation level below (ie. full aggregation)
             previous_aggregate = aggregate[: len(aggregate) - i + 1]
             # the aggregation level above (ie. postal_code)
             next_aggregate = previous_aggregate[:-1]
 
-            # get bounds of groups that don't have a model yet
+            # GET REMAINING BOUNDS
+            # Get bounds of groups that don't have a model yet
             # that is get indices (and then elements) of groups that DON'T
             # appear in both bounds (all groups) and modeled bounds (groups that already have a model)
+            # These are therefore the remaining bounds we need to match.
             remaining_bounds_idx = (
-                bounds.merge(modeled_bounds, how="left", on=previous_aggregate, indicator=True)
-                .query("_merge != 'both'")
-                .index
+                bounds.merge(modeled_bounds, how="left", on=aggregate, indicator=True).query("_merge != 'both'").index
             )
-            remaining_bounds = bounds.iloc[remaining_bounds_idx].reset_index(drop=True)
 
-            # combine bounds for groups that have already been matched yet and then haven't
-            # been matched yet, but are matched now (enough units on this level of aggregation)
-            modeled_bounds = pd.concat(
-                [modeled_bounds, remaining_bounds.merge(remaining_models, how="inner", on=next_aggregate)]
-            )
+            remaining_bounds = bounds.iloc[remaining_bounds_idx].reset_index(drop=True)
+            # First step is to assign to merge the remaining models onto the remaining bounds
+            # In the case where aggregate == 1, next_aggregate is only an empty list and we
+
+            # MERGE REMAINING BOUNDS AND REMAINING MODELS
+            # Merge the remaining bounds onto the available models. Remaining bounds are the bounds without
+            # a model and the available models are the models for next highest agg level.
+            # In the case where there is no higher level of aggregation (i.e. we reach the end
+            # of 'aggregate'), we want to use the model constructed from ALL combined reporting
+            # units. In this case, next_aggregate is an empty list, but remaining_models only has
+            # one element, so we can cross merge that element to all rows in remaining_bounds.
+            # Note that the same model can be matched to multiple bounds at a more granular agg level!
+            if len(next_aggregate) == 0:
+                assert remaining_models.shape[0] <= 1
+                remaining_bounds_w_models = remaining_bounds.merge(remaining_models, how="cross")
+            else:
+
+                remaining_bounds_w_models = remaining_bounds.merge(remaining_models, how="inner", on=next_aggregate)
+            # APPEND NEWLY MODELED BOUNDS TO modeled_bounds
+            modeled_bounds = pd.concat([modeled_bounds, remaining_bounds_w_models])
 
         # construction conformal corrections using Gaussian models
         # get means and standard deviations for for aggregates
@@ -216,12 +250,19 @@ class GaussianElectionModel(BaseElectionModel):
         ]
 
         # un-residualize bounds by adding last election results
-        # elementwise maximum with zero to avoid adding negative vote count in nonreporting units
+        # elementwise maximum with votes from nonreporting units to avoid adding negative vote count in nonreporting units
+        # Note, gaussian interval aggregation can result in  a lower bound that is less than the votes
+        # already returned in non-reporting units. If that is the case we correct by assigning the number of votes
+        # already returned in nonreporting units.
         aggregate_prediction_intervals = (
             last_election.merge(modeled_bounds, how="inner", on=aggregate)
             .assign(
-                predicted_lower=lambda x: np.maximum(x[f"last_election_results_{estimand}"] + x.lb, 0),
-                predicted_upper=lambda x: np.maximum(x[f"last_election_results_{estimand}"] + x.ub, 0),
+                predicted_lower=lambda x: np.maximum(
+                    x[f"last_election_results_{estimand}"] + x.lb, aggregate_nonreporting_votes[f"results_{estimand}"]
+                ),
+                predicted_upper=lambda x: np.maximum(
+                    x[f"last_election_results_{estimand}"] + x.ub, aggregate_nonreporting_votes[f"results_{estimand}"]
+                ),
             )
             .drop(columns=f"last_election_results_{estimand}")
         )

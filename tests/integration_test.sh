@@ -26,5 +26,5 @@ elexmodel 2021-11-02_VA_G --estimands=dem --office_id=G --geographic_unit_type=p
 echo "Running VA Assembly 2017 precinct-district as historical model with district aggregates"
 elexmodel 2021-11-02_VA_G --estimands=dem --office_id=Y --geographic_unit_type=precinct-district --percent_reporting 60 --historical --aggregates=district
 
-echo "Running AZ 2021 Republican Senate priimary precinct model"
+echo "Running AZ 2021 Republican Senate primary precinct model"
 elexmodel 2020-08-04_AZ_R --estimands mcsally_61631 --office_id=S --geographic_unit_type=precinct --percent_reporting 20 --aggregates=postal_code

@@ -78,7 +78,9 @@ class GaussianModel:
         # pandas does not support grouping by an empty list
         # need to return true for all if we want to have everything in the same group
         to_aggregate = aggregate
+        drop_index = False
         if not aggregate:
+            drop_index = True
 
             def to_aggregate(x):
                 return True
@@ -105,7 +107,7 @@ class GaussianModel:
                     }
                 )
             )
-            .reset_index(drop=False)
+            .reset_index(drop=drop_index)
         )
         return gaussian_fit
 
@@ -189,7 +191,7 @@ class GaussianModel:
                 )
 
                 # combine large and small models
-                x = pd.concat([gaussian_model_small_groups, gaussian_model_large_groups])
+                x = pd.concat([gaussian_model_small_groups, gaussian_model_large_groups]).reset_index(drop=True)
             else:
                 # when the group is large enough we can compute the Gaussian model for conformalization
                 x = self._fit(conformalization_data, estimand, aggregate, alpha, beta)
