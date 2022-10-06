@@ -1,5 +1,15 @@
 # Changelog
 
+### 1.0.6 (10/05/2022)
+- fix: Gaussian model bug in lower bound of confidence intervals [#8](https://github.com/washingtonpost/elex-live-model/pull/8)
+- fix: save results even with not enough subunits [#13](https://github.com/washingtonpost/elex-live-model/pull/13)
+- feat: write an error message for conformity values [#11](https://github.com/washingtonpost/elex-live-model/pull/11)
+- feat: automate releases [#10](https://github.com/washingtonpost/elex-live-model/pull/10)
+- chore: wrap dataframe in a list to avoid deprecation [#12](https://github.com/washingtonpost/elex-live-model/pull/12)
+- fix: gaussian merge [#9](https://github.com/washingtonpost/elex-live-model/pull/9)
+- fix: release workflow [#14](https://github.com/washingtonpost/elex-live-model/pull/14)
+- feat: add data README [#15](https://github.com/washingtonpost/elex-live-model/pull/15)
+
 ### 1.0.5 (09/20/2022)
 - fix: Update README link to 2020 model [#2](https://github.com/washingtonpost/elex-live-model/pull/2)
 - chore: set up repository [#4](https://github.com/washingtonpost/elex-live-model/pull/4)
