@@ -1,7 +1,7 @@
 import logging
+import math
 
 import numpy as np
-import math
 from scipy.stats import bootstrap
 
 LOG = logging.getLogger()
