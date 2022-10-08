@@ -1,13 +1,13 @@
+import logging
 import math
 import warnings
 from collections import namedtuple
 
-warnings.filterwarnings("error", category=UserWarning, module="cvxpy")
-import logging
-
 import cvxpy
 import numpy as np
 from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
+
+warnings.filterwarnings("error", category=UserWarning, module="cvxpy")
 
 PredictionIntervals = namedtuple("PredictionIntervals", ["lower", "upper", "conformalization"], defaults=(None,) * 3)
 
@@ -47,8 +47,8 @@ class BaseElectionModel(object):
         # in that case, we catch the error and warning and re-run with normalize_weights false
         try:
             model.fit(X, y, tau_value=tau, weights=weights, normalize_weights=normalize_weights)
-        except (UserWarning, cvxpy.error.SolverError) as e:
-            LOG.warning("Warning: solution was inaccurate or solver broke. Re-running with normalize_weights=False")
+        except (UserWarning, cvxpy.error.SolverError):
+            LOG.warning("Warning: solution was inaccurate or solver broke. Re-running with normalize_weights=False.")
             model.fit(X, y, tau_value=tau, weights=weights, normalize_weights=False)
 
         # generate new coefficient matrix with zeroes for all coefficents
