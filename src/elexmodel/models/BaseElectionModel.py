@@ -1,10 +1,17 @@
+import logging
 import math
+import warnings
 from collections import namedtuple
 
+import cvxpy
 import numpy as np
 from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
 
+warnings.filterwarnings("error", category=UserWarning, module="cvxpy")
+
 PredictionIntervals = namedtuple("PredictionIntervals", ["lower", "upper", "conformalization"], defaults=(None,) * 3)
+
+LOG = logging.getLogger(__name__)
 
 
 class BaseElectionModel(object):
@@ -33,7 +40,16 @@ class BaseElectionModel(object):
         X = df_X.loc[:, columns_to_keep].values
         y = df_y.values
         weights = weights.values
-        model.fit(X, y, tau_value=tau, weights=weights, normalize_weights=normalize_weights)
+
+        # normalizing weights speed up solution by a lot. However, if the relative size
+        # of the smallest weight is too close to zero, it can lead to numerical instability
+        # where the solver either throws a warning for inaccurate solution or breaks entirely
+        # in that case, we catch the error and warning and re-run with normalize_weights false
+        try:
+            model.fit(X, y, tau_value=tau, weights=weights, normalize_weights=normalize_weights)
+        except (UserWarning, cvxpy.error.SolverError):
+            LOG.warning("Warning: solution was inaccurate or solver broke. Re-running with normalize_weights=False.")
+            model.fit(X, y, tau_value=tau, weights=weights, normalize_weights=False)
 
         # generate new coefficient matrix with zeroes for all coefficents
         coefficients = np.zeros((df_X.shape[1],))
