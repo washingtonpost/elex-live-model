@@ -1,5 +1,9 @@
 # Changelog
 
+### 1.0.7 (10/28/2022)
+- fix: fix mape when uncontested historical baseline [#18](https://github.com/washingtonpost/elex-live-model/pull/18)
+- fix: small relative weights for ecos solver [#19](https://github.com/washingtonpost/elex-live-model/pull/18)
+
 ### 1.0.6 (10/05/2022)
 - fix: Gaussian model bug in lower bound of confidence intervals [#8](https://github.com/washingtonpost/elex-live-model/pull/8)
 - fix: save results even with not enough subunits [#13](https://github.com/washingtonpost/elex-live-model/pull/13)
