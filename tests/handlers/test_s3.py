@@ -22,7 +22,7 @@ def test_s3_put(test_s3_util):
 def test_s3_get_file_path_preprocessed(test_s3_util):
     file_type = "preprocessed"
     path_info = {"election_id": "2017-11-07_VA_G", "office": "G", "geographic_unit_type": "county"}
-    assert test_s3_util.get_file_path(file_type, path_info) == f"{S3_FILE_PATH}/2017-11-07_VA_G/data/G/data_county.csv"
+    assert test_s3_util.get_file_path(file_type, path_info) == f"{S3_FILE_PATH}/2017-11-07_VA_G/data/G_county/data_county.csv"
 
 
 def test_s3_get_file_path_config(test_s3_util):

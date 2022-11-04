@@ -1,6 +1,6 @@
 {
     "2018-03-06_TX_R": [{
-        "office": "G",
+        "office": "G_county",
         "states": ["TX"],
         "geographic_unit_types": ["county"],
         "baseline_results_year": 2014,

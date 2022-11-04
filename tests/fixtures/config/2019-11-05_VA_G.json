@@ -1,8 +1,8 @@
 {
     "2019-11-05_VA_G": [{
-        "office": "Y",
+        "office": "Y_precinct-district",
         "states": ["VA"],
-        "geographic_unit_types": ["precinct-district", "county-district"],
+        "geographic_unit_types": ["precinct-district"],
         "baseline_results_year": 2017,
         "historical_election": ["2017-11-07_VA_G"],
         "features": ["age_le_30", "age_geq_30_le_45", "age_geq_45_le_65", 

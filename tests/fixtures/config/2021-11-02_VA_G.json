@@ -1,8 +1,8 @@
 {
     "2021-11-02_VA_G": [{
-        "office": "G",
+        "office": "G_precinct",
         "states": ["VA"],
-        "geographic_unit_types": ["county", "precinct"],
+        "geographic_unit_types": ["precinct"],
         "baseline_results_year": 2017,
         "historical_election": ["2017-11-07_VA_G"],
         "features": ["age_le_30", "age_geq_30_le_45", "age_geq_45_le_65", 
@@ -14,9 +14,9 @@
         "aggregates": ["unit", "postal_code", "county_classification", "county_fips"],
         "fixed_effect": ["postal_code",  "county_fips", "county_classification"]
     }, {
-        "office": "Y",
+        "office": "Y_precinct-district",
         "states": ["VA"],
-        "geographic_unit_types": ["county-district", "precinct-district"],
+        "geographic_unit_types": ["precinct-district"],
         "baseline_results_year": 2019,
         "historical_election": ["2017-11-07_VA_G", "2019-11-05_VA_G"],
         "features": ["age_le_30", "age_geq_30_le_45", "age_geq_45_le_65", 

@@ -1,6 +1,6 @@
 {
     "2020-08-04_AZ_R": [{
-        "office": "S",
+        "office": "S_precinct",
         "states": ["AZ"],
         "geographic_unit_types": ["precinct"],
         "baseline_results_year": 2018,
