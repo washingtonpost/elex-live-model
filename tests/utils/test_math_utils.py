@@ -1,4 +1,7 @@
+import math
+
 import numpy as np
+import pandas as pd
 import pytest
 
 from elexmodel.utils import math_utils
@@ -101,11 +104,23 @@ def test_compute_mae():
     assert math_utils.compute_error(y_true, y_pred, type_="mae") == pytest.approx(180)
 
 
+@pytest.mark.filterwarnings("ignore:divide by zero")
 def test_compute_mape():
     random_number_generator = np.random.RandomState(42)
     y_true = random_number_generator.exponential(size=100)
     y_pred = 1.8 * y_true
     assert math_utils.compute_error(y_true, y_pred, type_="mape") == pytest.approx(0.8)
+
+    # if multiple true values are zero
+    y_true = pd.Series(np.asarray([0, 1, 4, 0, 5, 3]))
+    y_pred = pd.Series(np.asarray([10, 4, 8, 20, 5, 8]))
+    mape = round((abs(1 - 4) / 1 + abs(4 - 8) / 4 + abs(5 - 5) / 5 + abs(3 - 8) / 3) / 4, 2)
+    assert math_utils.compute_error(y_true, y_pred, type_="mape") == pytest.approx(mape)
+
+    # if all true values are zero
+    y_true = pd.Series(np.asarray([0, 0, 0, 0, 0, 0]))  # cast as series to generate same error exactly
+    y_pred = pd.Series(np.asarray([10, 4, 8, 20, 5, 8]))
+    assert math.isnan(math_utils.compute_error(y_true, y_pred, type_="mape"))
 
 
 def test_compute_frac_within_pi():

@@ -1,4 +1,5 @@
 import logging
+import math
 
 import numpy as np
 from scipy.stats import bootstrap
@@ -74,7 +75,11 @@ def compute_error(true, pred, type_="mae"):
         return np.mean(np.abs(true - pred)).round(decimals=0)
     elif type_ == "mape":
         mask = true != 0
-        return np.mean((np.abs(true - pred) / true)[mask]).round(decimals=2)
+        mape = np.mean((np.abs(true - pred) / true)[mask])
+        # if all true values are zero, then race was uncontested and mape doesn't make sense to compute
+        if math.isnan(mape):
+            return mape
+        return mape.round(decimals=2)
 
 
 def compute_frac_within_pi(lower, upper, results):
