@@ -64,7 +64,7 @@ class PreprocessedDataHandler(object):
 
     def get_preprocessed_data_path(self):
         directory_path = get_directory_path()
-        path = f"{directory_path}/data/{self.election_id}/{self.office}/data_{self.geographic_unit_type}.csv"
+        path = f"{directory_path}/data/{self.election_id}/{self.office}_{self.geographic_unit_type}/data_{self.geographic_unit_type}.csv"
         return path
 
     def select_rows_in_states(self, data, states_with_election):

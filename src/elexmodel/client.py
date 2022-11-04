@@ -50,6 +50,8 @@ class ModelClient(object):
         robust,
         handle_unreporting,
     ):
+        # Account for config change
+        office = f"{office}_{geographic_unit_type}"
         offices = config_handler.get_offices()
         if office not in offices:
             raise ValueError(f"Office '{office}' is not valid. Please check config.")
@@ -150,8 +152,8 @@ class ModelClient(object):
             robust,
             handle_unreporting,
         )
-        states_with_election = config_handler.get_states(office)
-        estimand_baselines = config_handler.get_estimand_baselines(office, estimands)
+        states_with_election = config_handler.get_states(f"{office}_{geographic_unit_type}")
+        estimand_baselines = config_handler.get_estimand_baselines(f"{office}_{geographic_unit_type}", estimands)
 
         LOG.info("Getting preprocessed data: %s", election_id)
         preprocessed_data_handler = PreprocessedDataHandler(
