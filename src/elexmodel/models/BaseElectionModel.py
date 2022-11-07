@@ -272,7 +272,7 @@ class BaseElectionModel(object):
         from sklearn.preprocessing import StandardScaler
         from sklearn.svm import SVC
 
-        features = list(set(features) & set(training_miscoverage.columns))
+        features = list(set(features) & set(training_observed.columns))
 
         clf_1 = make_pipeline(StandardScaler(), SVC(gamma = 'auto', probability=True, random_state=0))
         clf_2 = make_pipeline(StandardScaler(), SVC(gamma = 'auto', probability=True, random_state=0))
