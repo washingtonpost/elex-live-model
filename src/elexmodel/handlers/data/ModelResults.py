@@ -31,6 +31,9 @@ class ModelResultsHandler(object):
         self.nonreporting_units = nonreporting_units
         self.unexpected_units = unexpected_units
 
+        self.coverage_estimates = {}
+        self.feature_importances = {}
+
     def add_unit_predictions(self, estimand, unit_predictions):
         """
         unit_predictions: data frame with unit predictions, as produced by model.get_unit_predictions
@@ -39,6 +42,22 @@ class ModelResultsHandler(object):
         self.reporting_units[f"pred_{estimand}"] = self.reporting_units[f"results_{estimand}"]
         self.nonreporting_units[f"pred_{estimand}"] = unit_predictions
         self.unexpected_units[f"pred_{estimand}"] = self.unexpected_units[f"results_{estimand}"]
+
+    def add_coverage_estimates(self, estimand, coverage_estimates):
+        """
+        coverage_estimates: (float, float) with estimated future coverage and std. dev. of estimate
+        """
+        for alpha in self.prediction_interval_alphas:
+            self.coverage_estimates[f"{alpha}_{estimand}"] = coverage_estimates[alpha]
+
+    def add_feature_importances(self, estimand, feature_importances):
+        """
+        feature_importances: feature importances for this estimand
+        """
+        for alpha in self.prediction_interval_alphas:
+            self.feature_importances[f"{alpha}_{estimand}"] = feature_importances[alpha]
+
+        self.feature_importances[f"0.5_{estimand}"] = feature_importances[0]
 
     def add_unit_intervals(self, estimand, prediction_intervals_unit):
         """
@@ -101,6 +120,9 @@ class ModelResultsHandler(object):
             self.final_results["unit_data"] = reduce(
                 lambda x, y: pd.merge(x, y, how="inner", on=merge_on), self.unit_data.values()
             )
+
+        self.final_results["coverage_estimates"] = self.coverage_estimates
+        self.final_results["feature_importances"] = self.feature_importances
 
     def write_data(self, election_id, office, geographic_unit_type):
         """

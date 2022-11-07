@@ -4,6 +4,7 @@ import warnings
 from collections import namedtuple
 
 import cvxpy
+import pandas as pd
 import numpy as np
 from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
 
@@ -183,6 +184,113 @@ class BaseElectionModel(object):
         )
 
         return aggregate_data
+
+    def compute_feature_importances(self, train_data, alpha, estimand, features):
+        upper_bound = (1 + alpha) / 2
+        lower_bound = (1 - alpha) / 2
+
+        train_data_features = train_data[self.features]
+        train_data_residuals = train_data[f"residuals_{estimand}"]
+        train_data_weights = train_data[f"total_voters_{estimand}"]
+
+        lower_qr = QuantileRegressionSolver(solver="ECOS")
+        self.fit_model(lower_qr, train_data_features, train_data_residuals, lower_bound, train_data_weights, True)
+
+        upper_qr = QuantileRegressionSolver(solver="ECOS")
+        self.fit_model(upper_qr, train_data_features, train_data_residuals, upper_bound, train_data_weights, True)
+
+        feature_importances = {}
+        for feature in features:
+            sorted_df = train_data.sort_values(feature)
+            sorted_residuals = sorted_df[f"residuals_{estimand}"].values
+            sorted_features = sorted_df[self.features]
+            
+            n = len(sorted_residuals)
+            stat_lower = (lower_bound - (sorted_residuals - lower_qr.predict(sorted_features) < 0)).cumsum() / n
+            stat_upper = (upper_bound - (sorted_residuals - upper_qr.predict(sorted_features) < 0)).cumsum() / n
+
+            stat_lower = np.mean((stat_lower**2).values[:-1])
+            stat_upper = np.mean((stat_upper**2).values[:-1])
+
+            feature_importances[feature] = np.mean([stat_lower, stat_upper])
+        
+        return feature_importances
+
+    def estimate_unit_nonreporting_coverage(self, reporting_units, nonreporting_units, alpha, estimand, features, K=2):
+        """
+        Estimate marginal coverage of prediction intervals by estimating covariate shift between
+        reporting_units and nonreporting_units. 
+        Returns estimate of marginal coverage on nonreporting_units + an 80% CI on that estimate.
+        """
+        prediction_intervals = self.get_unit_prediction_intervals(
+            reporting_units, nonreporting_units, alpha, estimand
+        )
+
+        # cross-fit estimate of marginal coverage on nonreporting_units
+        # not quite correct because the conformalization threshold is estimated
+        # using all the data (but I suspect this is not a big deal)
+
+        conformalization_folds = np.array_split(prediction_intervals.conformalization, K)
+        nonreporting_folds = np.array_split(nonreporting_units.sample(frac=1, random_state=self.seed), K)
+
+        estimates = []
+        variances = []
+        for i in range(K):
+            training_observed = pd.concat(conformalization_folds[:i] + conformalization_folds[(i + 1):])
+            training_unobserved = pd.concat(nonreporting_folds[:i] + nonreporting_folds[(i + 1):])
+
+
+            est, var = self._estimate_miscoverage_one_step(training_observed, training_unobserved,
+                conformalization_folds[i], nonreporting_folds[i], estimand, features
+            )
+            estimates.append(est * (conformalization_folds[i].shape[0] + nonreporting_folds[i].shape[0]))
+            variances.append(var * (conformalization_folds[i].shape[0] + nonreporting_folds[i].shape[0]))
+        
+        n = prediction_intervals.conformalization.shape[0] + nonreporting_units.shape[0]
+        coverage_est = 1 - np.sum(estimates) / n
+        std_dev = np.sqrt(np.sum(variances) / n) / np.sqrt(n)
+        return np.clip(coverage_est, 0, 1), std_dev
+    
+    def _estimate_miscoverage_one_step(
+        self, 
+        training_observed, 
+        training_unobserved, 
+        test_observed, 
+        test_unobserved,
+        estimand,
+        features
+    ):
+        """
+        Implements Algorithm 1 of Qiu et al. (2021) - aka estimator in PredSet-1Step
+        """
+        training_miscoverage = np.maximum(training_observed.lower_bounds_c, training_observed.upper_bounds_c) > 0
+        test_miscoverage = np.maximum(test_observed.lower_bounds_c, test_observed.upper_bounds_c) > 0
+
+        if np.sum(training_miscoverage) == 0:
+            return 0, 0
+        from sklearn.pipeline import make_pipeline
+        from sklearn.preprocessing import StandardScaler
+        from sklearn.svm import SVC
+
+        features = list(set(features) & set(training_miscoverage.columns))
+
+        clf_1 = make_pipeline(StandardScaler(), SVC(gamma = 'auto', probability=True, random_state=0))
+        clf_2 = make_pipeline(StandardScaler(), SVC(gamma = 'auto', probability=True, random_state=0))
+        miscoverage_model = clf_1.fit(X = training_observed[features], y = training_miscoverage)
+        propensity_model = clf_2.fit(X = pd.concat([training_observed[features], training_unobserved[features]]),
+            y = np.concatenate([np.ones(training_observed.shape[0]), np.zeros(training_unobserved.shape[0])]))
+        gamma = training_observed.shape[0] / (training_observed.shape[0] + training_unobserved.shape[0])
+
+        # term 1
+        miscoverage_pred_u = miscoverage_model.predict_proba(test_unobserved[features])[:,1]
+
+        # term 2
+        miscoverage_pred_o = miscoverage_model.predict_proba(test_observed[features])[:,1]
+        propensity_pred_o = propensity_model.predict_proba(test_observed[features])[:,1]
+
+        propensity_score = (gamma / (1 - gamma)) * ((1 - propensity_pred_o) / propensity_pred_o)
+        derivative =  propensity_score * (test_miscoverage - miscoverage_pred_o)
+        return np.mean(miscoverage_pred_u) + np.mean(derivative), np.mean(derivative**2)
 
     def get_unit_prediction_interval_bounds(self, reporting_units, nonreporting_units, conf_frac, alpha, estimand):
         """

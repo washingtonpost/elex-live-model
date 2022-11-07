@@ -79,6 +79,10 @@ class NonparametricElectionModel(BaseElectionModel):
         lower = prediction_intervals.lower - correction
         upper = prediction_intervals.upper + correction
 
+        # update conformalization bounds with the correction
+        prediction_intervals.conformalization["lower_bounds_c"] = prediction_intervals.conformalization["lower_bounds"] - correction
+        prediction_intervals.conformalization["upper_bounds_c"] = prediction_intervals.conformalization["upper_bounds"] - correction
+
         # save for later
         self.nonreporting_lower_bounds = lower
         self.nonreporting_upper_bounds = upper

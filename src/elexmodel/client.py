@@ -152,6 +152,7 @@ class ModelClient(object):
         )
         states_with_election = config_handler.get_states(office)
         estimand_baselines = config_handler.get_estimand_baselines(office, estimands)
+        other_features = list(set(config_handler.get_features(office)) - set(features))
 
         LOG.info("Getting preprocessed data: %s", election_id)
         preprocessed_data_handler = PreprocessedDataHandler(
@@ -251,6 +252,23 @@ class ModelClient(object):
             }
             results_handler.add_unit_intervals(estimand, alpha_to_unit_prediction_intervals)
 
+            alpha_to_coverage_estimates = {
+                alpha: model.estimate_unit_nonreporting_coverage(
+                    results_handler.reporting_units, results_handler.nonreporting_units, alpha, estimand,
+                    config_handler.get_features(office), K=2
+                )
+                for alpha in prediction_intervals
+            }
+            results_handler.add_coverage_estimates(estimand, alpha_to_coverage_estimates)
+
+            alpha_to_feature_importances = {
+                alpha: model.compute_feature_importances(
+                    results_handler.reporting_units, alpha, estimand, other_features
+                )
+                for alpha in prediction_intervals + [0]
+            }
+            results_handler.add_feature_importances(estimand, alpha_to_feature_importances)
+
             for aggregate in results_handler.aggregates:
                 aggregate_list = sorted(list(set(["postal_code", aggregate])), key=lambda x: AGGREGATE_ORDER.index(x))
                 estimates_df = model.get_aggregate_predictions(
@@ -328,6 +346,8 @@ class HistoricalModelClient(ModelClient):
                 geographic_unit_type,
                 **kwargs,
             )
+            unobserved_units = historical_estimates["unit_data"]["reporting"] != 1
+            historical_estimates["unit_data"] = historical_estimates["unit_data"][unobserved_units]
             historical_evaluation_and_estimates[historical_election_id] = {
                 "evaluation": self.evaluate_historical_estimates(
                     historical_estimates, preprocessed_data, self.aggregates, prediction_intervals, estimands
@@ -453,7 +473,10 @@ class HistoricalModelClient(ModelClient):
                 prediction_intervals,
                 estimand,
             )[True]
-
+            estimated_coverage = {f"est_frac_within_pi_{alpha}_{estimand}" : historical_estimates["coverage_estimates"][f"{alpha}_{estimand}"]
+                for alpha in prediction_intervals}
+            evaluation["unit_data"]["all"].update(estimated_coverage)
+            
             for aggregate in aggregates:
                 aggregate_label = VALID_AGGREGATES_MAPPING.get(aggregate)
                 aggregate_list = sorted(list(set(["postal_code", aggregate])), key=lambda x: AGGREGATE_ORDER.index(x))

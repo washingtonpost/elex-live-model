@@ -60,6 +60,9 @@ class GaussianElectionModel(BaseElectionModel):
         self.nonreporting_lower_bounds = prediction_intervals.lower.copy()
         self.nonreporting_upper_bounds = prediction_intervals.upper.copy()
 
+        prediction_intervals.conformalization["lower_bounds_c"] = prediction_intervals.conformalization["lower_bounds"] - lower_correction
+        prediction_intervals.conformalization["upper_bounds_c"] = prediction_intervals.conformalization["upper_bounds"] - upper_correction
+
         # apply correction
         lower = prediction_intervals.lower - lower_correction
         upper = prediction_intervals.upper + upper_correction
