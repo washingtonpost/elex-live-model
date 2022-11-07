@@ -21,6 +21,15 @@ def sample_std(x, axis):
     # ddof=1 to get unbiased sample estimate.
     return np.std(x, ddof=1, axis=-1)
 
+def robust_sample_std(x, axis):
+    """
+    Median absolute deviation - a robust estimator of the sample std 
+    """
+    robust_est = np.median(np.abs(x - np.mean(x, axis=-1).reshape(-1,1)), axis=-1)
+    if len(robust_est) == 1:
+        return robust_est.item()
+    else:
+        return robust_est
 
 def weighted_median(x, weights):
     """
@@ -63,7 +72,7 @@ def boot_sigma(data, conf, num_iterations=10000):
     """
     # we use upper bound of confidence interval for more robustness
     return bootstrap(
-        data.reshape(1, -1), sample_std, confidence_level=conf, method="basic", n_resamples=num_iterations
+        data.reshape(1, -1), robust_sample_std, confidence_level=conf, method="basic", n_resamples=num_iterations
     ).confidence_interval.high
 
 
