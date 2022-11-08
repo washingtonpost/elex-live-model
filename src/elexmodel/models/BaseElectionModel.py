@@ -200,6 +200,8 @@ class BaseElectionModel(object):
         self.fit_model(upper_qr, train_data_features, train_data_residuals, upper_bound, train_data_weights, True)
 
         feature_importances = {}
+        features = list(set(features) & set(train_data.columns))
+
         for feature in features:
             sorted_df = train_data.sort_values(feature)
             sorted_residuals = sorted_df[f"residuals_{estimand}"].values
