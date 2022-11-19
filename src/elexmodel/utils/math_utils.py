@@ -2,7 +2,7 @@ import logging
 import math
 
 import numpy as np
-from scipy.stats import bootstrap
+from scipy.stats import bootstrap, median_abs_deviation
 
 LOG = logging.getLogger()
 
@@ -25,11 +25,7 @@ def robust_sample_std(x, axis):
     """
     Median absolute deviation - a robust estimator of the sample std 
     """
-    robust_est = np.median(np.abs(x - np.mean(x, axis=-1).reshape(-1,1)), axis=-1)
-    if len(robust_est) == 1:
-        return robust_est.item()
-    else:
-        return robust_est
+    return median_abs_deviation(x, axis=-1, center=np.mean)
 
 def weighted_median(x, weights):
     """
