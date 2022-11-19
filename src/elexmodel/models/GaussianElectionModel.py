@@ -61,8 +61,6 @@ class GaussianElectionModel(BaseElectionModel):
         # save for later, but need to copy to avoid changing the original
         self.alpha_to_nonreporting_lower_bounds[alpha] = prediction_intervals.lower.copy()
         self.alpha_to_nonreporting_upper_bounds[alpha] = prediction_intervals.upper.copy()
-        #self.nonreporting_lower_bounds = prediction_intervals.lower.copy()
-        #self.nonreporting_upper_bounds = prediction_intervals.upper.copy()
 
         # apply correction
         lower = prediction_intervals.lower - lower_correction
