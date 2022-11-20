@@ -25,7 +25,7 @@ def robust_sample_std(x, axis):
     """
     Median absolute deviation - a robust estimator of the sample std 
     """
-    return median_abs_deviation(x, axis=-1, center=np.mean)
+    return 1.5 * median_abs_deviation(x, axis=-1, center=np.median)
 
 def weighted_median(x, weights):
     """
