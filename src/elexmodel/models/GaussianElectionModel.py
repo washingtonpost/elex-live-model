@@ -11,6 +11,8 @@ class GaussianElectionModel(BaseElectionModel):
         super().__init__(model_settings)
         self.model_settings = model_settings
         self.beta = model_settings.get("beta", 1)
+        self.alpha_to_nonreporting_lower_bounds = {}
+        self.alpha_to_nonreporting_upper_bounds = {}
 
     def _compute_conf_frac(self):
         """
@@ -57,8 +59,8 @@ class GaussianElectionModel(BaseElectionModel):
         )
 
         # save for later, but need to copy to avoid changing the original
-        self.nonreporting_lower_bounds = prediction_intervals.lower.copy()
-        self.nonreporting_upper_bounds = prediction_intervals.upper.copy()
+        self.alpha_to_nonreporting_lower_bounds[alpha] = prediction_intervals.lower.copy()
+        self.alpha_to_nonreporting_upper_bounds[alpha] = prediction_intervals.upper.copy()
 
         # apply correction
         lower = prediction_intervals.lower - lower_correction
@@ -130,8 +132,8 @@ class GaussianElectionModel(BaseElectionModel):
 
         # assign nonreporting unadjusted lower/upper bounds to unobsered data
         bounds = nonreporting_units.assign(
-            nonreporting_lower_bounds=self.nonreporting_lower_bounds,
-            nonreporting_upper_bounds=self.nonreporting_upper_bounds,
+            nonreporting_lower_bounds=self.alpha_to_nonreporting_lower_bounds[alpha],
+            nonreporting_upper_bounds=self.alpha_to_nonreporting_upper_bounds[alpha],
         )
 
         # un-normalize unadjusted lower/upper bounds and sum per group to get unadjusted group bounds
