@@ -234,6 +234,7 @@ class GaussianElectionModel(BaseElectionModel):
         # construction conformal corrections using Gaussian models
         # get means and standard deviations for for aggregates
         # and add correction (which is percentile of the Gaussian at the quantile we care about)
+        #import pdb; pdb.set_trace()
         quantile = (3 + alpha) / 4
         modeled_bounds = modeled_bounds.assign(
             lb_mean=lambda x: x.nonreporting_weight_sum * x.mu_lower_bound,
@@ -243,13 +244,12 @@ class GaussianElectionModel(BaseElectionModel):
             ub_sd=lambda x: x.sigma_upper_bound
             * np.sqrt(x.nonreporting_weight_ssum + x.var_inflate * np.power(x.nonreporting_weight_sum, 2)),
         ).assign(
-            lb=lambda x: x.nonreporting_aggregate_lower_bound
-            - stats.norm.ppf(q=quantile, loc=x.lb_mean, scale=x.lb_sd),
-            ub=lambda x: x.nonreporting_aggregate_upper_bound
-            + stats.norm.ppf(q=quantile, loc=x.ub_mean, scale=x.ub_sd),
-        )[
-            aggregate + ["lb", "ub"]
-        ]
+            lower_correction = lambda x: stats.norm.ppf(q=quantile, loc=x.lb_mean, scale=x.lb_sd),
+            upper_correction = lambda x: stats.norm.ppf(q=quantile, loc=x.ub_mean, scale=x.ub_sd)
+        ).assign(
+            lb=lambda x: x.nonreporting_aggregate_lower_bound - x.lower_correction,
+            ub=lambda x: x.nonreporting_aggregate_upper_bound + x.upper_correction
+        )
 
         # un-residualize bounds by adding last election results
         # elementwise maximum with votes from nonreporting units to avoid adding negative vote count in nonreporting units

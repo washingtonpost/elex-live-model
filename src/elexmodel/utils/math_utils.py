@@ -2,7 +2,13 @@ import logging
 import math
 
 import numpy as np
-from scipy.stats import bootstrap, median_abs_deviation
+from scipy.stats import bootstrap, median_abs_deviation, iqr
+from scipy.stats.mstats import winsorize
+from scipy.spatial.distance import pdist, cdist, squareform
+from scipy.special import huber
+
+#from statsmodels.robust import scale
+
 
 LOG = logging.getLogger()
 
@@ -21,11 +27,32 @@ def sample_std(x, axis):
     # ddof=1 to get unbiased sample estimate.
     return np.std(x, ddof=1, axis=-1)
 
+def median_absolute_deviation(x, axis):
+    return median_abs_deviation(x, axis=axis, center=np.median, scale='normal')
+
+def interquartile_range(x, axis):
+    return iqr(x, axis=axis)
+
+def winsorize_std(x, axis):
+    x_win = winsorize(x, limits=(0.01, 0.01), axis=0).data
+    return np.std(x_win, ddof=1, axis=-1)
+
+def S_n(x, axis):
+    S_ns = []
+    for x_i in x:
+        dists_i = squareform(pdist(x_i.reshape(-1, 1), 'cityblock'))
+        sn_i = 1.1926 * np.median(np.median(dists_i, axis=1))
+        S_ns.append(sn_i)
+    return np.asarray(S_ns)
+
+#def Q_n(x, axis):
+#    return scale.qn_scale(x)
+
 def robust_sample_std(x, axis):
     """
     Median absolute deviation - a robust estimator of the sample std 
     """
-    return 1.5 * median_abs_deviation(x, axis=-1, center=np.median)
+    return winsorize_std(x, axis=-1)
 
 def weighted_median(x, weights):
     """
@@ -68,7 +95,7 @@ def boot_sigma(data, conf, num_iterations=10000):
     """
     # we use upper bound of confidence interval for more robustness
     return bootstrap(
-        data.reshape(1, -1), robust_sample_std, confidence_level=conf, method="basic", n_resamples=num_iterations
+        data.reshape(1, -1), sample_std, confidence_level=conf, method="basic", n_resamples=num_iterations
     ).confidence_interval.high
 
 
