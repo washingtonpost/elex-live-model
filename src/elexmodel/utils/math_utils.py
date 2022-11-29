@@ -1,8 +1,9 @@
 import logging
 import math
-from scipy.stats.mstats import winsorize
+
 import numpy as np
 from scipy.stats import bootstrap
+from scipy.stats.mstats import winsorize
 
 LOG = logging.getLogger()
 
@@ -21,9 +22,11 @@ def sample_std(x, axis):
     # ddof=1 to get unbiased sample estimate.
     return np.std(x, ddof=1, axis=-1)
 
+
 def winsorize_std(x, axis):
     x_win = winsorize(x, limits=(0.01, 0.01), axis=0).data
     return np.std(x_win, ddof=1, axis=-1)
+
 
 def weighted_median(x, weights):
     """
@@ -59,11 +62,13 @@ def weighted_median(x, weights):
     else:
         return x_sorted[median_index + 1]
 
+
 def robust_sample_std(x, axis):
     """
-    Median absolute deviation - a robust estimator of the sample std 
+    Median absolute deviation - a robust estimator of the sample std
     """
     return winsorize_std(x, axis=-1)
+
 
 def boot_sigma(data, conf, num_iterations=10000):
     """
