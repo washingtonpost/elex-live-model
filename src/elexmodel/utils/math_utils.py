@@ -31,7 +31,7 @@ def median_absolute_deviation(x, axis):
     return median_abs_deviation(x, axis=axis, center=np.median, scale='normal')
 
 def interquartile_range(x, axis):
-    return iqr(x, axis=axis)
+    return iqr(x, axis=axis, scale = "normal")
 
 def winsorize_std(x, axis):
     x_win = winsorize(x, limits=(0.01, 0.01), axis=0).data
@@ -95,7 +95,7 @@ def boot_sigma(data, conf, num_iterations=10000):
     """
     # we use upper bound of confidence interval for more robustness
     return bootstrap(
-        data.reshape(1, -1), sample_std, confidence_level=conf, method="basic", n_resamples=num_iterations
+        data.reshape(1, -1), robust_sample_std, confidence_level=conf, method="basic", n_resamples=num_iterations
     ).confidence_interval.high
 
 
