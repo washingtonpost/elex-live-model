@@ -24,7 +24,7 @@ def sample_std(x, axis):
 
 
 def winsorize_std(x, axis):
-    x_win = winsorize(x, limits=(0.01, 0.01), axis=0).data
+    x_win = winsorize(x, limits=(0.01, 0.01), axis=-1).data
     return np.std(x_win, ddof=1, axis=-1)
 
 
@@ -64,9 +64,7 @@ def weighted_median(x, weights):
 
 
 def robust_sample_std(x, axis):
-    """
-    Median absolute deviation - a robust estimator of the sample std
-    """
+
     return winsorize_std(x, axis=-1)
 
 
