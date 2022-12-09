@@ -120,6 +120,11 @@ def test_drop_unreporting_missing_single_estimand_value(va_governor_county_data)
 
 
 def test_generate_fixed_effects(va_governor_county_data):
+    """
+    We test adding one or two fixed effects. This test assumes that all units are reporting,
+    and therefore all fixed effect categories will exist in reporting_units. That means that
+    all fixed effect categories get added to nonreporting_units.
+    """
     election_id = "2017-11-07_VA_G"
     office = "G"
     geographic_unit_type = "county"
@@ -187,6 +192,110 @@ def test_generate_fixed_effects(va_governor_county_data):
     assert "county_classification" in combined_data_handler.fixed_effects
     assert "county_fips" in combined_data_handler.fixed_effects
     assert len(combined_data_handler.expanded_fixed_effects) == 137  # 6 + 133 - 2
+
+def test_test_generate_fixed_effects_complex(va_governor_county_data):
+    """
+    This tests adding fixed effects when not all units are reporting and therefore
+    only a subset of the fixed effect categories are added as columns to the reporting data
+    """
+    election_id = "2017-11-07_VA_G"
+    office = "G"
+    geographic_unit_type = "county"
+    estimands = ["turnout"]
+    estimand_baseline = {"turnout": "turnout"}
+    n = 10
+    live_data_handler = MockLiveDataHandler(
+        election_id, office, geographic_unit_type, estimands, data=va_governor_county_data
+    )
+    current_data = live_data_handler.get_n_fully_reported(n=n)
+
+    preprocessed_data_handler = PreprocessedDataHandler(
+        election_id, office, geographic_unit_type, estimands, estimand_baseline, data=va_governor_county_data
+    )
+
+    combined_data_handler = CombinedDataHandler(
+        preprocessed_data_handler.data,
+        current_data,
+        estimands,
+        "county",
+        fixed_effects=["county_fips"],
+        handle_unreporting="drop",
+    )
+    
+    reporting_data = combined_data_handler.get_reporting_units(99)
+    nonreporting_data = combined_data_handler.get_nonreporting_units(99)
+
+    assert combined_data_handler.data.shape == (133, 33)
+
+    n_expected_columns = combined_data_handler.data.shape[1] + 3 # residual intercept and reporting
+    n_expected_columns += n - 1 # for dropped 
+    assert reporting_data.shape == (n, n_expected_columns)
+    assert nonreporting_data.shape == (133 - n, n_expected_columns + (133 - n))
+
+    assert "county_fips_51001" not in reporting_data.columns # dropped fromg get_dummies because first
+    assert "county_fips_51001" not in nonreporting_data.columns # not added manually nor in nonreporting data
+
+    assert "county_fips_51003" in reporting_data.columns # in here because get_dummies
+    assert "county_fips_51003" in nonreporting_data.columns # in here because manaully added
+
+    assert "county_fips_51790" not in reporting_data.columns # not in here because not reporting
+    assert "county_fips_51790" in nonreporting_data.columns # in here because get_dummies
+
+    assert "county_fips" in combined_data_handler.fixed_effects
+    assert len(combined_data_handler.expanded_fixed_effects) == n - 1
+
+def test_test_generate_fixed_effects_complex(va_governor_precinct_data):
+    """
+    This tests adding fixed effects when not all units are reporting and therefore
+    only a subset of the fixed effect categories are added as columns to the reporting data
+    """
+    election_id = "2017-11-07_VA_G"
+    office = "G"
+    geographic_unit_type = "precinct"
+    estimands = ["turnout"]
+    estimand_baseline = {"turnout": "turnout"}
+    n = 100
+    live_data_handler = MockLiveDataHandler(
+        election_id, office, geographic_unit_type, estimands, data=va_governor_precinct_data
+    )
+    current_data = live_data_handler.get_n_fully_reported(n=n)
+
+    preprocessed_data_handler = PreprocessedDataHandler(
+        election_id, office, geographic_unit_type, estimands, estimand_baseline, data=va_governor_precinct_data
+    )
+
+    combined_data_handler = CombinedDataHandler(
+        preprocessed_data_handler.data,
+        current_data,
+        estimands,
+        "county",
+        fixed_effects=["county_fips"],
+        handle_unreporting="drop",
+    )
+    
+    reporting_data = combined_data_handler.get_reporting_units(99)
+    nonreporting_data = combined_data_handler.get_nonreporting_units(99)
+    assert combined_data_handler.data.shape == (2360, 33)
+
+    n_expected_columns = combined_data_handler.data.shape[1] + 3 # residual intercept and reporting
+    n_expected_columns += 7 - 1 # when n = 100 we get to county 51013
+    assert reporting_data.shape == (n, n_expected_columns)
+    assert nonreporting_data.shape == (2360 - n, n_expected_columns + (133 - 7))
+
+    assert "county_fips_51001" not in reporting_data.columns # dropped fromg get_dummies because first
+    assert "county_fips_51001" not in nonreporting_data.columns # not added manually nor in nonreporting data
+
+    assert "county_fips_51003" in reporting_data.columns # in here because get_dummies
+    assert "county_fips_51003" in nonreporting_data.columns # in here because manaully added
+
+    assert "county_fips_51013" in reporting_data.columns # in here because get_dummies
+    assert "county_fips_51013" in nonreporting_data.columns # in here because get_dummies and drop_first=False
+
+    assert "county_fips_51790" not in reporting_data.columns # not in here because not reporting
+    assert "county_fips_51790" in nonreporting_data.columns # in here because get_dummies
+
+    assert "county_fips" in combined_data_handler.fixed_effects
+    assert len(combined_data_handler.expanded_fixed_effects) == 7 - 1
 
 
 def test_expanding_fixed_effects_basic():
