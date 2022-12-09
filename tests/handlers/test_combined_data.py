@@ -205,6 +205,22 @@ def test_expanding_fixed_effects_basic():
         ),
     )
 
+    df = pd.DataFrame({"c1": ["a", "b", "b", "c"], "c2": ["w", "x", "y", "z"], "c3": [2, 4, 1, 9]})
+    expanded = CombinedDataHandler._expand_fixed_effects(df, ["c1"], drop_first=False)
+    pd.testing.assert_frame_equal(
+        expanded,
+        pd.DataFrame(
+            {
+                "c2": ["w", "x", "y", "z"],
+                "c3": [2, 4, 1, 9],
+                "c1_a": [1, 0, 0, 0],
+                "c1_b": [0, 1, 1, 0],
+                "c1_c": [0, 0, 0, 1],
+                "c1": ["a", "b", "b", "c"],
+            }
+        ),
+    )
+
     expanded = CombinedDataHandler._expand_fixed_effects(df, ["c1", "c2"], drop_first=True)
     pd.testing.assert_frame_equal(
         expanded,
