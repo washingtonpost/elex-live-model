@@ -55,7 +55,14 @@ class CombinedDataHandler(object):
         original_fixed_effect_columns = data[fixed_effects]
         return pd.concat(
             [
-                pd.get_dummies(data, columns=fixed_effects, prefix=fixed_effects, prefix_sep='_', dtype=np.int64, drop_first=drop_first),
+                pd.get_dummies(
+                    data,
+                    columns=fixed_effects,
+                    prefix=fixed_effects,
+                    prefix_sep="_",
+                    dtype=np.int64,
+                    drop_first=drop_first,
+                ),
                 original_fixed_effect_columns,
             ],
             axis=1,
@@ -89,7 +96,7 @@ class CombinedDataHandler(object):
             reporting_units["intercept"] = 1
 
         if len(self.fixed_effects) > 0:
-            # drop_first is True for reporting units since we want to avoid the design matrix with 
+            # drop_first is True for reporting units since we want to avoid the design matrix with
             # expanded fixed effects to be linearly dependent
             reporting_units = self._expand_fixed_effects(reporting_units, self.fixed_effects, drop_first=True)
             # we save the expanded fixed effects to be able to add fixed effects that are not in the non-reporting
@@ -127,7 +134,7 @@ class CombinedDataHandler(object):
         if len(self.fixed_effects) > 0:
             missing_expanded_fixed_effects = {}
             nonreporting_units = self._expand_fixed_effects(nonreporting_units, self.fixed_effects, drop_first=False)
-            # if all units from one fixed effect are reporting they will not appear in the nonreporting_units and won't 
+            # if all units from one fixed effect are reporting they will not appear in the nonreporting_units and won't
             # get a column when we expand the fixed effects on that dataframe. Therefore we add those columns with zero
             # fixed effects manually.
             for expanded_fixed_effect in self.expanded_fixed_effects:

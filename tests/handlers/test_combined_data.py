@@ -147,14 +147,14 @@ def test_generate_fixed_effects(va_governor_county_data):
         fixed_effects=["county_classification"],
         handle_unreporting="drop",
     )
-    
+
     reporting_data = combined_data_handler.get_reporting_units(99)
     nonreporting_data = combined_data_handler.get_nonreporting_units(99)
 
     assert combined_data_handler.data.shape == (133, 33)
 
-    n_expected_columns = combined_data_handler.data.shape[1] + 3 # residual intercept and reporting
-    n_expected_columns += 5 # 6 - 1 the fixed effects with one dropped
+    n_expected_columns = combined_data_handler.data.shape[1] + 3  # residual intercept and reporting
+    n_expected_columns += 5  # 6 - 1 the fixed effects with one dropped
     assert reporting_data.shape == (133, n_expected_columns)
     assert nonreporting_data.shape == (0, n_expected_columns)
 
@@ -178,10 +178,10 @@ def test_generate_fixed_effects(va_governor_county_data):
 
     assert combined_data_handler.data.shape == (133, 33)
 
-    n_expected_columns = combined_data_handler.data.shape[1] + 3 # residual intercept and reporting
-    n_expected_columns += 6 + 133 - 2 # subtracting two dropped columns
-    assert reporting_data.shape == (133, n_expected_columns) 
-    assert nonreporting_data.shape == (0, n_expected_columns) 
+    n_expected_columns = combined_data_handler.data.shape[1] + 3  # residual intercept and reporting
+    n_expected_columns += 6 + 133 - 2  # subtracting two dropped columns
+    assert reporting_data.shape == (133, n_expected_columns)
+    assert nonreporting_data.shape == (0, n_expected_columns)
 
     assert "county_classification_nova" in reporting_data.columns
     assert "county_classification_nova" in nonreporting_data.columns
@@ -193,7 +193,8 @@ def test_generate_fixed_effects(va_governor_county_data):
     assert "county_fips" in combined_data_handler.fixed_effects
     assert len(combined_data_handler.expanded_fixed_effects) == 137  # 6 + 133 - 2
 
-def test_test_generate_fixed_effects_complex(va_governor_county_data):
+
+def test_generate_fixed_effects_not_all_reporting(va_governor_county_data):
     """
     This tests adding fixed effects when not all units are reporting and therefore
     only a subset of the fixed effect categories are added as columns to the reporting data
@@ -221,33 +222,34 @@ def test_test_generate_fixed_effects_complex(va_governor_county_data):
         fixed_effects=["county_fips"],
         handle_unreporting="drop",
     )
-    
+
     reporting_data = combined_data_handler.get_reporting_units(99)
     nonreporting_data = combined_data_handler.get_nonreporting_units(99)
 
     assert combined_data_handler.data.shape == (133, 33)
 
-    n_expected_columns = combined_data_handler.data.shape[1] + 3 # residual intercept and reporting
-    n_expected_columns += n - 1 # for dropped 
+    n_expected_columns = combined_data_handler.data.shape[1] + 3  # residual intercept and reporting
+    n_expected_columns += n - 1  # for dropped
     assert reporting_data.shape == (n, n_expected_columns)
     assert nonreporting_data.shape == (133 - n, n_expected_columns + (133 - n))
 
-    assert "county_fips_51001" not in reporting_data.columns # dropped fromg get_dummies because first
-    assert "county_fips_51001" not in nonreporting_data.columns # not added manually nor in nonreporting data
+    assert "county_fips_51001" not in reporting_data.columns  # dropped fromg get_dummies because first
+    assert "county_fips_51001" not in nonreporting_data.columns  # not added manually nor in nonreporting data
 
-    assert "county_fips_51003" in reporting_data.columns # in here because get_dummies
-    assert "county_fips_51003" in nonreporting_data.columns # in here because manaully added
+    assert "county_fips_51003" in reporting_data.columns  # in here because get_dummies
+    assert "county_fips_51003" in nonreporting_data.columns  # in here because manaully added
 
-    assert "county_fips_51790" not in reporting_data.columns # not in here because not reporting
-    assert "county_fips_51790" in nonreporting_data.columns # in here because get_dummies
+    assert "county_fips_51790" not in reporting_data.columns  # not in here because not reporting
+    assert "county_fips_51790" in nonreporting_data.columns  # in here because get_dummies
 
     assert "county_fips" in combined_data_handler.fixed_effects
     assert len(combined_data_handler.expanded_fixed_effects) == n - 1
 
-def test_test_generate_fixed_effects_complex(va_governor_precinct_data):
+
+def test_generate_fixed_effects_mixed_reporting(va_governor_precinct_data):
     """
-    This tests adding fixed effects when not all units are reporting and therefore
-    only a subset of the fixed effect categories are added as columns to the reporting data
+    This tests adding fixed effects when not all units are reporting but units from the fixed
+    effects appear in both the reporting and the nonreporting set.
     """
     election_id = "2017-11-07_VA_G"
     office = "G"
@@ -272,27 +274,27 @@ def test_test_generate_fixed_effects_complex(va_governor_precinct_data):
         fixed_effects=["county_fips"],
         handle_unreporting="drop",
     )
-    
+
     reporting_data = combined_data_handler.get_reporting_units(99)
     nonreporting_data = combined_data_handler.get_nonreporting_units(99)
     assert combined_data_handler.data.shape == (2360, 33)
 
-    n_expected_columns = combined_data_handler.data.shape[1] + 3 # residual intercept and reporting
-    n_expected_columns += 7 - 1 # when n = 100 we get to county 51013
+    n_expected_columns = combined_data_handler.data.shape[1] + 3  # residual intercept and reporting
+    n_expected_columns += 7 - 1  # when n = 100 we get to county 51013
     assert reporting_data.shape == (n, n_expected_columns)
     assert nonreporting_data.shape == (2360 - n, n_expected_columns + (133 - 7))
 
-    assert "county_fips_51001" not in reporting_data.columns # dropped fromg get_dummies because first
-    assert "county_fips_51001" not in nonreporting_data.columns # not added manually nor in nonreporting data
+    assert "county_fips_51001" not in reporting_data.columns  # dropped fromg get_dummies because first
+    assert "county_fips_51001" not in nonreporting_data.columns  # not added manually nor in nonreporting data
 
-    assert "county_fips_51003" in reporting_data.columns # in here because get_dummies
-    assert "county_fips_51003" in nonreporting_data.columns # in here because manaully added
+    assert "county_fips_51003" in reporting_data.columns  # in here because get_dummies
+    assert "county_fips_51003" in nonreporting_data.columns  # in here because manaully added
 
-    assert "county_fips_51013" in reporting_data.columns # in here because get_dummies
-    assert "county_fips_51013" in nonreporting_data.columns # in here because get_dummies and drop_first=False
+    assert "county_fips_51013" in reporting_data.columns  # in here because get_dummies
+    assert "county_fips_51013" in nonreporting_data.columns  # in here because get_dummies and drop_first=False
 
-    assert "county_fips_51790" not in reporting_data.columns # not in here because not reporting
-    assert "county_fips_51790" in nonreporting_data.columns # in here because get_dummies
+    assert "county_fips_51790" not in reporting_data.columns  # not in here because not reporting
+    assert "county_fips_51790" in nonreporting_data.columns  # in here because get_dummies
 
     assert "county_fips" in combined_data_handler.fixed_effects
     assert len(combined_data_handler.expanded_fixed_effects) == 7 - 1
