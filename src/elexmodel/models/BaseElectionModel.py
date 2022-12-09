@@ -26,7 +26,7 @@ class BaseElectionModel(object):
         """
         Fits the quantile regression for the model
         Removes two kinds of columns and then substitutes zeroes as those coefficients:
-            Zero columns: these are caused by  fixed effects that don't appear in df_X.
+            Zero columns: these are caused by fixed effects that don't appear in df_X.
                 The dummy variables were created using all data (not just the reporting data).
                 So the corresponding columns for fixed ffects that only appear in non-reporting units
                 will be all zero in the reporting matrix.
@@ -62,6 +62,8 @@ class BaseElectionModel(object):
         Produces unit level predictions. Fits quantile regression to reporting data, applies
         it to nonreporting data. The features are specified in model_settings.
         """
+        # specifying self.features extracts the correct columns and makes sure they are in the correct
+        # order. Necessary when fitting and predicting on the model.
         reporting_units_features = reporting_units[self.features]
         nonreporting_units_features = nonreporting_units[self.features]
 
@@ -201,6 +203,8 @@ class BaseElectionModel(object):
         train_rows = math.floor(reporting_units.shape[0] * conf_frac)
         train_data = reporting_units_shuffled[:train_rows].reset_index(drop=True)
 
+        # specifying self.features extracts the correct columns and makes sure they are in the correct
+        # order. Necessary when fitting and predicting on the model.
         train_data_features = train_data[self.features]
         train_data_residuals = train_data[f"residuals_{estimand}"]
         train_data_weights = train_data[f"total_voters_{estimand}"]

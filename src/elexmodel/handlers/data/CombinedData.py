@@ -42,29 +42,20 @@ class CombinedDataHandler(object):
             data.loc[indices_with_null_val, "percent_expected_vote"] = 0
         self.fixed_effects = fixed_effects
         self.expanded_fixed_effects = []
-        if len(self.fixed_effects) > 0:
-            data = self._expand_fixed_effects(data, self.fixed_effects)
-            self.expanded_fixed_effects = [
-                x
-                for x in data.columns
-                if x.startswith(tuple([fixed_effect + "_" for fixed_effect in self.fixed_effects]))
-            ]
 
         self.data = data
 
     @classmethod
-    def _expand_fixed_effects(self, data, fixed_effects):
+    def _expand_fixed_effects(self, data, fixed_effects, drop_first):
         """
         Turn fixed effect columns into dummy variables. Concatenates original columns also
         """
-        # for each fixed efffect we want to return the column as a categorical (dummy) variable
-        # drop_first is True to avoid linear dependence of dummy variables
         # we concatenate the dummies with the original fixed effects, since we need the original fixed effect
         # columns in order to potentially aggregate on them.
         original_fixed_effect_columns = data[fixed_effects]
         return pd.concat(
             [
-                pd.get_dummies(data, columns=fixed_effects, prefix=fixed_effects, dtype=np.int64, drop_first=True),
+                pd.get_dummies(data, columns=fixed_effects, prefix=fixed_effects, prefix_sep='_', dtype=np.int64, drop_first=drop_first),
                 original_fixed_effect_columns,
             ],
             axis=1,
@@ -97,6 +88,19 @@ class CombinedDataHandler(object):
             # we effectively always need the intercept for the model to work
             reporting_units["intercept"] = 1
 
+        if len(self.fixed_effects) > 0:
+            # drop_first is True for reporting units since we want to avoid the design matrix with 
+            # expanded fixed effects to be linearly dependent
+            reporting_units = self._expand_fixed_effects(reporting_units, self.fixed_effects, drop_first=True)
+            # we save the expanded fixed effects to be able to add fixed effects that are not in the non-reporting
+            # units as a zero column and to be able to specify the order of the expanded fixed effect when fitting
+            # the model
+            self.expanded_fixed_effects = [
+                x
+                for x in reporting_units.columns
+                if x.startswith(tuple([fixed_effect + "_" for fixed_effect in self.fixed_effects]))
+            ]
+
         reporting_units["reporting"] = 1
         return reporting_units
 
@@ -119,6 +123,15 @@ class CombinedDataHandler(object):
 
         if add_intercept:
             nonreporting_units["intercept"] = 1
+
+        if len(self.fixed_effects) > 0:
+            nonreporting_units = self._expand_fixed_effects(nonreporting_units, self.fixed_effects, drop_first=False)
+            # if all units from one fixed effect are reporting they will not appear in the nonreporting_units and won't 
+            # get a column when we expand the fixed effects on that dataframe. Therefore we add those columns with zero
+            # fixed effects manually.
+            for expanded_fixed_effect in self.expanded_fixed_effects:
+                if expanded_fixed_effect not in nonreporting_units.columns:
+                    nonreporting_units[expanded_fixed_effect] = 0
 
         nonreporting_units["reporting"] = 0
 
