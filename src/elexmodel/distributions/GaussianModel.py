@@ -3,7 +3,6 @@ import pandas as pd
 
 from elexmodel.handlers import s3
 from elexmodel.utils import math_utils, pandas_utils
-from elexmodel.utils.constants import AGGREGATE_ORDER
 from elexmodel.utils.file_utils import S3_FILE_PATH, TARGET_BUCKET, convert_df_to_csv
 
 
