@@ -217,10 +217,6 @@ class GaussianModel:
                     aggregate,
                     alpha,
                 )
-                # Write columns for preceding aggregates
-                for agg in AGGREGATE_ORDER[: AGGREGATE_ORDER.index(aggregate[-1])]:
-                    if agg in conformalization_data:
-                        gaussian_bounds[agg] = conformalization_data[agg]
                 # Write bounds
                 self._write_gaussian_bounds(
                     gaussian_bounds,
