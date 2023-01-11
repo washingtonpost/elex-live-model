@@ -1,5 +1,10 @@
 # Changelog
 
+### 1.0.8 (01/11/2022)
+- fix: fix overwriting non-reporting lower/upper bounds in multiple prediction interval case [#23](https://github.com/washingtonpost/elex-live-model/pull/23)
+- fix: fix bug when computing fixed effects [#27](https://github.com/washingtonpost/elex-live-model/pull/27)
+- fix: fix overwritting columns when saving conformalization set/bounds to s3 [#28](https://github.com/washingtonpost/elex-live-model/pull/28)
+
 ### 1.0.7 (10/28/2022)
 - fix: fix mape when uncontested historical baseline [#18](https://github.com/washingtonpost/elex-live-model/pull/18)
 - fix: small relative weights for ecos solver [#19](https://github.com/washingtonpost/elex-live-model/pull/18)
