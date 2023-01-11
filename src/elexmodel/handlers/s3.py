@@ -66,6 +66,7 @@ class S3CsvUtil(S3Util):
         """
         if not filename.endswith(".csv"):
             filename = f"{filename}.csv"
+        kwargs.setdefault("ContentType", "text/csv")
         super().put(filename, data, **kwargs)
 
     def get(self, filename, load=True, **kwargs):
