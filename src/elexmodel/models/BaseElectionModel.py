@@ -10,9 +10,7 @@ from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
 warnings.filterwarnings("error", category=UserWarning, module="cvxpy")
 
 PredictionIntervals = namedtuple("PredictionIntervals", ["lower", "upper", "conformalization"], defaults=(None,) * 3)
-
 LOG = logging.getLogger(__name__)
-
 
 class BaseElectionModel(object):
     def __init__(self, model_settings={}):
@@ -237,7 +235,7 @@ class BaseElectionModel(object):
         nonreporting_units_features = nonreporting_units[self.features].values
         nonreporting_lower_bounds = lower_qr.predict(nonreporting_units_features)
         nonreporting_upper_bounds = upper_qr.predict(nonreporting_units_features)
-
+     #   self.conformalization_data = conformalization_data
         return PredictionIntervals(nonreporting_lower_bounds, nonreporting_upper_bounds, conformalization_data)
 
     def get_unit_prediction_intervals(self):

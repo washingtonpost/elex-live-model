@@ -86,6 +86,11 @@ class ModelClient(object):
             raise ValueError("handle_unreporting must be either `drop` or `zero`")
         return True
 
+    def get_conformalization_data(self):        
+        return self.conformalization_data_dict
+    #TODO comment: conformalization data pulled out from get_estimates function below
+    #which means model_client.get_conformalization_data() after model_client.get_estimates - bad?
+    
     def get_estimates(
         self,
         current_data,  # list of lists
@@ -238,7 +243,8 @@ class ModelClient(object):
         results_handler = ModelResultsHandler(
             aggregates, prediction_intervals, reporting_units, nonreporting_units, unexpected_units
         )
-
+        
+        self.conformalization_data_dict = {alpha: {} for alpha in prediction_intervals}
         for estimand in estimands:
             unit_predictions = model.get_unit_predictions(reporting_units, nonreporting_units, estimand)
             results_handler.add_unit_predictions(estimand, unit_predictions)
@@ -247,8 +253,11 @@ class ModelClient(object):
                 alpha: model.get_unit_prediction_intervals(
                     results_handler.reporting_units, results_handler.nonreporting_units, alpha, estimand
                 )
+                
                 for alpha in prediction_intervals
             }
+            self.conformalization_data_dict[alpha][estimand] = model.get_conformalization_data_all()
+            
             results_handler.add_unit_intervals(estimand, alpha_to_unit_prediction_intervals)
 
             for aggregate in results_handler.aggregates:
@@ -278,12 +287,13 @@ class ModelClient(object):
                     estimand, aggregate, estimates_df, alpha_to_agg_prediction_intervals
                 )
 
+
         results_handler.process_final_results()
         if APP_ENV != "local" and save_results:
             results_handler.write_data(election_id, office, geographic_unit_type)
 
         return results_handler.final_results
-
+            
 
 class HistoricalModelClient(ModelClient):
     def __init__(self):

@@ -44,7 +44,8 @@ class GaussianElectionModel(BaseElectionModel):
             alpha=alpha,
             beta=self.beta,
         )
-
+        self.gaussian_bounds = gaussian_model
+        self.conformalization_data= prediction_intervals.conformalization
         # gaussian model for single unit prediction intervals
         quantile = (3 + alpha) / 4
         lower_correction = stats.norm.ppf(
@@ -83,6 +84,9 @@ class GaussianElectionModel(BaseElectionModel):
             lower.round(decimals=0), upper.round(decimals=0), prediction_intervals.conformalization
         )
 
+    def get_conformalization_data_all(self):
+        return self.gaussian_bounds, self.conformalization_data
+    
     def get_aggregate_prediction_intervals(
         self,
         reporting_units,
