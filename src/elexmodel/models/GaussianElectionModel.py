@@ -93,6 +93,10 @@ class GaussianElectionModel(BaseElectionModel):
     def get_conformalization_data_unit(self):
         return self.gaussian_bounds_unit, self.conformalization_data_unit
 
+    # Note that precinct level % conformalization data
+    def get_conformalization_data_agg(self):
+        return self.modeled_bounds_agg, self.conformalization_data_agg
+
     def get_aggregate_prediction_intervals(
         self,
         reporting_units,
@@ -295,6 +299,3 @@ class GaussianElectionModel(BaseElectionModel):
         )
 
         return PredictionIntervals(aggregate_data.lower.round(decimals=0), aggregate_data.upper.round(decimals=0))
-
-    def get_conformalization_data_agg(self):  # Note that precinct level % conformalization data
-        return self.modeled_bounds_agg, self.conformalization_data_agg
