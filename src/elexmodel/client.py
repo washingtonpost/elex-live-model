@@ -86,8 +86,10 @@ class ModelClient(object):
             raise ValueError("handle_unreporting must be either `drop` or `zero`")
         return True
 
-    def get_conformalization_data(self):        
-        return self.conformalization_data_dict
+    def get_conformalization_data_unit(self):        
+        return self.conformalization_data_unit_dict
+    def get_conformalization_data_agg(self):        
+        return self.conformalization_data_agg_dict
     #TODO comment: conformalization data pulled out from get_estimates function below
     #which means model_client.get_conformalization_data() after model_client.get_estimates - bad?
     
@@ -244,7 +246,8 @@ class ModelClient(object):
             aggregates, prediction_intervals, reporting_units, nonreporting_units, unexpected_units
         )
         
-        self.conformalization_data_dict = {alpha: {} for alpha in prediction_intervals}
+        self.conformalization_data_unit_dict = {alpha: {} for alpha in prediction_intervals}
+        self.conformalization_data_agg_dict = {alpha: {} for alpha in prediction_intervals}
         for estimand in estimands:
             unit_predictions = model.get_unit_predictions(reporting_units, nonreporting_units, estimand)
             results_handler.add_unit_predictions(estimand, unit_predictions)
@@ -256,8 +259,8 @@ class ModelClient(object):
                 
                 for alpha in prediction_intervals
             }
-            self.conformalization_data_dict[alpha][estimand] = model.get_conformalization_data_all()
-            
+            self.conformalization_data_unit_dict[alpha][estimand] = model.get_conformalization_data_unit()
+             
             results_handler.add_unit_intervals(estimand, alpha_to_unit_prediction_intervals)
 
             for aggregate in results_handler.aggregates:
@@ -286,7 +289,8 @@ class ModelClient(object):
                 results_handler.add_agg_predictions(
                     estimand, aggregate, estimates_df, alpha_to_agg_prediction_intervals
                 )
-
+                self.conformalization_data_agg_dict[alpha][estimand] = model.get_conformalization_data_agg()
+               
 
         results_handler.process_final_results()
         if APP_ENV != "local" and save_results:
