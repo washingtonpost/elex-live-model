@@ -254,14 +254,14 @@ class ModelClient(object):
             unit_predictions = model.get_unit_predictions(reporting_units, nonreporting_units, estimand)
             results_handler.add_unit_predictions(estimand, unit_predictions)
             # gets prediciton intervals for each alpha
-            alpha_to_unit_prediction_intervals = {
-                alpha: model.get_unit_prediction_intervals(
+            alpha_to_unit_prediction_intervals = {}
+            for alpha in prediction_intervals:
+                alpha_to_unit_prediction_intervals[alpha] = model.get_unit_prediction_intervals(
                     results_handler.reporting_units, results_handler.nonreporting_units, alpha, estimand
-                )
-                for alpha in prediction_intervals
-            }
-            self.conformalization_data_unit_dict[alpha][estimand] = model.get_conformalization_data_unit()
-
+                    )
+                self.conformalization_data_unit_dict[alpha][estimand] = None if pi_method == "nonparametric" else model.get_conformalization_data_unit()
+ 
+            
             results_handler.add_unit_intervals(estimand, alpha_to_unit_prediction_intervals)
 
             for aggregate in results_handler.aggregates:
@@ -273,8 +273,9 @@ class ModelClient(object):
                     aggregate_list,
                     estimand,
                 )
-                alpha_to_agg_prediction_intervals = {
-                    alpha: model.get_aggregate_prediction_intervals(
+                alpha_to_agg_prediction_intervals = {}
+                for alpha in prediction_intervals:
+                    alpha_to_agg_prediction_intervals[alpha] = model.get_aggregate_prediction_intervals(
                         results_handler.reporting_units,
                         results_handler.nonreporting_units,
                         results_handler.unexpected_units,
@@ -284,14 +285,14 @@ class ModelClient(object):
                         estimand,
                         model_settings,
                     )
-                    for alpha in prediction_intervals
-                }
+                    self.conformalization_data_agg_dict[alpha][estimand] = None if pi_method == "nonparametric" else model.get_conformalization_data_agg()
+
+
                 # get all of the prediction intervals here
                 results_handler.add_agg_predictions(
                     estimand, aggregate, estimates_df, alpha_to_agg_prediction_intervals
                 )
-                self.conformalization_data_agg_dict[alpha][estimand] = model.get_conformalization_data_agg()
-
+ 
         results_handler.process_final_results()
         if APP_ENV != "local" and save_results:
             results_handler.write_data(election_id, office, geographic_unit_type)
