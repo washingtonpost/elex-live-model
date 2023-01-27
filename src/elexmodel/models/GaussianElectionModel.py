@@ -259,7 +259,7 @@ class GaussianElectionModel(BaseElectionModel):
         )[
             aggregate + ["lb", "ub"]
         ]
-        
+
         # un-residualize bounds by adding last election results
         # elementwise maximum with votes from nonreporting units to avoid adding negative vote count in nonreporting units
         # Note, gaussian interval aggregation can result in  a lower bound that is less than the votes
@@ -291,8 +291,6 @@ class GaussianElectionModel(BaseElectionModel):
         )
 
         return PredictionIntervals(aggregate_data.lower.round(decimals=0), aggregate_data.upper.round(decimals=0))
-    
-        
-    def get_conformalization_data_agg(self): #Note that precinct level % conformalization data
+
+    def get_conformalization_data_agg(self):  # Note that precinct level % conformalization data
         return self.modeled_bounds_agg, self.conformalization_data_agg
-    

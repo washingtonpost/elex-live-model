@@ -18,7 +18,6 @@ class GaussianModel:
         self.office = model_settings.get("office")
         self.geographic_unit_type = model_settings.get("geographic_unit_type")
 
-
     def _empty_gaussian_model(self, conformalization_data, aggregate):
         """
         Return empty Gaussian model. Everything is None
@@ -109,7 +108,7 @@ class GaussianModel:
             )
             .reset_index(drop=drop_index)
         )
-        
+
         return gaussian_fit
 
     def fit(
@@ -228,10 +227,9 @@ class GaussianModel:
                     aggregate,
                     alpha,
                 )
-                
+
             return x
 
-    
     def _write_conformalization_data(
         self, conformalization_data, election_id, office, geographic_unit_type, estimand, aggregate, alpha
     ):
