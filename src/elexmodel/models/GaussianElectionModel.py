@@ -13,6 +13,10 @@ class GaussianElectionModel(BaseElectionModel):
         self.beta = model_settings.get("beta", 1)
         self.alpha_to_nonreporting_lower_bounds = {}
         self.alpha_to_nonreporting_upper_bounds = {}
+        self.modeled_bounds_agg = None
+        self.conformalization_data_agg = None
+        self.gaussian_bounds_unit = None
+        self.conformalization_data_unit = None
 
     def _compute_conf_frac(self):
         """

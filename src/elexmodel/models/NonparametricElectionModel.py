@@ -10,6 +10,11 @@ class NonparametricElectionModel(BaseElectionModel):
     def __init__(self, model_settings={}):
         super().__init__(model_settings)
         self.robust = model_settings.get("robust", False)
+        self.modeled_bounds_agg = None
+        self.conformalization_data_agg = None
+        self.gaussian_bounds_unit = None
+        self.conformalization_data_unit = None
+  
 
     def _compute_conf_frac(self, n_reporting_units, alpha):
         """
@@ -52,7 +57,7 @@ class NonparametricElectionModel(BaseElectionModel):
         prediction_intervals = self.get_unit_prediction_interval_bounds(
             reporting_units, nonreporting_units, conf_frac, alpha, estimand
         )
-
+        self.conformalization_data_unit = prediction_intervals.conformalization
         # compute conformity scores (e_j). This is how well the the lower/upper model cover the conformalization data.
         scores = np.maximum(
             prediction_intervals.conformalization.lower_bounds, prediction_intervals.conformalization.upper_bounds
@@ -99,7 +104,14 @@ class NonparametricElectionModel(BaseElectionModel):
         return PredictionIntervals(
             lower.round(decimals=0), upper.round(decimals=0), prediction_intervals.conformalization
         )
-
+    
+    def get_conformalization_data_unit(self):
+        return self.gaussian_bounds_unit, self.conformalization_data_unit
+    
+    # Note that precinct level % conformalization data
+    def get_conformalization_data_agg(self):  
+        return self.modeled_bounds_agg, self.conformalization_data_agg
+    
     def get_aggregate_prediction_intervals(
         self,
         reporting_units,
@@ -146,4 +158,7 @@ class NonparametricElectionModel(BaseElectionModel):
             .reset_index(drop=True)
         )
 
+        self.conformalization_data_agg = conformalization_data
         return PredictionIntervals(aggregate_data.lower.round(decimals=0), aggregate_data.upper.round(decimals=0))
+    
+    

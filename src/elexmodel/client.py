@@ -35,6 +35,8 @@ class ModelClient(object):
 
     def __init__(self):
         super().__init__()
+        self.conformalization_data_unit_dict = None
+        self.conformalization_data_agg_dict = None
 
     def _check_input_parameters(
         self,
@@ -86,14 +88,17 @@ class ModelClient(object):
             raise ValueError("handle_unreporting must be either `drop` or `zero`")
         return True
 
+    #These functions collect the conformalization data from a model run. They each produce a dictionary
+    # with two types of data (in the gaussian case): the conformalization points that a distribution is
+    # fit to, and the parameters of the resulting guassian distribution. In the unit function, the information for 
+    #one distribution is returned (all units combined) and in the agg case, distributions for each state (
+    #in a multi-state model) are returned. These functions return None if get_estimates isn't called, as the
+    # values they pull out are generated in that function.
     def get_conformalization_data_unit(self):
         return self.conformalization_data_unit_dict
 
     def get_conformalization_data_agg(self):
         return self.conformalization_data_agg_dict
-
-    # TODO comment: conformalization data pulled out from get_estimates function below
-    # which means model_client.get_conformalization_data() after model_client.get_estimates - bad?
 
     def get_estimates(
         self,
