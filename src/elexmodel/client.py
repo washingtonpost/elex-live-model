@@ -87,13 +87,14 @@ class ModelClient(object):
         if handle_unreporting not in {"drop", "zero"}:
             raise ValueError("handle_unreporting must be either `drop` or `zero`")
         return True
-
-    # These functions collect the conformalization data from a model run. They each produce a dictionary
-    # with two types of data (in the gaussian case): the conformalization points that a distribution is
-    # fit to, and the parameters of the resulting guassian distribution. In the unit function, the information for
-    # one distribution is returned (all units combined) and in the agg case, distributions for each state (
-    # in a multi-state model) are returned. These functions return None if get_estimates isn't called, as the
-    # values they pull out are generated in that function.
+    """
+    These functions collect the conformalization data from a model run. They each produce a dictionary
+    with two types of data (in the gaussian case): the conformalization points that a distribution is
+    fit to, and the parameters of the resulting guassian distribution. In the unit function, the information for
+    one distribution is returned (all units combined) and in the agg case, distributions for each state (
+    in a multi-state model) are returned. These functions return None if get_estimates isn't called, as the
+    values they pull out are generated in that function.
+    """
     def get_conformalization_data_unit(self):
         return self.conformalization_data_unit_dict
 
@@ -264,9 +265,7 @@ class ModelClient(object):
                 alpha_to_unit_prediction_intervals[alpha] = model.get_unit_prediction_intervals(
                     results_handler.reporting_units, results_handler.nonreporting_units, alpha, estimand
                 )
-                self.conformalization_data_unit_dict[alpha][estimand] = (
-                    None if pi_method == "nonparametric" else model.get_conformalization_data_unit()
-                )
+                self.conformalization_data_unit_dict[alpha][estimand] = model.get_conformalization_data_unit()
 
             results_handler.add_unit_intervals(estimand, alpha_to_unit_prediction_intervals)
 
@@ -291,9 +290,7 @@ class ModelClient(object):
                         estimand,
                         model_settings,
                     )
-                    self.conformalization_data_agg_dict[alpha][estimand] = (
-                        None if pi_method == "nonparametric" else model.get_conformalization_data_agg()
-                    )
+                    self.conformalization_data_agg_dict[alpha][estimand] = model.get_conformalization_data_agg()
 
                 # get all of the prediction intervals here
                 results_handler.add_agg_predictions(

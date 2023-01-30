@@ -90,10 +90,10 @@ class GaussianElectionModel(BaseElectionModel):
             lower.round(decimals=0), upper.round(decimals=0), prediction_intervals.conformalization
         )
 
+    #At the unit level, conformalization data is adjustment from estimated % change from baseline
     def get_conformalization_data_unit(self):
         return self.gaussian_bounds_unit, self.conformalization_data_unit
 
-    # Note that precinct level % conformalization data
     def get_conformalization_data_agg(self):
         return self.modeled_bounds_agg, self.conformalization_data_agg
 
