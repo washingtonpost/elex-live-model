@@ -10,9 +10,7 @@ class NonparametricElectionModel(BaseElectionModel):
     def __init__(self, model_settings={}):
         super().__init__(model_settings)
         self.robust = model_settings.get("robust", False)
-        self.modeled_bounds_agg = None
         self.conformalization_data_agg = None
-        self.gaussian_bounds_unit = None
         self.conformalization_data_unit = None
 
     def _compute_conf_frac(self, n_reporting_units, alpha):
@@ -105,11 +103,11 @@ class NonparametricElectionModel(BaseElectionModel):
         )
 
     # At the unit level, conformalization data is adjustment from estimated % change from baseline
-    def get_conformalization_data_unit(self):
-        return self.gaussian_bounds_unit, self.conformalization_data_unit
+    def get_all_conformalization_data_unit(self):
+        return None, self.conformalization_data_unit
 
-    def get_conformalization_data_agg(self):
-        return self.modeled_bounds_agg, self.conformalization_data_agg
+    def get_all_conformalization_data_agg(self):
+        return None, self.conformalization_data_agg
 
     def get_aggregate_prediction_intervals(
         self,

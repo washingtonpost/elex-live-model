@@ -10,8 +10,8 @@ from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
 warnings.filterwarnings("error", category=UserWarning, module="cvxpy")
 
 PredictionIntervals = namedtuple("PredictionIntervals", ["lower", "upper", "conformalization"], defaults=(None,) * 3)
-LOG = logging.getLogger(__name__)
 
+LOG = logging.getLogger(__name__)
 
 class BaseElectionModel(object):
     def __init__(self, model_settings={}):
