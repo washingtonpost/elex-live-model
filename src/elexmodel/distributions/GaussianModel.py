@@ -108,7 +108,6 @@ class GaussianModel:
             )
             .reset_index(drop=drop_index)
         )
-
         return gaussian_fit
 
     def fit(
