@@ -391,6 +391,7 @@ class HistoricalModelClient(ModelClient):
             s3_client=s3.S3CsvUtil(TARGET_BUCKET),
             historical=True,
         )
+        
         results_to_return = [f"results_{estimand}" for estimand in estimands]
         geo_columns = set(["geographic_unit_fips", "postal_code"] + [a for a in self.aggregates if a != "unit"])
         preprocessed_data = preprocessed_data_handler.data[list(geo_columns) + results_to_return].copy()

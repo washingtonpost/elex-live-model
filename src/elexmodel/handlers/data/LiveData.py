@@ -44,7 +44,6 @@ class MockLiveDataHandler(object):
         self.shuffle_dataframe = None
 
         self.data = data
-
         if data is not None:
             # passed in as a df
             data_for_estimands = self.load_data(data, estimands, historical)
@@ -56,7 +55,6 @@ class MockLiveDataHandler(object):
 
     def get_data(self):
         file_path = self.get_live_data_file_path()
-
         # If local data file is not available, read data from s3
         if not Path(file_path).is_file():
             path_info = {
@@ -92,7 +90,7 @@ class MockLiveDataHandler(object):
                 data[f"results_{estimand}"] = np.nan
             results_column_names = [x for x in data.columns if x.startswith("results")]
             # If this is not a historical run, then this is a live election
-            # so we are expecting that there will not be actual results  data
+            # so we are expecting that there will be actual results  data
             if not self.historical and len(results_column_names) == 0:
                 raise MockLiveDataHandlerException("This is not a test election, it is missing results data")
             if f"results_{estimand}" not in results_column_names:
@@ -120,6 +118,7 @@ class MockLiveDataHandler(object):
             for value in weight:  # e.g. value == "AL"
                 indices = self.data[self.shuffle_dataframe[category] == value].index
                 probabilities[indices] = probabilities[indices] * weight[value]
+
         self.data = self.data.sample(frac=1, random_state=seed, weights=probabilities)
 
         # get indices of units that must come first
