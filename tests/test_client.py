@@ -633,3 +633,77 @@ def test_get_estimates_not_enough_subunits_reporting(model_client, va_governor_c
             raw_config=va_governor_config,
             preprocessed_data=preprocessed_data,
         )
+
+
+def test_conformalization_data(model_client, va_governor_county_data, va_governor_config):
+    election_id = "2017-11-07_VA_G"
+    office_id = "G"
+    geographic_unit_type = "county"
+    estimands = ["turnout"]
+    prediction_intervals = [0.9]
+    percent_reporting_threshold = 100
+
+    data_handler = MockLiveDataHandler(
+        election_id, office_id, geographic_unit_type, estimands, data=va_governor_county_data
+    )
+
+    data_handler.shuffle()
+    data = data_handler.get_percent_fully_reported(70)
+
+    preprocessed_data = va_governor_county_data.copy()
+    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy()
+    preprocessed_data["total_voters_turnout"] = preprocessed_data["last_election_results_turnout"] + 1
+
+    model_client.get_estimates(
+        data,
+        election_id,
+        office_id,
+        estimands,
+        prediction_intervals,
+        percent_reporting_threshold,
+        geographic_unit_type,
+        raw_config=va_governor_config,
+        preprocessed_data=preprocessed_data,
+        pi_method="gaussian",
+    )
+
+    conform_unit = model_client.get_all_conformalization_data_unit()
+    conform_agg = model_client.get_all_conformalization_data_agg()
+
+    assert len(conform_unit) == 1
+    assert len(conform_agg) == 1
+    assert len(conform_unit[0.9]) == 1
+    assert len(conform_agg[0.9]) == 1
+    assert list(conform_unit[0.9].keys()) == ["turnout"]
+    assert list(conform_agg[0.9].keys()) == ["turnout"]
+    assert isinstance(conform_unit[0.9]["turnout"][0], pd.DataFrame)
+    assert isinstance(conform_unit[0.9]["turnout"][1], pd.DataFrame)
+    assert isinstance(conform_agg[0.9]["turnout"][0], pd.DataFrame)
+    assert isinstance(conform_agg[0.9]["turnout"][1], pd.DataFrame)
+
+    model_client.get_estimates(
+        data,
+        election_id,
+        office_id,
+        estimands,
+        prediction_intervals,
+        percent_reporting_threshold,
+        geographic_unit_type,
+        raw_config=va_governor_config,
+        preprocessed_data=preprocessed_data,
+        pi_method="nonparametric",
+    )
+
+    conform_unit = model_client.get_all_conformalization_data_unit()
+    conform_agg = model_client.get_all_conformalization_data_agg()
+
+    assert len(conform_unit) == 1
+    assert len(conform_agg) == 1
+    assert len(conform_unit[0.9]) == 1
+    assert len(conform_agg[0.9]) == 1
+    assert list(conform_unit[0.9].keys()) == ["turnout"]
+    assert list(conform_agg[0.9].keys()) == ["turnout"]
+    assert conform_unit[0.9]["turnout"][0] is None
+    assert isinstance(conform_unit[0.9]["turnout"][1], pd.DataFrame)
+    assert conform_agg[0.9]["turnout"][0] is None
+    assert isinstance(conform_agg[0.9]["turnout"][1], pd.DataFrame)
