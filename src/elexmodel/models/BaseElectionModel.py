@@ -13,6 +13,7 @@ PredictionIntervals = namedtuple("PredictionIntervals", ["lower", "upper", "conf
 
 LOG = logging.getLogger(__name__)
 
+
 class BaseElectionModel(object):
     def __init__(self, model_settings={}):
         self.qr = QuantileRegressionSolver(solver="ECOS")
