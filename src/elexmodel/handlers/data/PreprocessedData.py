@@ -52,7 +52,7 @@ class PreprocessedDataHandler(object):
                 "geographic_unit_type": self.geographic_unit_type,
             }
             file_path = self.s3_client.get_file_path("preprocessed", path_info)
-            print("file path historical", file_path)
+
             csv_data = self.s3_client.get(file_path)
             # read data as a buffer
             preprocessed_data = StringIO(csv_data)
