@@ -4,34 +4,54 @@ from elexsolver.TransitionMatrixSolver import TransitionMatrixSolver
 from scipy.stats import bootstrap
 import numpy as np
 class EnsembleElectionModel(BaseElectionModel):
-    def __init__(self):
+    def __init__(self, estimands, alphas):
+        self.unit_prediction_samples = []
         self.unit_predictions = None
+        self.alphas = alphas
+        self.unit_prediction_intervals_lower = {}
+        self.unit_prediction_intervals_upper = {}
+        self.estimands = estimands
+        self.estimand_to_index = {estimand: i for i, estimand in enumerate(self.estimands)}
+        self.method = 'transition'
+        self.sampling_method = 'random'
+
+    def get_minimum_reporting_units(self, alpha):
+        return np.power(len(self.estimands), 2) + 1
+
+    def get_estimand_index(self, estimand):
+        return self.estimand_to_index[estimand]
 
     @classmethod
     def string_add_prefix(cls, string, prefix, sep='_'):
         return f'{prefix}{sep}{string}'
 
-    def process_matrix_for_solving(self, dataframe, prefix='results'):
-        dem_string = self.string_add_prefix('dem', prefix)
-        gop_string = self.string_add_prefix('gop', prefix)
-        nonvoter_string = self.string_add_prefix('nonvoters', prefix)
-        matrix = dataframe[[dem_string, gop_string, 'total_gen_voters']].copy()
-        matrix[nonvoter_string] = matrix.total_gen_voters - (matrix[dem_string] + matrix[gop_string])
-        return matrix[[dem_string, gop_string, nonvoter_string]].copy().to_numpy()
+    @classmethod
+    def get_total_people(cls, dataframe):
+        if 'total_people' in dataframe:
+            return dataframe.total_people
+        elif 'total_gen_voters':
+            return dataframe.total_gen_voters
 
-    def get_samples(self, reporting_units, sampling_method, m):
+    def process_matrix_for_solving(self, dataframe, prefix='results'):
+        estimand_string_list = [self.string_add_prefix(estimand, prefix) for estimand in self.estimands]
+        nonvoter_string = self.string_add_prefix('nonvoters', prefix)
+        dataframe['total_people'] = self.get_total_people(dataframe)
+        matrix = dataframe[estimand_string_list + ['total_people']].copy()
+        matrix[nonvoter_string] = matrix.total_people - matrix[estimand_string_list].sum(1)
+        return matrix[estimand_string_list + [nonvoter_string]].copy().to_numpy()
+
+    def get_samples(self, reporting_units, m):
         K = reporting_units.shape[0]
-        n = round(0.2 * K)
-        if sampling_method == 'random':
+        n = round(0.5 * K)
+        if self.sampling_method == 'random':
             return np.random.choice(K, size=(n, m), replace=True).transpose()
 
-
-    def compute_predictions(self, reporting_units, nonreporting_units, method='transition', sampling_method = 'random'):
+    def sample_predictions(self, reporting_units, nonreporting_units):
         m = 100
-        if method == 'transition':
+        if self.method == 'transition':
             # estimate transition matrices
 
-            sample_indices = self.get_samples(reporting_units, sampling_method, m)
+            sample_indices = self.get_samples(reporting_units, m)
             # sample_indices_test = np.asarray([[0, 0, 0], [1, 1, 1], [2, 2, 2]]).transpose()
             # reporting_matrix_current[sample_indices]
             reporting_matrix_current = self.process_matrix_for_solving(reporting_units, 'results')
@@ -40,7 +60,6 @@ class EnsembleElectionModel(BaseElectionModel):
             reporting_matrix_past_sampled = reporting_matrix_past[sample_indices]
 
             nonreporting_matrix_past = self.process_matrix_for_solving(nonreporting_units, 'baseline')
-
             self.unit_predictions = []
             for i in range(m):
                 reporting_matrix_current_i = reporting_matrix_current_sampled[i]
@@ -50,130 +69,56 @@ class EnsembleElectionModel(BaseElectionModel):
                 transition_matrix_solver.fit(reporting_matrix_past_i, reporting_matrix_current_i, strict=False)
 
                 preds_i = transition_matrix_solver.predict(nonreporting_matrix_past).round(decimals=0)[:,:2] # can drop nonvoters now
-                # still need to max with current results
-                self.unit_predictions.append(preds_i)
-                print(f"{i} done")
-        elif method == 'regression':
+                preds_i = np.maximum(preds_i, nonreporting_units[['results_dem', 'results_gop']]).to_numpy()
+                
+                self.unit_prediction_samples.append(preds_i)
+        elif self.method == 'regression':
             # estimate many regressions with covariates
             pass
     
-    def get_unit_predictions(self):
-        median_predictions = np.median(self.unit_predictions, axis=0)
-        dem_predictions = median_predictions[:,0]
-        gop_predictions = median_predictions[:,1]
-        return dem_predictions, gop_predictions
+    def compute_unit_predictions(self):
+        self.unit_predictions = np.median(self.unit_prediction_samples, axis=0)
 
-    def get_unit_prediction_intervals(self):
-        max_predictions = np.max(self.unit_predictions, axis=0)
-        min_predictions = np.min(self.unit_predictions, axis=0)
-        dem_max = max_predictions[:,0]
-        gop_max = max_predictions[:,1]
-        dem_min = min_predictions[:,0]
-        gop_min = min_predictions[:,1]
-        return dem_min, dem_max, gop_min, gop_max
+    def get_unit_predictions(self, reporting_units, nonreporting_units, estimand):
+        if self.unit_predictions is None:
+            self.sample_predictions(reporting_units, nonreporting_units)
+            self.compute_unit_predictions()
+        estimand_index = self.get_estimand_index(estimand)
+        return self.unit_predictions[:,estimand_index]
+    
+    def compute_unit_prediction_intervals(self, alpha):
+        lower_quantile = (1 - alpha) / 2
+        upper_quantile = (1 + alpha) / 2
+        self.unit_prediction_intervals_lower[alpha] = np.quantile(self.unit_prediction_samples, lower_quantile, axis=0)
+        self.unit_prediction_intervals_upper[alpha] = np.quantile(self.unit_prediction_samples, upper_quantile, axis=0)
 
-    def _get_reporting_aggregate_votes(self, reporting_units, unexpected_units, aggregate):
-        reporting_units_known_votes = reporting_units.groupby(aggregate).sum().reset_index(drop=False)
-
-        # we cannot know the county classification of unexpected geographic units, so we can't add the votes back in
-        if "county_classification" in aggregate:
-            aggregate_votes = reporting_units_known_votes[aggregate + [f"results_dem", "results_gop", "reporting"]]
-        else:
-            unexpected_units_known_votes = unexpected_units.groupby(aggregate).sum().reset_index(drop=False)
-
-            # outer join to ensure that if entire districts of county classes are unexpectedly present, we
-            # should still have them. Same reasoning to replace NA with zero
-            # NA means there was no such geographic unit, so they don't capture any votes
-            results_col_dem = f"results_dem"
-            results_col_gop = f"results_gop"
-            reporting_col = "reporting"
-            aggregate_votes = (
-                reporting_units_known_votes.merge(
-                    unexpected_units_known_votes,
-                    how="outer",
-                    on=aggregate,
-                    suffixes=("_expected", "_unexpected"),
-                )
-                .fillna(
-                    {
-                        f"results_dem_expected": 0,
-                        f"results_dem_unexpected": 0,
-                        "results_gop_expected": 0,
-                        "results_gop_unexpected": 0,
-                        "reporting_expected": 0,
-                        "reporting_unexpected": 0,
-                    }
-                )
-                .assign(
-                    **{
-                        results_col_dem: lambda x: x[f"results_dem_expected"] + x[f"results_dem_unexpected"],
-                        results_col_gop: lambda x: x[f"results_gop_expected"] + x[f"results_gop_unexpected"],
-
-                        reporting_col: lambda x: x["reporting_expected"] + x["reporting_unexpected"],
-                    },
-                )[aggregate + [f"results_dem", "results_gop", "reporting"]]
-            )
-
-        return aggregate_votes
-
-    def get_aggregate_predictions(self, reporting_units, nonreporting_units, unexpected_units, aggregate):
-        # already counted votes
-        aggregate_votes = self._get_reporting_aggregate_votes(reporting_units, unexpected_units, aggregate)
-
-        # these are subunits that are not already counted
-        aggregate_preds = (
-            nonreporting_units.groupby(aggregate)
-            .sum()
-            .reset_index(drop=False)
-            .rename(
-                columns={
-                    f"pred_dem": f"pred_only_dem",
-                    f"results_dem": f"results_only_dem",
-                    "pred_gop": "pred_only_gop",
-                    "results_gop": "results_only_gop",
-                    "reporting": "reporting_only",
-                }
-            )
+    def get_unit_prediction_intervals(self, reporting_units, nonreporting_units, alpha, estimand):
+        if alpha not in self.unit_prediction_intervals_lower:
+            self.compute_unit_prediction_intervals(alpha)
+        estimand_index = self.get_estimand_index(estimand)
+        return PredictionIntervals(
+            self.unit_prediction_intervals_lower[alpha][:,estimand_index],
+            self.unit_prediction_intervals_upper[alpha][:,estimand_index],
+            None
         )
 
-        aggregate_data = (
-            aggregate_votes.merge(aggregate_preds, how="outer", on=aggregate)
-            .fillna(
-                {
-                    f"results_dem": 0,
-                    f"pred_only_dem": 0,
-                    f"results_only_dem": 0,
-                    "results_gop": 0,
-                    "pred_only_gop": 0,
-                    "results_only_gop": 0,
-                    "reporting": 0,
-                    "reporting_only": 0,
-                }
-            )
-            .assign(
-                # don't need to sum results_only for predictions since those are superceded by pred_only
-                # preds can't be smaller than results, since we maxed between predictions and results in unit function.
-                **{
-                    f"pred_dem": lambda x: x[f"results_dem"] + x[f"pred_only_dem"],
-                    f"results_dem": lambda x: x[f"results_dem"] + x[f"results_only_dem"],
-                    f"pred_gop": lambda x: x[f"results_gop"] + x[f"pred_only_gop"],
-                    f"results_gop": lambda x: x[f"results_gop"] + x[f"results_only_gop"],
-                    "reporting": lambda x: x["reporting"] + x["reporting_only"],
-                },
-            )
-            .sort_values(aggregate)[aggregate + [f"pred_dem", f"results_dem", "pred_gop", "results_gop", "reporting"]]
-            .reset_index(drop=True)
-        )
-        return aggregate_data
-
+    # getting aggregate prediction is not correct. need to aggregate and then get median
+    # same for prediction intervals (!)
+ 
     def get_aggregate_prediction_intervals(self,
         reporting_units,
         nonreporting_units,
         unexpected_units,
-        aggregate
+        aggregate,
+        alpha,
+        conformalization,
+        estimand,
+        model_settings,
     ):
-        # we're doing the same work as in get_aggregate_predictions here, can we just do this work once?
-        aggregate_votes = self._get_reporting_aggregate_votes(reporting_units, unexpected_units, aggregate)
+        aggregate_votes = self._get_reporting_aggregate_votes(reporting_units, unexpected_units, aggregate, estimand)
+
+        lower_string = f"lower_{alpha}_{estimand}"
+        upper_string = f"upper_{alpha}_{estimand}"
 
         # prediction intervals sum, kind of miraculous
         # Technically this is a conservative approach. This is equivalent to perfect correlation if
@@ -182,26 +127,24 @@ class EnsembleElectionModel(BaseElectionModel):
             nonreporting_units.groupby(aggregate)
             .sum()
             .reset_index(drop=False)
-            .rename(columns={"lower_0.9_dem": f"pi_lower_dem", "upper_0.9_dem": f"pi_upper_dem", "lower_0.9_gop": "pi_lower_gop", "upper_0.9_gop": "pi_upper_gop"})[
-                aggregate + [f"pi_lower_dem", f"pi_upper_dem", "pi_lower_gop", "pi_upper_gop"]
+            .rename(columns={lower_string: f"pi_lower_{estimand}", upper_string: f"pi_upper_{estimand}"})[
+                aggregate + [f"pi_lower_{estimand}", f"pi_upper_{estimand}"]
             ]
         )
 
         # sum in prediction intervals and rename
         aggregate_data = (
             aggregate_votes.merge(aggregate_prediction_intervals, how="outer", on=aggregate)
-            .fillna({f"results_dem": 0, f"pi_lower_dem": 0, f"pi_upper_dem": 0, "results_gop": 0, "pi_lower_gop": 0, "pi_upper_gop": 0})
+            .fillna({f"results_{estimand}": 0, f"pi_lower_{estimand}": 0, f"pi_upper_{estimand}": 0})
             .assign(
-                lower_dem=lambda x: x[f"pi_lower_dem"] + x[f"results_dem"],
-                upper_dem=lambda x: x[f"pi_upper_dem"] + x[f"results_dem"],
-                lower_gop=lambda x: x["pi_lower_gop"] + x["results_gop"],
-                upper_gop=lambda x: x["pi_upper_gop"] + x["results_gop"]
+                lower=lambda x: x[f"pi_lower_{estimand}"] + x[f"results_{estimand}"],
+                upper=lambda x: x[f"pi_upper_{estimand}"] + x[f"results_{estimand}"],
             )
-            .sort_values(aggregate)[aggregate + ["lower_dem", "upper_dem", "lower_gop", "upper_gop"]]
+            .sort_values(aggregate)[aggregate + ["lower", "upper"]]
             .reset_index(drop=True)
         )
 
-        return PredictionIntervals(aggregate_data.lower_dem.round(decimals=0), aggregate_data.upper_dem.round(decimals=0)), PredictionIntervals(aggregate_data.lower_gop.round(decimals=0), aggregate_data.upper_gop.round(decimals=0))
+        return PredictionIntervals(aggregate_data.lower.round(decimals=0), aggregate_data.upper.round(decimals=0), None)
     
     def get_all_conformalization_data_unit(self):
         return None

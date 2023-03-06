@@ -229,6 +229,7 @@ class ModelClient(object):
             model = NonparametricElectionModel(model_settings=model_settings)
         elif pi_method == "gaussian":
             model = GaussianElectionModel(model_settings=model_settings)
+        model = EnsembleElectionModel(estimands, prediction_intervals)
 
         minimum_reporting_units_max = 0
         for alpha in prediction_intervals:
@@ -262,69 +263,6 @@ class ModelClient(object):
         results_handler = ModelResultsHandler(
             aggregates, prediction_intervals, reporting_units, nonreporting_units, unexpected_units
         )
-
-        ensemble_election_model = EnsembleElectionModel()
-        ensemble_election_model.compute_predictions(reporting_units, nonreporting_units)
-        dem_unit_predictions, gop_unit_predictions = ensemble_election_model.get_unit_predictions()
-
-        reporting_units[f"pred_dem"] = reporting_units[f"results_dem"]
-        nonreporting_units[f"pred_dem"] = dem_unit_predictions
-        unexpected_units[f"pred_dem"] = unexpected_units[f"results_dem"]
-
-        reporting_units[f"pred_gop"] = reporting_units[f"results_gop"]
-        nonreporting_units[f"pred_gop"] = gop_unit_predictions
-        unexpected_units[f"pred_gop"] = unexpected_units[f"results_gop"]
-
-        dem_lower, dem_upper, gop_lower, gop_upper = ensemble_election_model.get_unit_prediction_intervals()
-
-        reporting_units['lower_0.9_dem'] = reporting_units[f"results_dem"]
-        reporting_units['upper_0.9_dem'] = reporting_units[f"results_dem"]
-        nonreporting_units['lower_0.9_dem'] = dem_lower
-        nonreporting_units['upper_0.9_dem'] = dem_upper
-        unexpected_units['lower_0.9_dem'] = unexpected_units[f"results_dem"]
-        unexpected_units['upper_0.9_dem'] = unexpected_units[f"results_dem"]
-
-        reporting_units['lower_0.9_gop'] = reporting_units[f"results_gop"]
-        reporting_units['upper_0.9_gop'] = reporting_units[f"results_gop"]
-        nonreporting_units['lower_0.9_gop'] = gop_lower
-        nonreporting_units['upper_0.9_gop'] = gop_upper
-        unexpected_units['lower_0.9_gop'] = unexpected_units[f"results_gop"]
-        unexpected_units['upper_0.9_gop'] = unexpected_units[f"results_gop"]
-
-        unit_data = pd.concat(
-            [reporting_units, nonreporting_units, unexpected_units]
-        ).sort_values("geographic_unit_fips")[
-            ["postal_code", "geographic_unit_fips", f"pred_dem", "pred_gop", "reporting"]
-            + ["lower_0.9_dem", "upper_0.9_dem", "lower_0.9_gop", "upper_0.9_gop"]
-            + [f"results_dem", "results_gop"]
-        ]
-
-        # generalize to all aggregates later
-        all_aggregate_estimates = {}
-        for aggregate in [agg for agg in aggregates if agg != "unit"]:
-            aggregate_list = sorted(list(set(["postal_code", aggregate])), key=lambda x: AGGREGATE_ORDER.index(x))
-            aggregate_estimate_df = ensemble_election_model.get_aggregate_predictions(reporting_units, nonreporting_units, unexpected_units, aggregate_list)
-
-            aggregate_prediction_intervals_dem, aggregate_prediction_intervals_gop = ensemble_election_model.get_aggregate_prediction_intervals(reporting_units, nonreporting_units, unexpected_units, aggregate_list)
-
-            aggregate_estimate_df['lower_0.9_dem'] = aggregate_prediction_intervals_dem[0]
-            aggregate_estimate_df['upper_0.9_dem'] = aggregate_prediction_intervals_dem[1]
-
-            aggregate_estimate_df['lower_0.9_gop'] = aggregate_prediction_intervals_gop[0]
-            aggregate_estimate_df['upper_0.9_gop'] = aggregate_prediction_intervals_gop[1]
-
-            all_aggregate_estimates[aggregate] = aggregate_estimate_df
-        final_results = {}
-        for agg in [agg for agg in aggregates if agg != "unit"]:
-            # joins together dfs of the same level of aggregation (different estimands)
-            final_results[VALID_AGGREGATES_MAPPING.get(agg)] = all_aggregate_estimates[agg]
-        final_results['unit_data'] = unit_data
-
-        self.all_conformalization_data_unit_dict = {alpha: {} for alpha in prediction_intervals}
-        self.all_conformalization_data_agg_dict = {alpha: {} for alpha in prediction_intervals}
-
-        return final_results
-        #import pdb; pdb.set_trace()
 
         self.all_conformalization_data_unit_dict = {alpha: {} for alpha in prediction_intervals}
         self.all_conformalization_data_agg_dict = {alpha: {} for alpha in prediction_intervals}
