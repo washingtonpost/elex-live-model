@@ -13,6 +13,10 @@ class GaussianElectionModel(BaseElectionModel):
         self.beta = model_settings.get("beta", 1)
         self.alpha_to_nonreporting_lower_bounds = {}
         self.alpha_to_nonreporting_upper_bounds = {}
+        self.modeled_bounds_agg = None
+        self.conformalization_data_agg = None
+        self.gaussian_bounds_unit = None
+        self.conformalization_data_unit = None
 
     def _compute_conf_frac(self):
         """
@@ -44,6 +48,8 @@ class GaussianElectionModel(BaseElectionModel):
             alpha=alpha,
             beta=self.beta,
         )
+        self.gaussian_bounds_unit = gaussian_model
+        self.conformalization_data_unit = prediction_intervals.conformalization
 
         # gaussian model for single unit prediction intervals
         quantile = (3 + alpha) / 4
@@ -52,6 +58,7 @@ class GaussianElectionModel(BaseElectionModel):
             loc=gaussian_model.mu_lower_bound,
             scale=np.sqrt(gaussian_model.var_inflate + 1) * gaussian_model.sigma_lower_bound,
         )
+
         upper_correction = stats.norm.ppf(
             q=quantile,
             loc=gaussian_model.mu_upper_bound,
@@ -82,6 +89,13 @@ class GaussianElectionModel(BaseElectionModel):
         return PredictionIntervals(
             lower.round(decimals=0), upper.round(decimals=0), prediction_intervals.conformalization
         )
+
+    # At the unit level, conformalization data is adjustment from estimated % change from baseline
+    def get_all_conformalization_data_unit(self):
+        return self.gaussian_bounds_unit, self.conformalization_data_unit
+
+    def get_all_conformalization_data_agg(self):
+        return self.modeled_bounds_agg, self.conformalization_data_agg
 
     def get_aggregate_prediction_intervals(
         self,
@@ -232,9 +246,12 @@ class GaussianElectionModel(BaseElectionModel):
             modeled_bounds = pd.concat([modeled_bounds, remaining_bounds_w_models])
 
         # construction conformal corrections using Gaussian models
-        # get means and standard deviations for for aggregates
+        # get means and standard deviations for aggregates
         # and add correction (which is percentile of the Gaussian at the quantile we care about)
+        self.modeled_bounds_agg = modeled_bounds
+        self.conformalization_data_agg = conformalization_data
         quantile = (3 + alpha) / 4
+
         modeled_bounds = modeled_bounds.assign(
             lb_mean=lambda x: x.nonreporting_weight_sum * x.mu_lower_bound,
             lb_sd=lambda x: x.sigma_lower_bound
@@ -269,7 +286,7 @@ class GaussianElectionModel(BaseElectionModel):
             .drop(columns=f"last_election_results_{estimand}")
         )
 
-        # add results from reporting and reporting and unexpected units to get final group bounds
+        # add results from reporting  and unexpected units to get final group bounds
         aggregate_data = (
             aggregate_votes.merge(aggregate_prediction_intervals, how="outer", on=aggregate)
             .fillna({f"results_{estimand}": 0, "predicted_lower": 0, "predicted_upper": 0})

@@ -35,6 +35,8 @@ class ModelClient(object):
 
     def __init__(self):
         super().__init__()
+        self.conformalization_data_unit_dict = None
+        self.conformalization_data_agg_dict = None
 
     def _check_input_parameters(
         self,
@@ -86,6 +88,26 @@ class ModelClient(object):
             raise ValueError("handle_unreporting must be either `drop` or `zero`")
         return True
 
+    def get_all_conformalization_data_unit(self):
+        """
+        This function collects the conformalization data from a model run. It produces a dictionary
+        with two types of data (in the gaussian case): the conformalization points that a distribution is
+        fit to, and the parameters of the resulting guassian distribution. In this unit-level function, the information for
+        one distribution is returned (all units combined). It returns None if get_estimates isn't called, as the
+        values they pull out are generated in that function.
+        """
+        return self.all_conformalization_data_unit_dict
+
+    def get_all_conformalization_data_agg(self):
+        """
+        This function collects the conformalization data from a model run. It produces a dictionary
+        with two types of data (in the gaussian case): the conformalization points that a distribution is
+        fit to, and the parameters of the resulting guassian distribution. In the agg case, distributions for each state (
+        in a multi-state model) are returned. This functions return None if get_estimates isn't called, as the
+        values they pull out are generated in that function.
+        """
+        return self.all_conformalization_data_agg_dict
+
     def get_estimates(
         self,
         current_data,  # list of lists
@@ -136,7 +158,6 @@ class ModelClient(object):
         config_handler = ConfigHandler(
             election_id, config=raw_config, s3_client=s3.S3JsonUtil(TARGET_BUCKET), save=save_config
         )
-
         self._check_input_parameters(
             config_handler,
             office,
@@ -239,16 +260,19 @@ class ModelClient(object):
             aggregates, prediction_intervals, reporting_units, nonreporting_units, unexpected_units
         )
 
+        self.all_conformalization_data_unit_dict = {alpha: {} for alpha in prediction_intervals}
+        self.all_conformalization_data_agg_dict = {alpha: {} for alpha in prediction_intervals}
         for estimand in estimands:
             unit_predictions = model.get_unit_predictions(reporting_units, nonreporting_units, estimand)
             results_handler.add_unit_predictions(estimand, unit_predictions)
             # gets prediciton intervals for each alpha
-            alpha_to_unit_prediction_intervals = {
-                alpha: model.get_unit_prediction_intervals(
+            alpha_to_unit_prediction_intervals = {}
+            for alpha in prediction_intervals:
+                alpha_to_unit_prediction_intervals[alpha] = model.get_unit_prediction_intervals(
                     results_handler.reporting_units, results_handler.nonreporting_units, alpha, estimand
                 )
-                for alpha in prediction_intervals
-            }
+                self.all_conformalization_data_unit_dict[alpha][estimand] = model.get_all_conformalization_data_unit()
+
             results_handler.add_unit_intervals(estimand, alpha_to_unit_prediction_intervals)
 
             for aggregate in results_handler.aggregates:
@@ -260,8 +284,9 @@ class ModelClient(object):
                     aggregate_list,
                     estimand,
                 )
-                alpha_to_agg_prediction_intervals = {
-                    alpha: model.get_aggregate_prediction_intervals(
+                alpha_to_agg_prediction_intervals = {}
+                for alpha in prediction_intervals:
+                    alpha_to_agg_prediction_intervals[alpha] = model.get_aggregate_prediction_intervals(
                         results_handler.reporting_units,
                         results_handler.nonreporting_units,
                         results_handler.unexpected_units,
@@ -271,8 +296,8 @@ class ModelClient(object):
                         estimand,
                         model_settings,
                     )
-                    for alpha in prediction_intervals
-                }
+                    self.all_conformalization_data_agg_dict[alpha][estimand] = model.get_all_conformalization_data_agg()
+
                 # get all of the prediction intervals here
                 results_handler.add_agg_predictions(
                     estimand, aggregate, estimates_df, alpha_to_agg_prediction_intervals
@@ -365,6 +390,7 @@ class HistoricalModelClient(ModelClient):
             s3_client=s3.S3CsvUtil(TARGET_BUCKET),
             historical=True,
         )
+
         results_to_return = [f"results_{estimand}" for estimand in estimands]
         geo_columns = set(["geographic_unit_fips", "postal_code"] + [a for a in self.aggregates if a != "unit"])
         preprocessed_data = preprocessed_data_handler.data[list(geo_columns) + results_to_return].copy()
