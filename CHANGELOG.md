@@ -1,5 +1,8 @@
 # Changelog
 
+### 1.0.9 (03/06/2022)
+- feat: allow model to return conformalization data [#32](https://github.com/washingtonpost/elex-live-model/pull/32)
+
 ### 1.0.8 (01/11/2022)
 - fix: fix overwriting non-reporting lower/upper bounds in multiple prediction interval case [#23](https://github.com/washingtonpost/elex-live-model/pull/23)
 - fix: fix bug when computing fixed effects [#27](https://github.com/washingtonpost/elex-live-model/pull/27)
