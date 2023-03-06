@@ -3,6 +3,8 @@ from elexmodel.models.BaseElectionModel import BaseElectionModel, PredictionInte
 from elexsolver.TransitionMatrixSolver import TransitionMatrixSolver
 from scipy.stats import bootstrap
 import numpy as np
+import pandas as pd
+
 class EnsembleElectionModel(BaseElectionModel):
     def __init__(self, estimands, alphas):
         self.unit_prediction_samples = []
@@ -60,7 +62,7 @@ class EnsembleElectionModel(BaseElectionModel):
             reporting_matrix_past_sampled = reporting_matrix_past[sample_indices]
 
             nonreporting_matrix_past = self.process_matrix_for_solving(nonreporting_units, 'baseline')
-            self.unit_predictions = []
+            unit_prediction_samples = []
             for i in range(m):
                 reporting_matrix_current_i = reporting_matrix_current_sampled[i]
                 reporting_matrix_past_i = reporting_matrix_past_sampled[i]
@@ -71,7 +73,9 @@ class EnsembleElectionModel(BaseElectionModel):
                 preds_i = transition_matrix_solver.predict(nonreporting_matrix_past).round(decimals=0)[:,:2] # can drop nonvoters now
                 preds_i = np.maximum(preds_i, nonreporting_units[['results_dem', 'results_gop']]).to_numpy()
                 
-                self.unit_prediction_samples.append(preds_i)
+                unit_prediction_samples.append(preds_i)
+            self.unit_prediction_samples = np.asarray(unit_prediction_samples)
+
         elif self.method == 'regression':
             # estimate many regressions with covariates
             pass
@@ -104,7 +108,26 @@ class EnsembleElectionModel(BaseElectionModel):
 
     # getting aggregate prediction is not correct. need to aggregate and then get median
     # same for prediction intervals (!)
- 
+
+    def get_aggregate_predictions(self, reporting_units, nonreporting_units, unexpected_units, aggregate, estimand):
+        aggregate_votes = self._get_reporting_aggregate_votes(reporting_units, unexpected_units, aggregate, estimand)
+        estimand_index = self.get_estimand_index(estimand)
+        nonreporting_units_samples = pd.DataFrame(self.unit_prediction_samples[:, :, estimand_index].transpose())
+        nonreporting_units_samples = (
+            nonreporting_units[aggregate]
+            .copy()
+            .join(nonreporting_units_samples)
+        )
+        aggregate_preds = (
+            nonreporting_units_samples
+            .groupby(aggregate)
+            .sum()
+            .median(1)
+            .reset_index(drop=False)
+            .rename(columns={0: f'pred_only_{estimand}'})
+        )
+        import pdb; pdb.set_trace()
+
     def get_aggregate_prediction_intervals(self,
         reporting_units,
         nonreporting_units,
