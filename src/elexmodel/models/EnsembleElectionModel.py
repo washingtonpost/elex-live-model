@@ -18,7 +18,7 @@ class EnsembleElectionModel(BaseElectionModel):
         self.sampling_method = 'random'
 
     def get_minimum_reporting_units(self, alpha):
-        return np.power(len(self.estimands), 2) + 1
+        return np.power(len(self.estimands) + 1, 2)
 
     def get_estimand_index(self, estimand):
         return self.estimand_to_index[estimand]
@@ -40,6 +40,7 @@ class EnsembleElectionModel(BaseElectionModel):
         dataframe['total_people'] = self.get_total_people(dataframe)
         matrix = dataframe[estimand_string_list + ['total_people']].copy()
         matrix[nonvoter_string] = matrix.total_people - matrix[estimand_string_list].sum(1)
+        matrix[estimand_string_list + [nonvoter_string]] = matrix[estimand_string_list + [nonvoter_string]].divide(matrix.total_people, axis='index')
         return matrix[estimand_string_list + [nonvoter_string]].copy().to_numpy()
 
     def get_samples(self, reporting_units, m):
@@ -70,10 +71,12 @@ class EnsembleElectionModel(BaseElectionModel):
                 transition_matrix_solver = TransitionMatrixSolver()
                 transition_matrix_solver.fit(reporting_matrix_past_i, reporting_matrix_current_i, strict=False)
 
-                preds_i = transition_matrix_solver.predict(nonreporting_matrix_past).round(decimals=0)[:,:2] # can drop nonvoters now
+                preds_i = transition_matrix_solver.predict(nonreporting_matrix_past).round(decimals=2)[:,:2] # can drop nonvoters now
                 preds_i = np.maximum(preds_i, nonreporting_units[['results_dem', 'results_gop']]).to_numpy()
                 
+                preds_i = nonreporting_units.total_people.to_numpy().reshape(-1, 1) * preds_i
                 unit_prediction_samples.append(preds_i)
+
             self.unit_prediction_samples = np.asarray(unit_prediction_samples)
 
         elif self.method == 'regression':
