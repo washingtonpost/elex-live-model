@@ -102,8 +102,7 @@ class EnsembleElectionModel(BaseElectionModel):
         estimand_index = self.get_estimand_index(estimand)
         return PredictionIntervals(
             self.unit_prediction_intervals_lower[alpha][:,estimand_index],
-            self.unit_prediction_intervals_upper[alpha][:,estimand_index],
-            None
+            self.unit_prediction_intervals_upper[alpha][:,estimand_index]
         )
 
     # getting aggregate prediction is not correct. need to aggregate and then get median
@@ -111,6 +110,16 @@ class EnsembleElectionModel(BaseElectionModel):
 
     def get_aggregate_predictions(self, reporting_units, nonreporting_units, unexpected_units, aggregate, estimand):
         aggregate_votes = self._get_reporting_aggregate_votes(reporting_units, unexpected_units, aggregate, estimand)
+        
+        aggregate_nonreporting_results = (
+            nonreporting_units
+            .groupby(aggregate)
+            .sum()
+            .reset_index(drop=False)
+            [aggregate + [f'results_{estimand}', 'reporting']]
+            .rename(columns={f'results_{estimand}': f'results_only_{estimand}', 'reporting': 'reporting_only'})
+        )
+        
         estimand_index = self.get_estimand_index(estimand)
         nonreporting_units_samples = pd.DataFrame(self.unit_prediction_samples[:, :, estimand_index].transpose())
         nonreporting_units_samples = (
@@ -118,15 +127,45 @@ class EnsembleElectionModel(BaseElectionModel):
             .copy()
             .join(nonreporting_units_samples)
         )
+
         aggregate_preds = (
             nonreporting_units_samples
             .groupby(aggregate)
             .sum()
-            .median(1)
+            .median(1) # take the median over the samples
+            .rename(f'pred_only_{estimand}')
             .reset_index(drop=False)
-            .rename(columns={0: f'pred_only_{estimand}'})
         )
-        import pdb; pdb.set_trace()
+
+        aggregate_data = (
+            aggregate_votes.merge(aggregate_preds, how="outer", on=aggregate)
+            .fillna(
+                {
+                    f"results_{estimand}": 0,
+                    f"pred_only_{estimand}": 0
+                }
+            )
+            .merge(aggregate_nonreporting_results, how="outer", on=aggregate)
+            .fillna(
+                {
+                    f'results_only_{estimand}': 0,
+                    'reporting_only': 0,
+                    'reporting': 0
+                }
+            )
+            .assign(
+                # don't need to sum results_only for predictions since those are superceded by pred_only
+                # preds can't be smaller than results, since we maxed between predictions and results in unit function.
+                **{
+                    f"pred_{estimand}": lambda x: x[f"results_{estimand}"] + x[f"pred_only_{estimand}"],
+                    f"results_{estimand}": lambda x: x[f"results_{estimand}"] + x[f"results_only_{estimand}"],
+                    "reporting": lambda x: x["reporting"] + x["reporting_only"],
+                },
+            )
+            .sort_values(aggregate)[aggregate + [f"pred_{estimand}", f"results_{estimand}", "reporting"]]
+            .reset_index(drop=True)
+        )
+        return aggregate_data
 
     def get_aggregate_prediction_intervals(self,
         reporting_units,
@@ -140,34 +179,49 @@ class EnsembleElectionModel(BaseElectionModel):
     ):
         aggregate_votes = self._get_reporting_aggregate_votes(reporting_units, unexpected_units, aggregate, estimand)
 
-        lower_string = f"lower_{alpha}_{estimand}"
-        upper_string = f"upper_{alpha}_{estimand}"
+        lower_quantile = (1 - alpha) / 2
+        upper_quantile = (1 + alpha) / 2
+        
+        estimand_index = self.get_estimand_index(estimand)
+        nonreporting_units_samples = pd.DataFrame(self.unit_prediction_samples[:, :, estimand_index].transpose())
+        nonreporting_units_samples = (
+            nonreporting_units[aggregate]
+            .copy()
+            .join(nonreporting_units_samples)
+        )
 
-        # prediction intervals sum, kind of miraculous
-        # Technically this is a conservative approach. This is equivalent to perfect correlation if
-        # we assume that the prediction intervals are multivariate gaussian
-        aggregate_prediction_intervals = (
-            nonreporting_units.groupby(aggregate)
+        aggregate_prediction_intervals_lower = (
+            nonreporting_units_samples
+            .groupby(aggregate)
             .sum()
+            .quantile(lower_quantile, axis=1)
+            .rename('pi_lower')
             .reset_index(drop=False)
-            .rename(columns={lower_string: f"pi_lower_{estimand}", upper_string: f"pi_upper_{estimand}"})[
-                aggregate + [f"pi_lower_{estimand}", f"pi_upper_{estimand}"]
-            ]
+        )
+
+        aggregate_prediction_intervals_upper = (
+            nonreporting_units_samples
+            .groupby(aggregate)
+            .sum()
+            .quantile(upper_quantile, axis=1)
+            .rename('pi_upper')
+            .reset_index(drop=False)
         )
 
         # sum in prediction intervals and rename
         aggregate_data = (
-            aggregate_votes.merge(aggregate_prediction_intervals, how="outer", on=aggregate)
-            .fillna({f"results_{estimand}": 0, f"pi_lower_{estimand}": 0, f"pi_upper_{estimand}": 0})
+            aggregate_votes.merge(aggregate_prediction_intervals_lower, how="outer", on=aggregate)
+            .fillna({f"results_{estimand}": 0, 'pi_lower': 0})
+            .merge(aggregate_prediction_intervals_upper, how='outer', on=aggregate)
+            .fillna({f"results_{estimand}": 0, 'pi_upper': 0})
             .assign(
-                lower=lambda x: x[f"pi_lower_{estimand}"] + x[f"results_{estimand}"],
-                upper=lambda x: x[f"pi_upper_{estimand}"] + x[f"results_{estimand}"],
+                lower=lambda x: x[f"pi_lower"] + x[f"results_{estimand}"],
+                upper=lambda x: x[f"pi_upper"] + x[f"results_{estimand}"],
             )
             .sort_values(aggregate)[aggregate + ["lower", "upper"]]
             .reset_index(drop=True)
         )
-
-        return PredictionIntervals(aggregate_data.lower.round(decimals=0), aggregate_data.upper.round(decimals=0), None)
+        return PredictionIntervals(aggregate_data.lower.round(decimals=0), aggregate_data.upper.round(decimals=0))
     
     def get_all_conformalization_data_unit(self):
         return None
