@@ -50,6 +50,7 @@ class ModelClient(object):
         features,
         aggregates,
         fixed_effects,
+        model_method,
         pi_method,
         beta,
         robust,
@@ -79,9 +80,13 @@ class ModelClient(object):
         ]
         if len(invalid_fixed_effects) > 0:
             raise ValueError(f"Fixed effect(s): {invalid_fixed_effects} not valid. Please check config")
-        if pi_method not in {"gaussian", "nonparametric"}:
+        if model_method not in {"conformalization", "ensemble"}:
             raise ValueError(
-                f"Prediction interval method: {pi_method} is not valid. pi_method has to be either `gaussian` or `nonparametric`."
+                f"Model method: {model_method} is not valid. model_method has to be either `conformalization` or `ensemble`."
+            )
+        if model_method == "conformalization" and pi_method not in {"gaussian", "nonparametric"}:
+            raise ValueError(
+                f"Prediction interval method: {pi_method} is not valid. When model_method id `conformalization` then pi_method has to be either `gaussian` or `nonparametric`."
             )
         if not isinstance(beta, (int, float)):
             raise ValueError("beta is not valid. Has to be either an integer or a float.")
@@ -137,6 +142,7 @@ class ModelClient(object):
         features = kwargs.get("features", [])
         aggregates = kwargs.get("aggregates", ["postal_code", "unit"])
         fixed_effects = kwargs.get("fixed_effects", [])
+        model_method = kwargs.get("model_method", "conformalization")
         pi_method = kwargs.get("pi_method", "nonparametric")
         beta = kwargs.get("beta", 1)
         robust = kwargs.get("robust", False)
@@ -169,6 +175,7 @@ class ModelClient(object):
             features,
             aggregates,
             fixed_effects,
+            model_method,
             pi_method,
             beta,
             robust,
@@ -213,7 +220,8 @@ class ModelClient(object):
         unexpected_units = data.get_unexpected_units(percent_reporting_threshold, aggregates)
 
         LOG.info(
-            "Model parameters: \n geographic_unit_type: %s, prediction intervals: %s, percent reporting threshold: %s, features: %s, pi_method: %s, aggregates: %s, fixed effects: %s, model settings: %s",
+            "Model parameters: \n model_method: %s, geographic_unit_type: %s, prediction intervals: %s, percent reporting threshold: %s, features: %s, pi_method: %s, aggregates: %s, fixed effects: %s, model settings: %s",
+            model_method,
             geographic_unit_type,
             prediction_intervals,
             percent_reporting_threshold,
@@ -225,11 +233,13 @@ class ModelClient(object):
         )
 
         model_settings["expanded_fixed_effects"] = data.expanded_fixed_effects
-        if pi_method == "nonparametric":
-            model = NonparametricElectionModel(model_settings=model_settings)
-        elif pi_method == "gaussian":
-            model = GaussianElectionModel(model_settings=model_settings)
-        model = EnsembleElectionModel(estimands, prediction_intervals)
+        if model_method == 'conformalization':
+            if pi_method == "nonparametric":
+                model = NonparametricElectionModel(model_settings=model_settings)
+            elif pi_method == "gaussian":
+                model = GaussianElectionModel(model_settings=model_settings)
+        elif model_method == 'ensemble':
+            model = EnsembleElectionModel(estimands, prediction_intervals)
 
         minimum_reporting_units_max = 0
         for alpha in prediction_intervals:

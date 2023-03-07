@@ -18,6 +18,16 @@ from elexmodel.utils.file_utils import TARGET_BUCKET  # noqa: E402
 @click.option("--features", default=[], multiple=True)
 @click.option("--aggregates", default=["postal_code", "unit"], multiple=True)
 @click.option(
+    "--model_method",
+    "model_method",
+    default="conformalization",
+    type=click.Choice(
+        [
+            "conformalization",
+            "ensemble"
+        ]
+    ))
+@click.option(
     "--pi_method",
     "pi_method",
     default="nonparametric",
