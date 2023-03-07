@@ -105,9 +105,6 @@ class EnsembleElectionModel(BaseElectionModel):
             self.unit_prediction_intervals_upper[alpha][:,estimand_index]
         )
 
-    # getting aggregate prediction is not correct. need to aggregate and then get median
-    # same for prediction intervals (!)
-
     def get_aggregate_predictions(self, reporting_units, nonreporting_units, unexpected_units, aggregate, estimand):
         aggregate_votes = self._get_reporting_aggregate_votes(reporting_units, unexpected_units, aggregate, estimand)
         
