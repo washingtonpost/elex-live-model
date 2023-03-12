@@ -1,12 +1,14 @@
 from elexmodel.models.BaseElectionModel import BaseElectionModel, PredictionIntervals
  
 from elexsolver.TransitionMatrixSolver import TransitionMatrixSolver
+from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
 from scipy.stats import bootstrap
 import numpy as np
 import pandas as pd
 
 class EnsembleElectionModel(BaseElectionModel):
-    def __init__(self, estimands, alphas):
+    def __init__(self, model_settings, estimands, alphas):
+        super().__init__(model_settings)
         self.unit_prediction_samples = []
         self.unit_predictions = None
         self.alphas = alphas
@@ -14,7 +16,7 @@ class EnsembleElectionModel(BaseElectionModel):
         self.unit_prediction_intervals_upper = {}
         self.estimands = estimands
         self.estimand_to_index = {estimand: i for i, estimand in enumerate(self.estimands)}
-        self.method = 'transition'
+        self.method = 'regression'
         self.sampling_method = 'random'
 
     def get_minimum_reporting_units(self, alpha):
@@ -34,14 +36,17 @@ class EnsembleElectionModel(BaseElectionModel):
         elif 'total_gen_voters':
             return dataframe.total_gen_voters
 
-    def process_matrix_for_solving(self, dataframe, prefix='results'):
-        estimand_string_list = [self.string_add_prefix(estimand, prefix) for estimand in self.estimands]
-        nonvoter_string = self.string_add_prefix('nonvoters', prefix)
-        dataframe['total_people'] = self.get_total_people(dataframe)
-        matrix = dataframe[estimand_string_list + ['total_people']].copy()
-        matrix[nonvoter_string] = matrix.total_people - matrix[estimand_string_list].sum(1)
-        matrix[estimand_string_list + [nonvoter_string]] = matrix[estimand_string_list + [nonvoter_string]].divide(matrix.total_people, axis='index')
-        return matrix[estimand_string_list + [nonvoter_string]].copy().to_numpy()
+    def process_dataframe_for_model(self, dataframe, prefix='results'):
+        if self.method == 'transition':
+            estimand_string_list = [self.string_add_prefix(estimand, prefix) for estimand in self.estimands]
+            nonvoter_string = self.string_add_prefix('nonvoters', prefix)
+            dataframe['total_people'] = self.get_total_people(dataframe)
+            matrix = dataframe[estimand_string_list + ['total_people']].copy()
+            matrix[nonvoter_string] = matrix.total_people - matrix[estimand_string_list].sum(1)
+            matrix[estimand_string_list + [nonvoter_string]] = matrix[estimand_string_list + [nonvoter_string]].divide(matrix.total_people, axis='index')
+            return matrix[estimand_string_list + [nonvoter_string]].copy().to_numpy()
+        elif self.method == 'regression':
+            return dataframe[self.features]
 
     def get_samples(self, reporting_units, m):
         K = reporting_units.shape[0]
@@ -51,37 +56,46 @@ class EnsembleElectionModel(BaseElectionModel):
 
     def sample_predictions(self, reporting_units, nonreporting_units):
         m = 100
-        if self.method == 'transition':
-            # estimate transition matrices
+        sample_indices = self.get_samples(reporting_units, m)
+        # sample_indices_test = np.asarray([[0, 0, 0], [1, 1, 1], [2, 2, 2]]).transpose()
+        # reporting_matrix_current[sample_indices]
+        reporting_matrix_current = self.process_dataframe_for_model(reporting_units, 'results')
+        reporting_matrix_current_sampled = reporting_matrix_current[sample_indices]
+        reporting_matrix_past = self.process_dataframe_for_model(reporting_units, 'baseline')
+        reporting_matrix_past_sampled = reporting_matrix_past[sample_indices]
+        nonreporting_matrix_past = self.process_dataframe_for_model(nonreporting_units, 'baseline')
+        unit_prediction_samples = []
 
-            sample_indices = self.get_samples(reporting_units, m)
-            # sample_indices_test = np.asarray([[0, 0, 0], [1, 1, 1], [2, 2, 2]]).transpose()
-            # reporting_matrix_current[sample_indices]
-            reporting_matrix_current = self.process_matrix_for_solving(reporting_units, 'results')
-            reporting_matrix_current_sampled = reporting_matrix_current[sample_indices]
-            reporting_matrix_past = self.process_matrix_for_solving(reporting_units, 'baseline')
-            reporting_matrix_past_sampled = reporting_matrix_past[sample_indices]
-
-            nonreporting_matrix_past = self.process_matrix_for_solving(nonreporting_units, 'baseline')
-            unit_prediction_samples = []
-            for i in range(m):
-                reporting_matrix_current_i = reporting_matrix_current_sampled[i]
-                reporting_matrix_past_i = reporting_matrix_past_sampled[i]
-
-                transition_matrix_solver = TransitionMatrixSolver()
-                transition_matrix_solver.fit(reporting_matrix_past_i, reporting_matrix_current_i, strict=False)
-
-                preds_i = transition_matrix_solver.predict(nonreporting_matrix_past).round(decimals=2)[:,:2] # can drop nonvoters now
+        for i in range(m):
+            reporting_matrix_current_i = reporting_matrix_current_sampled[i]
+            reporting_matrix_past_i = reporting_matrix_past_sampled[i]
+            if self.method == 'transition':
+                # estimate transition matrices
+                model = TransitionMatrixSolver()
+                model.fit(reporting_matrix_past_i, reporting_matrix_current_i, strict=False)
+                preds_i = model.predict(nonreporting_matrix_past).round(decimals=2)[:,:2] # can drop nonvoters now
                 preds_i = np.maximum(preds_i, nonreporting_units[['results_dem', 'results_gop']]).to_numpy()
-                
-                preds_i = nonreporting_units.total_people.to_numpy().reshape(-1, 1) * preds_i
-                unit_prediction_samples.append(preds_i)
+                preds_i = nonreporting_units.total_people.to_numpy().reshape(-1, 1) * preds_i # move predictions from % space to vote space
+                import pdb; pdb.set_trace()
+            elif self.method == 'regression':
+                model = QuantileRegressionSolver()
 
-            self.unit_prediction_samples = np.asarray(unit_prediction_samples)
+                nonreporting_units_features = nonreporting_units[self.features]
+                preds_i = np.zeros((nonreporting_units.shape[0], len(self.estimands)))
+                for estimand, j in self.estimand_to_index.items():
+                    reporting_units_y_i = reporting_units[f"residuals_{estimand}"]
+                    weights = np.ones((reporting_matrix_current_i.shape[0], 1))
+                    self.fit_model(model, reporting_matrix_current_i, reporting_units_y_i, 0.5, weights, normalize_weights=True) 
+                    preds_i_j = self.qr.predict(nonreporting_units_features)
+                    preds_i_j = preds_i_j * nonreporting_units.total_people # move into vote difference space
+                    preds_i_j = preds_i_j + nonreporting_units[f"last_election_results_{estimand}"] # move into vote space
+                    preds_i_j = np.maximum(preds_i_j, nonreporting_units[f"results_{estimand}"]).round(decimals=0)
+                    preds_i[:, j] = preds_i_j
 
-        elif self.method == 'regression':
-            # estimate many regressions with covariates
-            pass
+            unit_prediction_samples.append(preds_i)
+        
+        self.unit_prediction_samples = np.asarray(unit_prediction_samples)
+
     
     def compute_unit_predictions(self):
         self.unit_predictions = np.median(self.unit_prediction_samples, axis=0)

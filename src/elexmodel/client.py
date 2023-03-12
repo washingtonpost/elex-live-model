@@ -239,7 +239,7 @@ class ModelClient(object):
             elif pi_method == "gaussian":
                 model = GaussianElectionModel(model_settings=model_settings)
         elif model_method == 'ensemble':
-            model = EnsembleElectionModel(estimands, prediction_intervals)
+            model = EnsembleElectionModel(model_settings, estimands, prediction_intervals)
 
         minimum_reporting_units_max = 0
         for alpha in prediction_intervals:
