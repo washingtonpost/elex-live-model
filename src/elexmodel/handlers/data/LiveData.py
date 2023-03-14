@@ -111,6 +111,7 @@ class MockLiveDataHandler(object):
         enforce: list of geographic unit fips that enforce those units to come first
             the order of enforced first elements is random
         """
+
         probabilities = np.ones((self.data.shape[0],))
         # if upweight is empty this forloop is skipped
         for category in upweight:  # e.g. category == "postal_code"

@@ -1,7 +1,9 @@
 import logging
+import os
 
 import numpy as np
 import pandas as pd
+from dotenv import find_dotenv, load_dotenv
 
 from elexmodel.handlers import s3
 from elexmodel.handlers.config import ConfigHandler
@@ -15,6 +17,8 @@ from elexmodel.utils.constants import AGGREGATE_ORDER, VALID_AGGREGATES_MAPPING
 from elexmodel.utils.file_utils import APP_ENV, S3_FILE_PATH, TARGET_BUCKET
 from elexmodel.utils.math_utils import compute_error, compute_frac_within_pi, compute_mean_pi_length
 
+load_dotenv(find_dotenv())
+os.environ["DATA_ENV"] = "dev"
 initialize_logging()
 
 LOG = logging.getLogger(__name__)
@@ -308,6 +312,31 @@ class ModelClient(object):
             results_handler.write_data(election_id, office, geographic_unit_type)
 
         return results_handler.final_results
+
+    def get_agg_results(self, result, ecv_data_path, trials=1000):
+        ecv = pd.read_csv(ecv_data_path).drop("state", axis=1)
+        state_estimates = result["state_data"]
+        dem_wins = state_estimates[["postal_code", "lower_0.9_dem", "upper_0.9_dem", "lower_0.9_gop", "upper_0.9_gop"]]
+        total_evc = sum(ecv["vote"])
+
+        n = 0
+        while n < trials:
+            dem_wins["iter_" + str(n)] = dem_wins.apply(
+                lambda row: np.random.uniform(low=row["lower_0.9_dem"], high=row["upper_0.9_dem"], size=1).astype(int)[
+                    0
+                ]
+                > np.random.uniform(low=row["lower_0.9_gop"], high=row["upper_0.9_gop"], size=1).astype(int)[0],
+                axis=1,
+            )
+            n += 1
+
+        dem_wins_df = pd.merge(dem_wins, ecv, on="postal_code")
+        dem_votes = dem_wins_df[["iter_" + str(n) for n in range(trials)]].multiply(dem_wins_df["vote"], axis="index")
+
+        total_dem_votes_by_trial = dem_votes.sum(axis=0)
+        total_dem_wins = len([k for k in total_dem_votes_by_trial if k > total_evc / 2])
+
+        return total_dem_wins / trials, np.median(total_dem_votes_by_trial)
 
 
 class HistoricalModelClient(ModelClient):

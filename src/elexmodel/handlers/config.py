@@ -19,6 +19,7 @@ class ConfigHandler(object):
         self.election_id = election_id
         self.s3_client = s3_client
         self.local_file_path = self.get_config_file_path()
+
         if config:
             self.config = config
         else:
@@ -36,8 +37,8 @@ class ConfigHandler(object):
         Read config from file
         """
         LOG.info("Loading config: %s", self.election_id)
-
         # Read local config file if available
+
         if Path(self.local_file_path).is_file():
             with open(self.local_file_path, "r") as f:
                 config = json.load(f)
@@ -46,6 +47,7 @@ class ConfigHandler(object):
             path_info = {"election_id": self.election_id}
             file_path = self.s3_client.get_file_path("config", path_info)
             config = self.s3_client.get(file_path)
+
         return config
 
     def _get_office_subconfig(self, office):
