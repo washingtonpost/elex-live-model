@@ -2,14 +2,13 @@ from elexmodel.models.BaseElectionModel import BaseElectionModel, PredictionInte
  
 from elexsolver.TransitionMatrixSolver import TransitionMatrixSolver
 from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
-from scipy.stats import bootstrap
 import numpy as np
 import pandas as pd
 
 class EnsembleElectionModel(BaseElectionModel):
     def __init__(self, model_settings, estimands, alphas):
         super().__init__(model_settings)
-        self.unit_prediction_samples = []
+        self.unit_prediction_samples = None
         self.unit_predictions = None
         self.alphas = alphas
         self.unit_prediction_intervals_lower = {}
@@ -53,6 +52,7 @@ class EnsembleElectionModel(BaseElectionModel):
 
     def sample_predictions(self, reporting_units, nonreporting_units):
         m = 100
+        self.unit_prediction_samples = []
         sample_indices = self.get_samples(reporting_units, m)
         unit_prediction_samples = []
         if self.method == 'transition':
@@ -60,7 +60,8 @@ class EnsembleElectionModel(BaseElectionModel):
         elif self.method == 'regression':
             nonreporting_units_features = nonreporting_units[self.features]
 
-
+        import time
+        t0 = time.time()
         for i, sample_indices_i in enumerate(sample_indices):
             reporting_units_sample_i = reporting_units.loc[sample_indices_i,:]
             if self.method == 'transition':
@@ -80,7 +81,7 @@ class EnsembleElectionModel(BaseElectionModel):
                 preds_i = np.zeros((nonreporting_units.shape[0], len(self.estimands)))
                 for estimand, j in self.estimand_to_index.items():
                     reporting_units_sample_i_residuals = reporting_units_sample_i[f"residuals_{estimand}"]
-                    self.fit_model(model, reporting_units_sample_i_features, reporting_units_sample_i_residuals, 0.5, weights, normalize_weights=True) 
+                    self.fit_model(model, reporting_units_sample_i_features, reporting_units_sample_i_residuals, 0.5, weights, True)
                     preds_i_j = model.predict(nonreporting_units_features)
                     preds_i_j = preds_i_j * nonreporting_units[f"total_voters_{estimand}"] # move into vote difference space
                     preds_i_j = preds_i_j + nonreporting_units[f"last_election_results_{estimand}"] # move into vote space
@@ -88,17 +89,31 @@ class EnsembleElectionModel(BaseElectionModel):
                     preds_i[:, j] = preds_i_j
 
             unit_prediction_samples.append(preds_i)
-        
+            t1 = time.time()
+        print(t1 - t0)
         self.unit_prediction_samples = np.asarray(unit_prediction_samples).round(decimals=0)
 
     
-    def compute_unit_predictions(self):
-        self.unit_predictions = np.median(self.unit_prediction_samples, axis=0)
+    def compute_unit_predictions(self, reporting_units, nonreporting_units):
+        reporting_units_features = reporting_units[self.features]
+        weights = self.get_total_people(reporting_units)
+        nonreporting_units_features = nonreporting_units[self.features]
+        preds = np.zeros((nonreporting_units.shape[0], len(self.estimands)))
+        for estimand, j in self.estimand_to_index.items():  
+            model = QuantileRegressionSolver(solver='ECOS')
+            reporting_units_residuals = reporting_units[f"residuals_{estimand}"]
+            self.fit_model(model, reporting_units_features, reporting_units_residuals, 0.5, weights, True)
+            preds_estimand = model.predict(nonreporting_units_features)
+            preds_estimand = preds_estimand * nonreporting_units[f"total_voters_{estimand}"] # move into vote difference space
+            preds_estimand = preds_estimand + nonreporting_units[f"last_election_results_{estimand}"] # move into vote space
+            preds_estimand = np.maximum(preds_estimand, nonreporting_units[f"results_{estimand}"])
+            preds[:, j] = preds_estimand
+        
+        self.unit_predictions = preds.round(decimals=0)
 
     def get_unit_predictions(self, reporting_units, nonreporting_units, estimand):
         if self.unit_predictions is None:
-            self.sample_predictions(reporting_units, nonreporting_units)
-            self.compute_unit_predictions()
+            self.compute_unit_predictions(reporting_units, nonreporting_units)
         estimand_index = self.get_estimand_index(estimand)
         return self.unit_predictions[:,estimand_index]
     
@@ -109,14 +124,17 @@ class EnsembleElectionModel(BaseElectionModel):
         self.unit_prediction_intervals_upper[alpha] = np.quantile(self.unit_prediction_samples, upper_quantile, axis=0)
 
     def get_unit_prediction_intervals(self, reporting_units, nonreporting_units, alpha, estimand):
+        if self.unit_prediction_samples is None:
+            self.sample_predictions(reporting_units, nonreporting_units)
         if alpha not in self.unit_prediction_intervals_lower:
             self.compute_unit_prediction_intervals(alpha)
+
         estimand_index = self.get_estimand_index(estimand)
         return PredictionIntervals(
             self.unit_prediction_intervals_lower[alpha][:,estimand_index],
             self.unit_prediction_intervals_upper[alpha][:,estimand_index]
         )
-
+    '''
     def get_aggregate_predictions(self, reporting_units, nonreporting_units, unexpected_units, aggregate, estimand):
         aggregate_votes = self._get_reporting_aggregate_votes(reporting_units, unexpected_units, aggregate, estimand)
         
@@ -175,6 +193,7 @@ class EnsembleElectionModel(BaseElectionModel):
             .reset_index(drop=True)
         )
         return aggregate_data
+'''
 
     def get_aggregate_prediction_intervals(self,
         reporting_units,
