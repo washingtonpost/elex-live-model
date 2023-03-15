@@ -1,9 +1,7 @@
 import logging
-import os
 
 import numpy as np
 import pandas as pd
-from dotenv import find_dotenv, load_dotenv
 
 from elexmodel.handlers import s3
 from elexmodel.handlers.config import ConfigHandler
@@ -17,8 +15,6 @@ from elexmodel.utils.constants import AGGREGATE_ORDER, VALID_AGGREGATES_MAPPING
 from elexmodel.utils.file_utils import APP_ENV, S3_FILE_PATH, TARGET_BUCKET
 from elexmodel.utils.math_utils import compute_error, compute_frac_within_pi, compute_mean_pi_length
 
-load_dotenv(find_dotenv())
-os.environ["DATA_ENV"] = "dev"
 initialize_logging()
 
 LOG = logging.getLogger(__name__)
