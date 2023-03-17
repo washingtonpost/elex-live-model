@@ -18,6 +18,7 @@ from elexmodel.utils.math_utils import compute_error, compute_frac_within_pi, co
 initialize_logging()
 
 LOG = logging.getLogger(__name__)
+# ecv_data = pd.read_csv("data_for_agg_model/ec_votes_by_state.csv").drop("state", axis=1)
 
 
 class ModelClientException(Exception):
@@ -309,30 +310,38 @@ class ModelClient(object):
 
         return results_handler.final_results
 
-    def get_agg_results(self, result, ecv_data_path, trials=1000):
-        ecv = pd.read_csv(ecv_data_path).drop("state", axis=1)
-        state_estimates = result["state_data"]
-        dem_wins = state_estimates[["postal_code", "lower_0.9_dem", "upper_0.9_dem", "lower_0.9_gop", "upper_0.9_gop"]]
-        total_evc = sum(ecv["vote"])
+    def extend_str_with_list(self, string, list_to_add):
+        return [f"{string}_{str(item)}" for item in list_to_add]
+
+    def random_draws(self, row, alpha, estimands):
+        estimand_draws = {}
+        for estimand in estimands:
+            estimand_draws[estimand] = np.random.uniform(
+                row[f"lower_{alpha}_" + estimand], row[f"upper_{alpha}_" + estimand], size=1
+            ).astype(int)[0]
+        return max(estimand_draws, key=estimand_draws.get)
+
+    def get_electoral_count_estimate(self, state_preds, estimands, alpha, ecv_data, **kwargs):
+        trials = kwargs.get("trials", 100)
+        cols_for_draws = self.extend_str_with_list(f"lower_{alpha}", estimands) + self.extend_str_with_list(
+            f"upper_{alpha}", estimands
+        )
+        wins_df = state_preds[["postal_code"] + cols_for_draws]
 
         n = 0
         while n < trials:
-            dem_wins["iter_" + str(n)] = dem_wins.apply(
-                lambda row: np.random.uniform(low=row["lower_0.9_dem"], high=row["upper_0.9_dem"], size=1).astype(int)[
-                    0
-                ]
-                > np.random.uniform(low=row["lower_0.9_gop"], high=row["upper_0.9_gop"], size=1).astype(int)[0],
-                axis=1,
-            )
+            wins_df["iter_" + str(n)] = wins_df.apply(lambda row: self.random_draws(row, alpha, estimands), axis=1)
             n += 1
 
-        dem_wins_df = pd.merge(dem_wins, ecv, on="postal_code")
-        dem_votes = dem_wins_df[["iter_" + str(n) for n in range(trials)]].multiply(dem_wins_df["vote"], axis="index")
+        wins_votes_df = pd.merge(wins_df, ecv_data, on="postal_code")
+        ecv_votes_dfs = {}
+        for estimand in estimands:
+            ecv_votes_dfs[estimand] = (wins_votes_df[["iter_" + str(n) for n in range(trials)]] == estimand).multiply(
+                wins_votes_df["vote"], axis="index"
+            )
 
-        total_dem_votes_by_trial = dem_votes.sum(axis=0)
-        total_dem_wins = len([k for k in total_dem_votes_by_trial if k > total_evc / 2])
-
-        return total_dem_wins / trials, np.median(total_dem_votes_by_trial)
+        total_ecv_by_estimand = {estimand: list(ecv_votes_dfs[estimand].sum(axis=0)) for estimand in estimands}
+        return pd.DataFrame(data=total_ecv_by_estimand)
 
 
 class HistoricalModelClient(ModelClient):

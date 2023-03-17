@@ -45,7 +45,6 @@ data_handler = MockLiveDataHandler(
 data_handler.shuffle()
 data = data_handler.get_percent_fully_reported(percent_reporting)
 
-
 model_client = ModelClient()
 
 if not historical:
@@ -61,9 +60,7 @@ if not historical:
         aggregates=aggregates,
     )
 
-    agg_result_dem_share, agg_median_dem_ecv = model_client.get_agg_results(
-        result, "data_for_agg_model/ec_votes_by_state.csv", trials=1000
-    )
+    total_ecv_by_estimand = model_client.get_electoral_count_estimate(result["state_data"], estimands, 0.9)
 
 if historical:
     model_client = HistoricalModelClient()
@@ -78,8 +75,7 @@ if historical:
         pi_method="gaussian",
         aggregates=aggregates,
         fixed_effects=fixed_effects,
-        features=["age_geq_65", "ethnicity_east_and_south_asian"]
-        # "age_18_to_29", "age_over_65", 'median_household_income']
+        features=["age_18_to_29", "age_over_65", "median_household_income"],
     )
 
 for aggregate_level, estimates in result.items():
