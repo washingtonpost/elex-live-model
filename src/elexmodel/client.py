@@ -18,7 +18,14 @@ from elexmodel.utils.math_utils import compute_error, compute_frac_within_pi, co
 initialize_logging()
 
 LOG = logging.getLogger(__name__)
-# ecv_data = pd.read_csv("data_for_agg_model/ec_votes_by_state.csv").drop("state", axis=1)
+ecv_data = pd.read_csv("/Users/goldd/Projects/elex-live-model/data_for_agg_model/ec_votes_by_state.csv").drop(
+    "state", axis=1
+)
+ecv_states_called = (
+    pd.read_csv("/Users/goldd/Projects/elex-live-model/data_for_agg_model/ec_votes_called.csv")
+    .drop("state", axis=1)
+    .dropna()
+)
 
 
 class ModelClientException(Exception):
@@ -321,8 +328,12 @@ class ModelClient(object):
             ).astype(int)[0]
         return max(estimand_draws, key=estimand_draws.get)
 
-    def get_electoral_count_estimate(self, state_preds, estimands, alpha, ecv_data, **kwargs):
-        trials = kwargs.get("trials", 100)
+    def get_electoral_count_estimate(self, state_preds, estimands, alpha, agg_states_not_used, **kwargs):
+        trials = kwargs.get("trials", 1000)
+        states_called = dict(zip(list(ecv_states_called["postal_code"]), list(ecv_states_called["called"])))
+        # only make predictions for states that we want in the model
+        # (i.e. those in preprocessed data)
+        state_preds = state_preds[~state_preds["postal_code"].isin(agg_states_not_used)]
         cols_for_draws = self.extend_str_with_list(f"lower_{alpha}", estimands) + self.extend_str_with_list(
             f"upper_{alpha}", estimands
         )
@@ -330,7 +341,12 @@ class ModelClient(object):
 
         n = 0
         while n < trials:
-            wins_df["iter_" + str(n)] = wins_df.apply(lambda row: self.random_draws(row, alpha, estimands), axis=1)
+            wins_df["iter_" + str(n)] = wins_df.apply(
+                lambda row: states_called[row["postal_code"]]
+                if row["postal_code"] in states_called.keys()
+                else self.random_draws(row, alpha, estimands),
+                axis=1,
+            )
             n += 1
 
         wins_votes_df = pd.merge(wins_df, ecv_data, on="postal_code")
