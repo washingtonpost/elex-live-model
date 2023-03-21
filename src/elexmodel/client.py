@@ -2,6 +2,7 @@ import logging
 
 import numpy as np
 import pandas as pd
+import scipy.stats as st
 
 from elexmodel.handlers import s3
 from elexmodel.handlers.config import ConfigHandler
@@ -328,8 +329,7 @@ class ModelClient(object):
             ).astype(int)[0]
         return max(estimand_draws, key=estimand_draws.get)
 
-    def get_electoral_count_estimate(self, state_preds, estimands, alpha, agg_states_not_used, **kwargs):
-        trials = kwargs.get("trials", 1000)
+    def get_electoral_count_trials(self, state_preds, estimands, alpha, agg_states_not_used, trials):
         states_called = dict(zip(list(ecv_states_called["postal_code"]), list(ecv_states_called["called"])))
         # only make predictions for states that we want in the model
         # (i.e. those in preprocessed data)
@@ -358,6 +358,25 @@ class ModelClient(object):
 
         total_ecv_by_estimand = {estimand: list(ecv_votes_dfs[estimand].sum(axis=0)) for estimand in estimands}
         return pd.DataFrame(data=total_ecv_by_estimand)
+
+    def get_electoral_count_estimates(self, state_preds, estimands, alpha, **kwargs):
+        trials = kwargs.get("trials", 1000)
+        agg_states_not_used = kwargs.get("agg_states_not_used", [])
+
+        trials_df = self.get_electoral_count_trials(state_preds, estimands, alpha, agg_states_not_used, trials)
+        est_means = trials_df.mean().round(2)
+        est_sem = trials_df.sem().round(2)
+        est_CI = {
+            estimand: st.norm.interval(confidence=0.9, loc=est_means[estimand], scale=est_sem[estimand])
+            for estimand in estimands
+        }
+
+        est_mean_CI = {
+            estimand: [est_means[estimand], round(est_CI[estimand][0], 2), round(est_CI[estimand][1], 2)]
+            for estimand in estimands
+        }
+
+        return est_mean_CI
 
 
 class HistoricalModelClient(ModelClient):
