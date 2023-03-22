@@ -146,7 +146,9 @@ class CombinedDataHandler(object):
             # can throw a fragmentation warning when there are many missing fixed effects.
             # we have to fillna because all other that don't have index 0 will have NaNs for the missing
             # expanded fixed effect columns
-            nonreporting_units = pd.concat([nonreporting_units, missing_expanded_fixed_effects_df], axis=1).fillna(missing_expanded_fixed_effects)
+            nonreporting_units = pd.concat([nonreporting_units, missing_expanded_fixed_effects_df], axis=1).fillna(
+                missing_expanded_fixed_effects
+            )
 
             # if nonreporting_units is empty then the above concat creates a row which has zeroes
             # for the expanded fixed effects and NaN for all other columns. We want to remove that line
