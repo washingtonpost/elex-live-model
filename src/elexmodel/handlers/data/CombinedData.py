@@ -139,13 +139,18 @@ class CombinedDataHandler(object):
             # fixed effects manually.
             for expanded_fixed_effect in self.expanded_fixed_effects:
                 if expanded_fixed_effect not in nonreporting_units.columns:
-                    missing_expanded_fixed_effects[expanded_fixed_effect] = [0]
-            missing_expanded_fixed_effects_df = pd.DataFrame(missing_expanded_fixed_effects)
+                    missing_expanded_fixed_effects[expanded_fixed_effect] = 0
+
+            missing_expanded_fixed_effects_df = pd.DataFrame(missing_expanded_fixed_effects, index=[0])
             # if we use this method to add the missing expanded fixed effects because doing it manually
             # can throw a fragmentation warning when there are many missing fixed effects.
-            nonreporting_units = pd.concat([nonreporting_units, missing_expanded_fixed_effects_df], axis=1)
+            # we have to fillna because all other that don't have index 0 will have NaNs for the missing
+            # expanded fixed effect columns
+            nonreporting_units = pd.concat([nonreporting_units, missing_expanded_fixed_effects_df], axis=1).fillna(missing_expanded_fixed_effects)
+
+            # if nonreporting_units is empty then the above concat creates a row which has zeroes
+            # for the expanded fixed effects and NaN for all other columns. We want to remove that line
             # this is necessary because the concat above creates a row which has zeroes for the expanded
-            # fixed effects and NaN for all other columns.
             nonreporting_units = nonreporting_units[~nonreporting_units.postal_code.isnull()].reset_index(drop=True)
 
         nonreporting_units["reporting"] = 0
