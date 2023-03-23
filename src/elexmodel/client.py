@@ -329,11 +329,11 @@ class ModelClient(object):
             ).astype(int)[0]
         return max(estimand_draws, key=estimand_draws.get)
 
-    def get_electoral_count_trials(self, state_preds, estimands, agg_states_not_used, trials, alpha=0.9):
+    def get_electoral_count_trials(self, state_preds, estimands, agg_model_states_not_used, trials, alpha=0.9):
         states_called = dict(zip(list(ecv_states_called["postal_code"]), list(ecv_states_called["called"])))
         # only make predictions for states that we want in the model
         # (i.e. those in preprocessed data)
-        state_preds = state_preds[~state_preds["postal_code"].isin(agg_states_not_used)]
+        state_preds = state_preds[~state_preds["postal_code"].isin(agg_model_states_not_used)]
         cols_for_draws = self.extend_str_with_list(f"lower_{alpha}", estimands) + self.extend_str_with_list(
             f"upper_{alpha}", estimands
         )
@@ -359,11 +359,10 @@ class ModelClient(object):
         total_ecv_by_estimand = {estimand: list(ecv_votes_dfs[estimand].sum(axis=0)) for estimand in estimands}
         return pd.DataFrame(data=total_ecv_by_estimand)
 
-    def get_electoral_count_estimates(self, state_preds, estimands, **kwargs):
+    def get_electoral_count_estimates(self, state_preds, estimands, agg_model_states_not_used, **kwargs):
         trials = kwargs.get("trials", 1000)
-        agg_states_not_used = kwargs.get("agg_states_not_used", [])
 
-        trials_df = self.get_electoral_count_trials(state_preds, estimands, agg_states_not_used, trials)
+        trials_df = self.get_electoral_count_trials(state_preds, estimands, agg_model_states_not_used, trials)
         est_means = trials_df.mean().round(2)
         est_sem = trials_df.sem().round(2)
         est_CI = {

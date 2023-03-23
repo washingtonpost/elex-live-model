@@ -60,7 +60,9 @@ if not historical:
         aggregates=aggregates,
     )
 
-    ecv_estimates = model_client.get_electoral_count_estimates(result["state_data"], estimands, 0.9)
+    ecv_estimates = model_client.get_electoral_count_estimates(
+        result["state_data"], estimands, agg_model_states_not_used=["AK"]
+    )
 
 if historical:
     model_client = HistoricalModelClient()
