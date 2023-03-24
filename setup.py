@@ -3,7 +3,7 @@ from codecs import open
 
 from setuptools import find_packages, setup
 
-INSTALL_REQUIRES = ("click<8.1", "elex-solver<2", "pandas<1.5.0", "boto3<1.22", "python-dotenv==0.19.2")
+INSTALL_REQUIRES = ("click<8.1", "elex-solver<2", "pandas<1.5.0", "boto3<2", "python-dotenv==0.19.2")
 
 THIS_FILE_DIR = os.path.dirname(__file__)
 
