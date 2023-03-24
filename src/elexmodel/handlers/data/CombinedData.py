@@ -132,21 +132,25 @@ class CombinedDataHandler(object):
             nonreporting_units["intercept"] = 1
 
         if len(self.fixed_effects) > 0:
-            missing_expanded_fixed_effects = {}
+            missing_expanded_fixed_effects = []
             nonreporting_units = self._expand_fixed_effects(nonreporting_units, self.fixed_effects, drop_first=False)
             # if all units from one fixed effect are reporting they will not appear in the nonreporting_units and won't
             # get a column when we expand the fixed effects on that dataframe. Therefore we add those columns with zero
-            # fixed effects manually.
+            # fixed effects manually. As an example, if we are running a county model using state fixed effects, and
+            # all of Delaware's counties are reporting, then no Delaware county will be in nonreporting_units, as a result
+            # there will be no column for Delaware in the expanded fixed effects of nonreporting_units.
             for expanded_fixed_effect in self.expanded_fixed_effects:
                 if expanded_fixed_effect not in nonreporting_units.columns:
-                    missing_expanded_fixed_effects[expanded_fixed_effect] = [0]
-            missing_expanded_fixed_effects_df = pd.DataFrame(missing_expanded_fixed_effects)
+                    missing_expanded_fixed_effects.append(expanded_fixed_effect)
+
+            missing_expanded_fixed_effects_df = pd.DataFrame(
+                np.zeros((nonreporting_units.shape[0], len(missing_expanded_fixed_effects))),
+                columns=missing_expanded_fixed_effects,
+            )
             # if we use this method to add the missing expanded fixed effects because doing it manually
+            # ie. nonreporting[expanded_fixed_effect] = 0
             # can throw a fragmentation warning when there are many missing fixed effects.
-            nonreporting_units = pd.concat([nonreporting_units, missing_expanded_fixed_effects_df], axis=1)
-            # this is necessary because the concat above creates a row which has zeroes for the expanded
-            # fixed effects and NaN for all other columns.
-            nonreporting_units = nonreporting_units[~nonreporting_units.postal_code.isnull()].reset_index(drop=True)
+            nonreporting_units = nonreporting_units.join(missing_expanded_fixed_effects_df)
 
         nonreporting_units["reporting"] = 0
 
