@@ -245,6 +245,8 @@ def test_generate_fixed_effects_not_all_reporting(va_governor_county_data):
     assert "county_fips" in combined_data_handler.fixed_effects
     assert len(combined_data_handler.expanded_fixed_effects) == n - 1
 
+    assert not nonreporting_data["county_fips_51009"].isnull().any()
+
 
 def test_generate_fixed_effects_mixed_reporting(va_governor_precinct_data):
     """
