@@ -61,7 +61,7 @@ if not historical:
     )
 
     ecv_estimates = model_client.get_electoral_count_estimates(
-        result["state_data"], estimands, agg_model_states_not_used=["AK"]
+        result["state_data"], estimands, "dem", agg_model_states_not_used=["AK"]
     )
 
 if historical:

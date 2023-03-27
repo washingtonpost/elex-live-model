@@ -321,48 +321,77 @@ class ModelClient(object):
     def extend_str_with_list(self, string, list_to_add):
         return [f"{string}_{str(item)}" for item in list_to_add]
 
-    def random_draws(self, row, alpha, estimands):
-        estimand_draws = {}
-        for estimand in estimands:
-            estimand_draws[estimand] = np.random.uniform(
-                row[f"lower_{alpha}_" + estimand], row[f"upper_{alpha}_" + estimand], size=1
-            ).astype(int)[0]
-        return max(estimand_draws, key=estimand_draws.get)
+    def random_draws(self, mean_vec, cov_matrix):
 
-    def get_electoral_count_trials(self, state_preds, estimands, agg_model_states_not_used, trials, alpha=0.9):
-        states_called = dict(zip(list(ecv_states_called["postal_code"]), list(ecv_states_called["called"])))
+        return np.random.multivariate_normal(mean_vec, cov_matrix)
+
+    # def random_draws(self, row, alpha, estimands, primary_estimand, estimand):
+
+    #     estimand_draws = {}
+    #     for estimand in estimands:
+    #         estimand_draws[estimand] = np.random.uniform(
+    #             row[f"lower_{alpha}_" + estimand], row[f"upper_{alpha}_" + estimand], size=1
+    #         ).astype(int)[0]
+    #     return max(estimand_draws, key=estimand_draws.get)
+
+    def get_electoral_count_trials(
+        self, state_preds, estimands, primary_estimand, agg_model_states_not_used, trials, alpha=0.9
+    ):
+        #  states_called = dict(zip(list(ecv_states_called["postal_code"]), list(ecv_states_called["called"])))
         # only make predictions for states that we want in the model
         # (i.e. those in preprocessed data)
         state_preds = state_preds[~state_preds["postal_code"].isin(agg_model_states_not_used)]
-        cols_for_draws = self.extend_str_with_list(f"lower_{alpha}", estimands) + self.extend_str_with_list(
-            f"upper_{alpha}", estimands
-        )
-        wins_df = state_preds[["postal_code"] + cols_for_draws]
+        estimand_columns = [col for col in state_preds.columns if "pred" in col]
+        state_preds["total_estimand_votes"] = state_preds[estimand_columns].sum(axis=1)
+
+        for estimand in estimands:
+            state_preds[f"pred_{estimand}_share"] = (
+                state_preds["pred_" + estimand] / state_preds["total_estimand_votes"]
+            )
+            state_preds[f"upper_{alpha}_{estimand}_share"] = (
+                state_preds[f"upper_{alpha}_{estimand}"] / state_preds["total_estimand_votes"]
+            )
+            state_preds[f"lower_{alpha}_{estimand}_share"] = (
+                state_preds[f"lower_{alpha}_{estimand}"] / state_preds["total_estimand_votes"]
+            )
+            state_preds[f"var_{estimand}_share"] = (1 / 12) * (
+                state_preds[f"upper_{alpha}_{estimand}_share"] - state_preds[f"lower_{alpha}_{estimand}_share"]
+            ) ** 2
+
+        state_preds["var_sum"] = state_preds[[col for col in state_preds if "var_" in col]].sum(axis=1)
+        mean_vec = list(state_preds[f"pred_{primary_estimand}_share"])  # TEMPORARY SUB
+        var_vec = list(state_preds["var_sum"])  # TEMPORARY SUB
+        cov_matrix = np.diag(var_vec)  # TEMPORARY SUB
+        wins_df = state_preds[["postal_code"]]
 
         n = 0
         while n < trials:
-            wins_df["iter_" + str(n)] = wins_df.apply(
-                lambda row: states_called[row["postal_code"]]
-                if row["postal_code"] in states_called.keys()
-                else self.random_draws(row, alpha, estimands),
-                axis=1,
-            )
+            wins_df["iter_" + str(n)] = self.random_draws(mean_vec, cov_matrix)
             n += 1
 
         wins_votes_df = pd.merge(wins_df, ecv_data, on="postal_code")
-        ecv_votes_dfs = {}
-        for estimand in estimands:
-            ecv_votes_dfs[estimand] = (wins_votes_df[["iter_" + str(n) for n in range(trials)]] == estimand).multiply(
-                wins_votes_df["vote"], axis="index"
-            )
 
-        total_ecv_by_estimand = {estimand: list(ecv_votes_dfs[estimand].sum(axis=0)) for estimand in estimands}
-        return pd.DataFrame(data=total_ecv_by_estimand)
+        primary_estimand_wins = (wins_votes_df[["iter_" + str(n) for n in range(trials)]] > 0.5).multiply(
+            wins_votes_df["vote"], axis="index"
+        )
 
-    def get_electoral_count_estimates(self, state_preds, estimands, agg_model_states_not_used, **kwargs):
+        ecv_vote_totals = {primary_estimand: list(primary_estimand_wins.sum(axis=0))}
+        remaining_estimands = [k for k in estimands if k != primary_estimand]
+        total_ecv = sum(wins_votes_df["vote"])
+        ecv_vote_totals[" ".join(remaining_estimands)] = [
+            total_ecv - iter_ecv for iter_ecv in ecv_vote_totals[primary_estimand]
+        ]
+
+        return pd.DataFrame(data=ecv_vote_totals)
+
+    def get_electoral_count_estimates(
+        self, state_preds, estimands, primary_estimand, agg_model_states_not_used, **kwargs
+    ):
         trials = kwargs.get("trials", 1000)
 
-        trials_df = self.get_electoral_count_trials(state_preds, estimands, agg_model_states_not_used, trials)
+        trials_df = self.get_electoral_count_trials(
+            state_preds, estimands, primary_estimand, agg_model_states_not_used, trials
+        )
         est_means = trials_df.mean().round(2)
         est_sem = trials_df.sem().round(2)
         est_CI = {
