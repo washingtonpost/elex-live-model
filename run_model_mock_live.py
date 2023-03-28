@@ -32,6 +32,11 @@ percent_reporting = 20
 print("target bucket", TARGET_BUCKET)
 aggregates = ["unit", "postal_code"]
 fixed_effects = []
+
+# agg_model params:
+agg_model_states_not_used = ["AK"]
+ci_method = "percentile"  # percentile or normal_dist
+
 # if using standard preprocessed data for current or historical election
 data_handler = MockLiveDataHandler(
     election_id,
@@ -61,7 +66,7 @@ if not historical:
     )
 
     ecv_estimates = model_client.get_electoral_count_estimates(
-        result["state_data"], estimands, "dem", agg_model_states_not_used=["AK"]
+        result["state_data"], estimands, agg_model_states_not_used, ci_method
     )
 
 if historical:

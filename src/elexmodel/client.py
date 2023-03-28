@@ -3,6 +3,7 @@ import logging
 import numpy as np
 import pandas as pd
 import scipy.stats as st
+from scipy.stats import multivariate_t
 
 from elexmodel.handlers import s3
 from elexmodel.handlers.config import ConfigHandler
@@ -321,9 +322,10 @@ class ModelClient(object):
     def extend_str_with_list(self, string, list_to_add):
         return [f"{string}_{str(item)}" for item in list_to_add]
 
-    def random_draws(self, mean_vec, cov_matrix):
+    def random_draws(self, mean_vec, cov_matrix, trials):
 
-        return np.random.multivariate_normal(mean_vec, cov_matrix)
+        draws = pd.DataFrame(multivariate_t.rvs(mean_vec, cov_matrix, size=trials))
+        return draws.transpose()
 
     # def random_draws(self, row, alpha, estimands, primary_estimand, estimand):
 
@@ -364,11 +366,7 @@ class ModelClient(object):
         cov_matrix = np.diag(var_vec)  # TEMPORARY SUB
         wins_df = state_preds[["postal_code"]]
 
-        n = 0
-        while n < trials:
-            wins_df["iter_" + str(n)] = self.random_draws(mean_vec, cov_matrix)
-            n += 1
-
+        wins_df[["iter_" + str(n) for n in range(trials)]] = self.random_draws(mean_vec, cov_matrix, trials)
         wins_votes_df = pd.merge(wins_df, ecv_data, on="postal_code")
 
         primary_estimand_wins = (wins_votes_df[["iter_" + str(n) for n in range(trials)]] > 0.5).multiply(
@@ -384,25 +382,36 @@ class ModelClient(object):
 
         return pd.DataFrame(data=ecv_vote_totals)
 
-    def get_electoral_count_estimates(
-        self, state_preds, estimands, primary_estimand, agg_model_states_not_used, **kwargs
-    ):
+    def get_electoral_count_estimates(self, state_preds, estimands, agg_model_states_not_used, ci_method, **kwargs):
+        # options for method are percentile, normal_dist (which is just standard approach for large sample size > n = 30)
         trials = kwargs.get("trials", 1000)
+        primary_estimand = kwargs.get("primarry_estimand", "dem")
 
         trials_df = self.get_electoral_count_trials(
             state_preds, estimands, primary_estimand, agg_model_states_not_used, trials
         )
-        est_means = trials_df.mean().round(2)
-        est_sem = trials_df.sem().round(2)
-        est_CI = {
-            estimand: st.norm.interval(confidence=0.9, loc=est_means[estimand], scale=est_sem[estimand])
-            for estimand in estimands
-        }
+        if ci_method == "normal_dist":
+            est_means = trials_df.mean().round(2)
+            est_sem = trials_df.sem().round(2)
+            est_CI = {
+                estimand: st.norm.interval(confidence=0.9, loc=est_means[estimand], scale=est_sem[estimand])
+                for estimand in estimands
+            }
 
-        est_mean_CI = {
-            estimand: [est_means[estimand], round(est_CI[estimand][0], 2), round(est_CI[estimand][1], 2)]
-            for estimand in estimands
-        }
+            est_mean_CI = {
+                estimand: [est_means[estimand], round(est_CI[estimand][0], 2), round(est_CI[estimand][1], 2)]
+                for estimand in estimands
+            }
+
+        elif ci_method == "percentile":
+            est_means = trials_df.mean().round(2)
+            est_lb = trials_df.quantile(0.05, axis=0).round(2)
+            est_ub = trials_df.quantile(0.95, axis=0).round(2)
+
+            est_mean_CI = {
+                estimand: [est_means[estimand], round(est_lb[estimand], 2), round(est_ub[estimand], 2)]
+                for estimand in estimands
+            }
 
         return est_mean_CI
 
