@@ -390,7 +390,7 @@ class ModelClient(object):
         trials_df = self.get_electoral_count_trials(
             state_preds, estimands, primary_estimand, agg_model_states_not_used, trials
         )
-        if ci_method == "normal_dist":
+        if ci_method == "normal_dist_mean":
             est_means = trials_df.mean().round(2)
             est_sem = trials_df.sem().round(2)
             est_CI = {

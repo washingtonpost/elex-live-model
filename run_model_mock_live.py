@@ -35,7 +35,7 @@ fixed_effects = []
 
 # agg_model params:
 agg_model_states_not_used = ["AK"]
-ci_method = "percentile"  # percentile or normal_dist
+ci_method = "percentile"  # percentile or normal_dist_mean (this is CI for mean)
 
 # if using standard preprocessed data for current or historical election
 data_handler = MockLiveDataHandler(
