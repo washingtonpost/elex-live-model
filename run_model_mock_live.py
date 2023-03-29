@@ -36,6 +36,7 @@ fixed_effects = []
 # agg_model params:
 agg_model_states_not_used = ["AK"]
 ci_method = "percentile"  # percentile or normal_dist_mean (this is CI for mean)
+num_observations = 100  # if set to 1, result is same as one batch of draws, not bootstrapped
 
 # if using standard preprocessed data for current or historical election
 data_handler = MockLiveDataHandler(
@@ -66,7 +67,7 @@ if not historical:
     )
 
     ecv_estimates = model_client.get_electoral_count_estimates(
-        result["state_data"], estimands, agg_model_states_not_used, ci_method
+        result["state_data"], estimands, agg_model_states_not_used, num_observations, ci_method
     )
 
 if historical:

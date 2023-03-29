@@ -20,14 +20,15 @@ from elexmodel.utils.math_utils import compute_error, compute_frac_within_pi, co
 initialize_logging()
 
 LOG = logging.getLogger(__name__)
-ecv_data = pd.read_csv("/Users/goldd/Projects/elex-live-model/data_for_agg_model/ec_votes_by_state.csv").drop(
-    "state", axis=1
-)
-ecv_states_called = (
-    pd.read_csv("/Users/goldd/Projects/elex-live-model/data_for_agg_model/ec_votes_called.csv")
-    .drop("state", axis=1)
-    .dropna()
-)
+
+ecv_data = pd.read_csv("data_for_agg_model/ec_votes_by_state.csv").drop("state", axis=1)
+ecv_states_called = pd.read_csv("data_for_agg_model/ec_votes_called.csv").drop("state", axis=1).dropna()
+
+# ecv_states_called = (
+#     pd.read_csv("/Users/goldd/Projects/elex-live-model/data_for_agg_model/covar_matrix_data.csv")
+#     .drop("state", axis=1)
+#     .dropna()
+# )
 
 
 class ModelClientException(Exception):
@@ -322,9 +323,9 @@ class ModelClient(object):
     def extend_str_with_list(self, string, list_to_add):
         return [f"{string}_{str(item)}" for item in list_to_add]
 
-    def random_draws(self, mean_vec, cov_matrix, trials):
+    def random_draws(self, mean_vec, cov_matrix, num_observations):
 
-        draws = pd.DataFrame(multivariate_t.rvs(mean_vec, cov_matrix, size=trials))
+        draws = pd.DataFrame(multivariate_t.rvs(mean_vec, cov_matrix, size=num_observations))
         return draws.transpose()
 
     # def random_draws(self, row, alpha, estimands, primary_estimand, estimand):
@@ -337,7 +338,7 @@ class ModelClient(object):
     #     return max(estimand_draws, key=estimand_draws.get)
 
     def get_electoral_count_trials(
-        self, state_preds, estimands, primary_estimand, agg_model_states_not_used, trials, alpha=0.9
+        self, state_preds, estimands, primary_estimand, agg_model_states_not_used, trials, num_observations, alpha=0.9
     ):
         #  states_called = dict(zip(list(ecv_states_called["postal_code"]), list(ecv_states_called["called"])))
         # only make predictions for states that we want in the model
@@ -365,32 +366,43 @@ class ModelClient(object):
         var_vec = list(state_preds["var_sum"])  # TEMPORARY SUB
         cov_matrix = np.diag(var_vec)  # TEMPORARY SUB
         wins_df = state_preds[["postal_code"]]
-
-        wins_df[["iter_" + str(n) for n in range(trials)]] = self.random_draws(mean_vec, cov_matrix, trials)
-        wins_votes_df = pd.merge(wins_df, ecv_data, on="postal_code")
-
-        primary_estimand_wins = (wins_votes_df[["iter_" + str(n) for n in range(trials)]] > 0.5).multiply(
-            wins_votes_df["vote"], axis="index"
-        )
-
-        ecv_vote_totals = {primary_estimand: list(primary_estimand_wins.sum(axis=0))}
         remaining_estimands = [k for k in estimands if k != primary_estimand]
+        ecv_vote_totals_by_trial = {primary_estimand: [], " ".join(remaining_estimands): []}
+        for k in range(trials):
+
+            observation_batch = self.random_draws(mean_vec, cov_matrix, num_observations)
+            if num_observations == 1:
+                observation_batch = observation_batch.transpose()
+            wins_df[["obs_" + str(n) for n in range(num_observations)]] = observation_batch
+            wins_votes_df = pd.merge(wins_df, ecv_data, on="postal_code")
+
+            primary_estimand_wins = (wins_votes_df[["obs_" + str(n) for n in range(num_observations)]] > 0.5).multiply(
+                wins_votes_df["vote"], axis="index"
+            )
+
+            primary_estimand_trial_ecv_mean = np.mean(list(primary_estimand_wins.sum(axis=0)))
+            ecv_vote_totals_by_trial[primary_estimand].append(primary_estimand_trial_ecv_mean)
+
         total_ecv = sum(wins_votes_df["vote"])
-        ecv_vote_totals[" ".join(remaining_estimands)] = [
-            total_ecv - iter_ecv for iter_ecv in ecv_vote_totals[primary_estimand]
+        ecv_vote_totals_by_trial[" ".join(remaining_estimands)] = [
+            total_ecv - iter_ecv for iter_ecv in ecv_vote_totals_by_trial[primary_estimand]
         ]
 
-        return pd.DataFrame(data=ecv_vote_totals)
+        return pd.DataFrame(data=ecv_vote_totals_by_trial)
 
-    def get_electoral_count_estimates(self, state_preds, estimands, agg_model_states_not_used, ci_method, **kwargs):
+    def get_electoral_count_estimates(
+        self, state_preds, estimands, agg_model_states_not_used, num_observations, ci_method, **kwargs
+    ):
         # options for method are percentile, normal_dist (which is just standard approach for large sample size > n = 30)
         trials = kwargs.get("trials", 1000)
-        primary_estimand = kwargs.get("primarry_estimand", "dem")
+        primary_estimand = kwargs.get("primary_estimand", "dem")
 
         trials_df = self.get_electoral_count_trials(
-            state_preds, estimands, primary_estimand, agg_model_states_not_used, trials
+            state_preds, estimands, primary_estimand, agg_model_states_not_used, trials, num_observations
         )
         if ci_method == "normal_dist_mean":
+            # in case of num_oberservations =1, this gives CI around dem ecv estimate iteself
+            # in case of num_observations > 1, this is CI of sample mean of dem ecv
             est_means = trials_df.mean().round(2)
             est_sem = trials_df.sem().round(2)
             est_CI = {
