@@ -1,4 +1,5 @@
 import logging
+from itertools import combinations
 
 import numpy as np
 import pandas as pd
@@ -24,11 +25,9 @@ LOG = logging.getLogger(__name__)
 ecv_data = pd.read_csv("data_for_agg_model/ec_votes_by_state.csv").drop("state", axis=1)
 ecv_states_called = pd.read_csv("data_for_agg_model/ec_votes_called.csv").drop("state", axis=1).dropna()
 
-# ecv_states_called = (
-#     pd.read_csv("/Users/goldd/Projects/elex-live-model/data_for_agg_model/covar_matrix_data.csv")
-#     .drop("state", axis=1)
-#     .dropna()
-# )
+ecv_cov_matrix_data = pd.read_csv(
+    "/Users/goldd/Projects/elex-live-model/data_for_agg_model/covar_matrix_data.csv"
+).dropna()
 
 
 class ModelClientException(Exception):
@@ -363,8 +362,9 @@ class ModelClient(object):
 
         state_preds["var_sum"] = state_preds[[col for col in state_preds if "var_" in col]].sum(axis=1)
         mean_vec = list(state_preds[f"pred_{primary_estimand}_share"])  # TEMPORARY SUB
-        var_vec = list(state_preds["var_sum"])  # TEMPORARY SUB
-        cov_matrix = np.diag(var_vec)  # TEMPORARY SUB
+
+        cov_matrix = self.construct_cov_matrix(state_preds)
+
         wins_df = state_preds[["postal_code"]]
         remaining_estimands = [k for k in estimands if k != primary_estimand]
         ecv_vote_totals_by_trial = {primary_estimand: [], " ".join(remaining_estimands): []}
@@ -373,6 +373,7 @@ class ModelClient(object):
             observation_batch = self.random_draws(mean_vec, cov_matrix, num_observations)
             if num_observations == 1:
                 observation_batch = observation_batch.transpose()
+            breakpoint()
             wins_df[["obs_" + str(n) for n in range(num_observations)]] = observation_batch
             wins_votes_df = pd.merge(wins_df, ecv_data, on="postal_code")
 
@@ -401,7 +402,7 @@ class ModelClient(object):
             state_preds, estimands, primary_estimand, agg_model_states_not_used, trials, num_observations
         )
         if ci_method == "normal_dist_mean":
-            # in case of num_oberservations =1, this gives CI around dem ecv estimate iteself
+            # in case of num_oberservations = 1, this gives PI around dem ecv estimate iteself
             # in case of num_observations > 1, this is CI of sample mean of dem ecv
             est_means = trials_df.mean().round(2)
             est_sem = trials_df.sem().round(2)
@@ -416,6 +417,7 @@ class ModelClient(object):
             }
 
         elif ci_method == "percentile":
+            # either percentile in group of ecv draws, or percentile in distribution of ecv mean
             est_means = trials_df.mean().round(2)
             est_lb = trials_df.quantile(0.05, axis=0).round(2)
             est_ub = trials_df.quantile(0.95, axis=0).round(2)
@@ -426,6 +428,38 @@ class ModelClient(object):
             }
 
         return est_mean_CI
+
+    def construct_cov_matrix(self, state_preds):
+        states_in_use = state_preds["postal_code"]
+        var_vec = list(state_preds["var_sum"])
+        blue_states = [state for state in list(ecv_cov_matrix_data["blue_state"]) if state in states_in_use.to_list()]
+        red_states = [state for state in list(ecv_cov_matrix_data["red_state"]) if state in states_in_use.to_list()]
+        swing_states = [state for state in list(ecv_cov_matrix_data["swing_state"]) if state in states_in_use.to_list()]
+
+        cov_matrix = np.zeros((len(states_in_use), len(states_in_use)))
+        #  breakpoint()
+        for pair in combinations(blue_states, 2):
+            pair_indices = [
+                states_in_use[states_in_use == pair[0]].index[0],
+                states_in_use[states_in_use == pair[1]].index[0],
+            ]
+            cov_matrix[pair_indices] = 0.8
+        for pair in combinations(red_states, 2):
+            pair_indices = [
+                states_in_use[states_in_use == pair[0]].index[0],
+                states_in_use[states_in_use == pair[1]].index[0],
+            ]
+            cov_matrix[pair_indices] = 0.9
+        for pair in combinations(swing_states, 2):
+            pair_indices = [
+                states_in_use[states_in_use == pair[0]].index[0],
+                states_in_use[states_in_use == pair[1]].index[0],
+            ]
+            cov_matrix[pair_indices] = 0.7
+
+        np.fill_diagonal(cov_matrix, var_vec)
+
+        return np.diag(var_vec)  # cov_matrix #
 
 
 class HistoricalModelClient(ModelClient):
