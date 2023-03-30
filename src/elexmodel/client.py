@@ -25,9 +25,7 @@ LOG = logging.getLogger(__name__)
 ecv_data = pd.read_csv("data_for_agg_model/ec_votes_by_state.csv").drop("state", axis=1)
 ecv_states_called = pd.read_csv("data_for_agg_model/ec_votes_called.csv").drop("state", axis=1).dropna()
 
-ecv_cov_matrix_data = pd.read_csv(
-    "/Users/goldd/Projects/elex-live-model/data_for_agg_model/covar_matrix_data.csv"
-).dropna()
+ecv_cov_matrix_data = pd.read_csv("data_for_agg_model/covar_matrix_data.csv").dropna()
 
 
 class ModelClientException(Exception):
