@@ -340,7 +340,7 @@ class ModelClient(object):
         #  states_called = dict(zip(list(ecv_states_called["postal_code"]), list(ecv_states_called["called"])))
         # only make predictions for states that we want in the model
         # (i.e. those in preprocessed data)
-        state_preds = state_preds[~state_preds["postal_code"].isin(agg_model_states_not_used)]
+        state_preds = state_preds[~state_preds["postal_code"].isin(agg_model_states_not_used)].reset_index()
         estimand_columns = [col for col in state_preds.columns if "pred" in col]
         state_preds["total_estimand_votes"] = state_preds[estimand_columns].sum(axis=1)
 
@@ -371,7 +371,7 @@ class ModelClient(object):
             observation_batch = self.random_draws(mean_vec, cov_matrix, num_observations)
             if num_observations == 1:
                 observation_batch = observation_batch.transpose()
-            breakpoint()
+
             wins_df[["obs_" + str(n) for n in range(num_observations)]] = observation_batch
             wins_votes_df = pd.merge(wins_df, ecv_data, on="postal_code")
 
@@ -435,7 +435,7 @@ class ModelClient(object):
         swing_states = [state for state in list(ecv_cov_matrix_data["swing_state"]) if state in states_in_use.to_list()]
 
         cov_matrix = np.zeros((len(states_in_use), len(states_in_use)))
-        #  breakpoint()
+
         for pair in combinations(blue_states, 2):
             pair_indices = [
                 states_in_use[states_in_use == pair[0]].index[0],

@@ -31,7 +31,7 @@ percent_reporting_threshold = 100
 percent_reporting = 20
 print("target bucket", TARGET_BUCKET)
 aggregates = ["unit", "postal_code"]
-fixed_effects = []
+fixed_effects = ["postal_code"]
 
 # agg_model params:
 agg_model_states_not_used = ["AK"]
