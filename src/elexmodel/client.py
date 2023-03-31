@@ -390,7 +390,7 @@ class ModelClient(object):
         return pd.DataFrame(data=ecv_vote_totals_by_trial)
 
     def get_electoral_count_estimates(
-        self, state_preds, estimands, agg_model_states_not_used, num_observations, ci_method, **kwargs
+        self, state_preds, estimands, agg_model_states_not_used, num_observations, ci_method, alpha, **kwargs
     ):
         # options for method are percentile, normal_dist (which is just standard approach for large sample size > n = 30)
         trials = kwargs.get("trials", 1000)
@@ -405,7 +405,7 @@ class ModelClient(object):
             est_means = trials_df.mean().round(2)
             est_sem = trials_df.sem().round(2)
             est_CI = {
-                estimand: st.norm.interval(confidence=0.9, loc=est_means[estimand], scale=est_sem[estimand])
+                estimand: st.norm.interval(confidence=alpha, loc=est_means[estimand], scale=est_sem[estimand])
                 for estimand in estimands
             }
 
@@ -417,8 +417,9 @@ class ModelClient(object):
         elif ci_method == "percentile":
             # either percentile in group of ecv draws, or percentile in distribution of ecv mean
             est_means = trials_df.mean().round(2)
-            est_lb = trials_df.quantile(0.05, axis=0).round(2)
-            est_ub = trials_df.quantile(0.95, axis=0).round(2)
+            ci_tail = (1 - alpha) / 2
+            est_lb = trials_df.quantile(ci_tail, axis=0).round(2)
+            est_ub = trials_df.quantile(1 - ci_tail, axis=0).round(2)
 
             est_mean_CI = {
                 estimand: [est_means[estimand], round(est_lb[estimand], 2), round(est_ub[estimand], 2)]
