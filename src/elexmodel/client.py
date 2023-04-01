@@ -393,6 +393,7 @@ class ModelClient(object):
         self, state_preds, estimands, agg_model_states_not_used, num_observations, ci_method, alpha, **kwargs
     ):
         # options for method are percentile, normal_dist (which is just standard approach for large sample size > n = 30)
+        # or t- distribution
         trials = kwargs.get("trials", 1000)
         primary_estimand = kwargs.get("primary_estimand", "dem")
 
@@ -406,6 +407,23 @@ class ModelClient(object):
             est_sem = trials_df.sem().round(2)
             est_CI = {
                 estimand: st.norm.interval(confidence=alpha, loc=est_means[estimand], scale=est_sem[estimand])
+                for estimand in estimands
+            }
+
+            est_mean_CI = {
+                estimand: [est_means[estimand], round(est_CI[estimand][0], 2), round(est_CI[estimand][1], 2)]
+                for estimand in estimands
+            }
+
+        if ci_method == "t_dist_mean":
+            # in case of num_oberservations = 1, this gives PI around dem ecv estimate iteself
+            # in case of num_observations > 1, this is CI of sample mean of dem ecv
+            est_means = trials_df.mean().round(2)
+            est_sem = trials_df.sem().round(2)
+            est_CI = {
+                estimand: st.t.interval(
+                    alpha=alpha, df=len(trials_df) - 1, loc=est_means[estimand], scale=est_sem[estimand]
+                )
                 for estimand in estimands
             }
 
@@ -431,34 +449,38 @@ class ModelClient(object):
     def construct_cov_matrix(self, state_preds):
         states_in_use = state_preds["postal_code"]
         var_vec = list(state_preds["var_sum"])
+        std_vec = [np.sqrt(k) for k in var_vec]
         blue_states = [state for state in list(ecv_cov_matrix_data["blue_state"]) if state in states_in_use.to_list()]
         red_states = [state for state in list(ecv_cov_matrix_data["red_state"]) if state in states_in_use.to_list()]
         swing_states = [state for state in list(ecv_cov_matrix_data["swing_state"]) if state in states_in_use.to_list()]
 
-        cov_matrix = np.zeros((len(states_in_use), len(states_in_use)))
+        corr_matrix = np.zeros((len(states_in_use), len(states_in_use)))
 
         for pair in combinations(blue_states, 2):
             pair_indices = [
                 states_in_use[states_in_use == pair[0]].index[0],
                 states_in_use[states_in_use == pair[1]].index[0],
             ]
-            cov_matrix[pair_indices] = 0.8
+            corr_matrix[pair_indices] = 0.8
         for pair in combinations(red_states, 2):
             pair_indices = [
                 states_in_use[states_in_use == pair[0]].index[0],
                 states_in_use[states_in_use == pair[1]].index[0],
             ]
-            cov_matrix[pair_indices] = 0.9
+            corr_matrix[pair_indices] = 0.9
         for pair in combinations(swing_states, 2):
             pair_indices = [
                 states_in_use[states_in_use == pair[0]].index[0],
                 states_in_use[states_in_use == pair[1]].index[0],
             ]
-            cov_matrix[pair_indices] = 0.7
+            corr_matrix[pair_indices] = 0.7
 
-        np.fill_diagonal(cov_matrix, var_vec)
-
-        return np.diag(var_vec)  # cov_matrix #
+        np.fill_diagonal(corr_matrix, 1)
+        std_dev_diag_matrix = np.diag(std_vec)
+        cov_matrix = std_dev_diag_matrix @ corr_matrix @ std_dev_diag_matrix
+        # REMOVE FOLLOWING LINE - TEMP SUB
+        cov_matrix = np.diag(var_vec)
+        return cov_matrix
 
 
 class HistoricalModelClient(ModelClient):

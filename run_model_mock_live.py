@@ -35,8 +35,8 @@ fixed_effects = ["postal_code"]
 
 # agg_model params:
 agg_model_states_not_used = ["AK"]
-ci_method = "percentile"  # percentile or normal_dist_mean (this is CI for mean)
-num_observations = 100  # if set to 1, result is same as one batch of draws, not bootstrapped
+ci_method = "t_dist_mean"  # percentile or normal_dist_mean (this is CI for mean)
+num_observations = 1  # if set to 1, result is same as one batch of draws, not bootstrapped
 
 # if using standard preprocessed data for current or historical election
 data_handler = MockLiveDataHandler(
