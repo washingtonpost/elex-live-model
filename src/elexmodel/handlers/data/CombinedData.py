@@ -43,6 +43,13 @@ class CombinedDataHandler(object):
         self.fixed_effects = fixed_effects
         self.expanded_fixed_effects = []
 
+        data_report_counts = data.groupby(by="postal_code").apply(lambda x: sum(x["percent_expected_vote"] > 99))
+        states_one_report = [state for state in data_report_counts.index if data_report_counts[state] == 1]
+        data.loc[
+            (data["percent_expected_vote"] > 99) & (data["postal_code"].isin(states_one_report)),
+            "percent_expected_vote",
+        ] = 0
+
         self.data = data
 
     @classmethod
