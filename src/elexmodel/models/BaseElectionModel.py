@@ -20,6 +20,7 @@ class BaseElectionModel(object):
         self.qr = QuantileRegressionSolver(solver="ECOS")
         self.features = model_settings.get("features", []) 
         self.fixed_effects = model_settings.get("fixed_effects", [])
+        self.featurizer = Featurizer(self.features, self.fixed_effects)
         #self.features = (
         #    ["intercept"] + model_settings.get("features", []) + model_settings.get("expanded_fixed_effects", [])
         #)
@@ -67,10 +68,9 @@ class BaseElectionModel(object):
         """
         # specifying self.features extracts the correct columns and makes sure they are in the correct
         # order. Necessary when fitting and predicting on the model.
-        featurizer = Featurizer(self.features, self.fixed_effects)
-        featurizer.compute_means_for_normalization(reporting_units, nonreporting_units)
-        reporting_units_features = featurizer.featurize_fitting_data(reporting_units)
-        nonreporting_units_features = featurizer.featurize_heldout_data(nonreporting_units)
+        self.featurizer.compute_means_for_normalization(reporting_units, nonreporting_units)
+        reporting_units_features = self.featurizer.featurize_fitting_data(reporting_units)
+        nonreporting_units_features = self.featurizer.featurize_heldout_data(nonreporting_units)
         #reporting_units_features = reporting_units[self.features]
         #nonreporting_units_features = nonreporting_units[self.features]
 
@@ -200,8 +200,6 @@ class BaseElectionModel(object):
         and nonreporting data to get conformalization lower/upper bounds and nonreporting lower/upper bounds.
         Returns unadjusted bounds for nonreporting dat and conformalization data including bounds.
         """
-        featurizer = Featurizer(self.features, self.fixed_effects)
-        featurizer.compute_means_for_normalization(reporting_units, nonreporting_units)
         # split reporting data into training and conformalization data
         # seed is set during initialization, to make sure we always get the same training/conformalization split for each alpha of one run
         reporting_units_shuffled = reporting_units.sample(frac=1, random_state=self.seed).reset_index(drop=True)
@@ -215,7 +213,7 @@ class BaseElectionModel(object):
         # specifying self.features extracts the correct columns and makes sure they are in the correct
         # order. Necessary when fitting and predicting on the model.
         #train_data_features = train_data[self.features]
-        train_data_features = featurizer.featurize_fitting_data(train_data)
+        train_data_features = self.featurizer.featurize_fitting_data(train_data)
         train_data_residuals = train_data[f"residuals_{estimand}"]
         train_data_weights = train_data[f"total_voters_{estimand}"]
 
@@ -229,7 +227,7 @@ class BaseElectionModel(object):
         # apply to conformalization data. Conformalization bounds will later tell us how much to adjust lower/upper
         # bounds for nonreporting data.
         conformalization_data = reporting_units_shuffled[train_rows:].reset_index(drop=True)
-        conformalization_data_features = featurizer.featurize_heldout_data(conformalization_data)
+        conformalization_data_features = self.featurizer.featurize_heldout_data(conformalization_data)
         #conformalization_data_features = conformalization_data[self.features].values
         
         # we are interested in f(X) - r
@@ -246,7 +244,7 @@ class BaseElectionModel(object):
         conformalization_data["lower_bounds"] = conformalization_lower_bounds
 
         # apply lower/upper models to nonreporting data
-        nonreporting_units_features = featurizer.featurize_heldout_data(nonreporting_units)
+        nonreporting_units_features = self.featurizer.featurize_heldout_data(nonreporting_units)
         #nonreporting_units_features = nonreporting_units[self.features].values
         nonreporting_lower_bounds = lower_qr.predict(nonreporting_units_features)
         nonreporting_upper_bounds = upper_qr.predict(nonreporting_units_features)
