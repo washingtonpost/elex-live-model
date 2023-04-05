@@ -94,7 +94,7 @@ class Featurizer(object):
         new_heldout_data = heldout_data.copy()
 
         if self.center_features:
-            self._normalize(new_heldout_data)
+            self._center_features(new_heldout_data)
 
         if self.add_intercept:
             self._add_intercept(new_heldout_data)
