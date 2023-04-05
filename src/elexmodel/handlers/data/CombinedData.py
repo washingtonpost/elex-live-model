@@ -16,7 +16,6 @@ class CombinedDataHandler(object):
         current_data,
         estimands,
         geographic_unit_type,
-        fixed_effects=[],
         handle_unreporting="drop",
     ):
         self.estimands = estimands
@@ -40,39 +39,8 @@ class CombinedDataHandler(object):
             indices_with_null_val = data[result_cols].isna().any(axis=1)
             data.update(data[result_cols].fillna(value=0))
             data.loc[indices_with_null_val, "percent_expected_vote"] = 0
-        self.fixed_effects = fixed_effects
-        self.expanded_fixed_effects = []
 
         self.data = data
-
-    @classmethod
-    def _expand_fixed_effects(self, data, fixed_effects, drop_first):
-        """
-        Turn fixed effect columns into dummy variables. Concatenates original columns also
-        """
-        # we concatenate the dummies with the original fixed effects, since we need the original fixed effect
-        # columns in order to potentially aggregate on them.
-        original_fixed_effect_columns = data[fixed_effects]
-        return pd.concat(
-            [
-                pd.get_dummies(
-                    data,
-                    columns=fixed_effects,
-                    prefix=fixed_effects,
-                    prefix_sep="_",
-                    dtype=np.int64,
-                    drop_first=drop_first,
-                ),
-                original_fixed_effect_columns,
-            ],
-            axis=1,
-        )
-
-    def _normalize_features(self, df, features):
-        """
-        Normalize features. Columnize normalization, to make coefficients of model interpretable
-        """
-        return df[features] - df[features].mean()
 
     def get_reporting_units(self, percent_reporting_threshold, features_to_normalize=[], add_intercept=True):
         """
@@ -87,27 +55,7 @@ class CombinedDataHandler(object):
             reporting_units[f"residuals_{estimand}"] = (
                 reporting_units[f"results_{estimand}"] - reporting_units[f"last_election_results_{estimand}"]
             ) / reporting_units[f"total_voters_{estimand}"]
-        '''
-        if features_to_normalize:
-            reporting_units[features_to_normalize] = self._normalize_features(reporting_units, features_to_normalize)
 
-        if add_intercept:
-            # we effectively always need the intercept for the model to work
-            reporting_units["intercept"] = 1
-
-        if len(self.fixed_effects) > 0:
-            # drop_first is True for reporting units since we want to avoid the design matrix with
-            # expanded fixed effects to be linearly dependent
-            reporting_units = self._expand_fixed_effects(reporting_units, self.fixed_effects, drop_first=True)
-            # we save the expanded fixed effects to be able to add fixed effects that are not in the non-reporting
-            # units as a zero column and to be able to specify the order of the expanded fixed effect when fitting
-            # the model
-            self.expanded_fixed_effects = [
-                x
-                for x in reporting_units.columns
-                if x.startswith(tuple([fixed_effect + "_" for fixed_effect in self.fixed_effects]))
-            ]
-        '''
         reporting_units["reporting"] = 1
         return reporting_units
 
@@ -122,36 +70,7 @@ class CombinedDataHandler(object):
             .reset_index(drop=True)
             .assign(residuals=np.nan)
         )
-        '''
-        if features_to_normalize:
-            nonreporting_units[features_to_normalize] = self._normalize_features(
-                nonreporting_units, features_to_normalize
-            )
 
-        if add_intercept:
-            nonreporting_units["intercept"] = 1
-
-        if len(self.fixed_effects) > 0:
-            missing_expanded_fixed_effects = []
-            nonreporting_units = self._expand_fixed_effects(nonreporting_units, self.fixed_effects, drop_first=False)
-            # if all units from one fixed effect are reporting they will not appear in the nonreporting_units and won't
-            # get a column when we expand the fixed effects on that dataframe. Therefore we add those columns with zero
-            # fixed effects manually. As an example, if we are running a county model using state fixed effects, and
-            # all of Delaware's counties are reporting, then no Delaware county will be in nonreporting_units, as a result
-            # there will be no column for Delaware in the expanded fixed effects of nonreporting_units.
-            for expanded_fixed_effect in self.expanded_fixed_effects:
-                if expanded_fixed_effect not in nonreporting_units.columns:
-                    missing_expanded_fixed_effects.append(expanded_fixed_effect)
-
-            missing_expanded_fixed_effects_df = pd.DataFrame(
-                np.zeros((nonreporting_units.shape[0], len(missing_expanded_fixed_effects))),
-                columns=missing_expanded_fixed_effects,
-            )
-            # if we use this method to add the missing expanded fixed effects because doing it manually
-            # ie. nonreporting[expanded_fixed_effect] = 0
-            # can throw a fragmentation warning when there are many missing fixed effects.
-            nonreporting_units = nonreporting_units.join(missing_expanded_fixed_effects_df)
-        '''
         nonreporting_units["reporting"] = 0
 
         return nonreporting_units

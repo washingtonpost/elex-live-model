@@ -21,27 +21,13 @@ class BaseElectionModel(object):
         self.features = model_settings.get("features", []) 
         self.fixed_effects = model_settings.get("fixed_effects", [])
         self.featurizer = Featurizer(self.features, self.fixed_effects)
-        #self.features = (
-        #    ["intercept"] + model_settings.get("features", []) + model_settings.get("expanded_fixed_effects", [])
-        #)
         self.seed = 4191  # set arbitrarily
 
     def fit_model(self, model, df_X, df_y, tau, weights, normalize_weights):
         """
         Fits the quantile regression for the model
-        Removes two kinds of columns and then substitutes zeroes as those coefficients:
-            Zero columns: these are caused by fixed effects that don't appear in df_X.
-                The dummy variables were created using all data (not just the reporting data).
-                So the corresponding columns for fixed ffects that only appear in non-reporting units
-                will be all zero in the reporting matrix.
-            Duplicate columns: in case we accidentally specify a covariate twice. If a fixed effect
-                column is all ones then it is a duplicate of the intercept column and so will be removed.
         """
-        # identify columns to keep. we keep the non-zero ones
-        columns_to_keep_duplicated = ~df_X.transpose().duplicated(keep="first")
-        columns_to_keep_zero = df_X.sum(0) != 0
-        columns_to_keep = columns_to_keep_duplicated & columns_to_keep_zero
-        X = df_X.loc[:, columns_to_keep].values
+        X = df_X.values
         y = df_y.values
         weights = weights.values
 
@@ -55,24 +41,16 @@ class BaseElectionModel(object):
             LOG.warning("Warning: solution was inaccurate or solver broke. Re-running with normalize_weights=False.")
             model.fit(X, y, tau_value=tau, weights=weights, normalize_weights=False)
 
-        # generate new coefficient matrix with zeroes for all coefficents
-        coefficients = np.zeros((df_X.shape[1],))
-        # replace non-zero coefficients
-        coefficients[columns_to_keep] = model.coefficients
-        model.coefficients = coefficients
-
     def get_unit_predictions(self, reporting_units, nonreporting_units, estimand):
         """
         Produces unit level predictions. Fits quantile regression to reporting data, applies
         it to nonreporting data. The features are specified in model_settings.
         """
-        # specifying self.features extracts the correct columns and makes sure they are in the correct
-        # order. Necessary when fitting and predicting on the model.
-        self.featurizer.compute_means_for_normalization(reporting_units, nonreporting_units)
+        # compute the means of both reporting_units and nonreporting_units for centering (part of featurizing)
+        # we want them both, since together they are the subunit population
+        self.featurizer.compute_means_for_centering(reporting_units, nonreporting_units)
         reporting_units_features = self.featurizer.featurize_fitting_data(reporting_units)
         nonreporting_units_features = self.featurizer.featurize_heldout_data(nonreporting_units)
-        #reporting_units_features = reporting_units[self.features]
-        #nonreporting_units_features = nonreporting_units[self.features]
 
         weights = reporting_units[f"total_voters_{estimand}"]
         reporting_units_residuals = reporting_units[f"residuals_{estimand}"]
@@ -212,7 +190,6 @@ class BaseElectionModel(object):
 
         # specifying self.features extracts the correct columns and makes sure they are in the correct
         # order. Necessary when fitting and predicting on the model.
-        #train_data_features = train_data[self.features]
         train_data_features = self.featurizer.featurize_fitting_data(train_data)
         train_data_residuals = train_data[f"residuals_{estimand}"]
         train_data_weights = train_data[f"total_voters_{estimand}"]
@@ -228,7 +205,6 @@ class BaseElectionModel(object):
         # bounds for nonreporting data.
         conformalization_data = reporting_units_shuffled[train_rows:].reset_index(drop=True)
         conformalization_data_features = self.featurizer.featurize_heldout_data(conformalization_data)
-        #conformalization_data_features = conformalization_data[self.features].values
         
         # we are interested in f(X) - r
         # since later conformity scores care about deviation of bounds from residuals
@@ -245,7 +221,6 @@ class BaseElectionModel(object):
 
         # apply lower/upper models to nonreporting data
         nonreporting_units_features = self.featurizer.featurize_heldout_data(nonreporting_units)
-        #nonreporting_units_features = nonreporting_units[self.features].values
         nonreporting_lower_bounds = lower_qr.predict(nonreporting_units_features)
         nonreporting_upper_bounds = upper_qr.predict(nonreporting_units_features)
 
