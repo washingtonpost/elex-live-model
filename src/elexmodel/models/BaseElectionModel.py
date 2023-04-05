@@ -6,6 +6,7 @@ from collections import namedtuple
 import cvxpy
 import numpy as np
 from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
+from elexmodel.handlers.data.Featurizer import Featurizer
 
 warnings.filterwarnings("error", category=UserWarning, module="cvxpy")
 
@@ -17,9 +18,11 @@ LOG = logging.getLogger(__name__)
 class BaseElectionModel(object):
     def __init__(self, model_settings={}):
         self.qr = QuantileRegressionSolver(solver="ECOS")
-        self.features = (
-            ["intercept"] + model_settings.get("features", []) + model_settings.get("expanded_fixed_effects", [])
-        )
+        self.features = model_settings.get("features", []) 
+        self.fixed_effects = model_settings.get("fixed_effects", [])
+        #self.features = (
+        #    ["intercept"] + model_settings.get("features", []) + model_settings.get("expanded_fixed_effects", [])
+        #)
         self.seed = 4191  # set arbitrarily
 
     def fit_model(self, model, df_X, df_y, tau, weights, normalize_weights):
@@ -64,8 +67,12 @@ class BaseElectionModel(object):
         """
         # specifying self.features extracts the correct columns and makes sure they are in the correct
         # order. Necessary when fitting and predicting on the model.
-        reporting_units_features = reporting_units[self.features]
-        nonreporting_units_features = nonreporting_units[self.features]
+        featurizer = Featurizer(self.features, self.fixed_effects)
+        featurizer.compute_means_for_normalization(reporting_units, nonreporting_units)
+        reporting_units_features = featurizer.featurize_fitting_data(reporting_units)
+        nonreporting_units_features = featurizer.featurize_heldout_data(nonreporting_units)
+        #reporting_units_features = reporting_units[self.features]
+        #nonreporting_units_features = nonreporting_units[self.features]
 
         weights = reporting_units[f"total_voters_{estimand}"]
         reporting_units_residuals = reporting_units[f"residuals_{estimand}"]
@@ -193,6 +200,8 @@ class BaseElectionModel(object):
         and nonreporting data to get conformalization lower/upper bounds and nonreporting lower/upper bounds.
         Returns unadjusted bounds for nonreporting dat and conformalization data including bounds.
         """
+        featurizer = Featurizer(self.features, self.fixed_effects)
+        featurizer.compute_means_for_normalization(reporting_units, nonreporting_units)
         # split reporting data into training and conformalization data
         # seed is set during initialization, to make sure we always get the same training/conformalization split for each alpha of one run
         reporting_units_shuffled = reporting_units.sample(frac=1, random_state=self.seed).reset_index(drop=True)
@@ -205,7 +214,8 @@ class BaseElectionModel(object):
 
         # specifying self.features extracts the correct columns and makes sure they are in the correct
         # order. Necessary when fitting and predicting on the model.
-        train_data_features = train_data[self.features]
+        #train_data_features = train_data[self.features]
+        train_data_features = featurizer.featurize_fitting_data(train_data)
         train_data_residuals = train_data[f"residuals_{estimand}"]
         train_data_weights = train_data[f"total_voters_{estimand}"]
 
@@ -219,7 +229,9 @@ class BaseElectionModel(object):
         # apply to conformalization data. Conformalization bounds will later tell us how much to adjust lower/upper
         # bounds for nonreporting data.
         conformalization_data = reporting_units_shuffled[train_rows:].reset_index(drop=True)
-        conformalization_data_features = conformalization_data[self.features].values
+        conformalization_data_features = featurizer.featurize_heldout_data(conformalization_data)
+        #conformalization_data_features = conformalization_data[self.features].values
+        
         # we are interested in f(X) - r
         # since later conformity scores care about deviation of bounds from residuals
         conformalization_lower_bounds = (
@@ -234,7 +246,8 @@ class BaseElectionModel(object):
         conformalization_data["lower_bounds"] = conformalization_lower_bounds
 
         # apply lower/upper models to nonreporting data
-        nonreporting_units_features = nonreporting_units[self.features].values
+        nonreporting_units_features = featurizer.featurize_heldout_data(nonreporting_units)
+        #nonreporting_units_features = nonreporting_units[self.features].values
         nonreporting_lower_bounds = lower_qr.predict(nonreporting_units_features)
         nonreporting_upper_bounds = upper_qr.predict(nonreporting_units_features)
 

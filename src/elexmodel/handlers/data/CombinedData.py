@@ -87,7 +87,7 @@ class CombinedDataHandler(object):
             reporting_units[f"residuals_{estimand}"] = (
                 reporting_units[f"results_{estimand}"] - reporting_units[f"last_election_results_{estimand}"]
             ) / reporting_units[f"total_voters_{estimand}"]
-
+        '''
         if features_to_normalize:
             reporting_units[features_to_normalize] = self._normalize_features(reporting_units, features_to_normalize)
 
@@ -107,7 +107,7 @@ class CombinedDataHandler(object):
                 for x in reporting_units.columns
                 if x.startswith(tuple([fixed_effect + "_" for fixed_effect in self.fixed_effects]))
             ]
-
+        '''
         reporting_units["reporting"] = 1
         return reporting_units
 
@@ -122,7 +122,7 @@ class CombinedDataHandler(object):
             .reset_index(drop=True)
             .assign(residuals=np.nan)
         )
-
+        '''
         if features_to_normalize:
             nonreporting_units[features_to_normalize] = self._normalize_features(
                 nonreporting_units, features_to_normalize
@@ -151,7 +151,7 @@ class CombinedDataHandler(object):
             # ie. nonreporting[expanded_fixed_effect] = 0
             # can throw a fragmentation warning when there are many missing fixed effects.
             nonreporting_units = nonreporting_units.join(missing_expanded_fixed_effects_df)
-
+        '''
         nonreporting_units["reporting"] = 0
 
         return nonreporting_units
