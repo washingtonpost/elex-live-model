@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 
 from elexmodel.handlers import s3
 from elexmodel.utils.file_utils import S3_FILE_PATH, TARGET_BUCKET, convert_df_to_csv

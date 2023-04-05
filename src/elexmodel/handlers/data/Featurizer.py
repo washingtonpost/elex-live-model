@@ -1,5 +1,6 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
+
 
 class Featurizer(object):
     """
@@ -24,11 +25,11 @@ class Featurizer(object):
     def _center_features(self, df):
         """
         Centers the features. This changes the interpretation of the intercept coefficient
-        from conditional mean given covariates = 0, to conditional mean given covariates are 
+        from conditional mean given covariates = 0, to conditional mean given covariates are
         their average value
         """
         df[self.features] = df[self.features] - self.column_means
-    
+
     def _add_intercept(self, df):
         df["intercept"] = 1
 
@@ -53,10 +54,10 @@ class Featurizer(object):
             ],
             axis=1,
         )
-    
+
     def featurize_fitting_data(self, fitting_data, center_features=True, add_intercept=True):
         """
-        Featurize the data that the model is fitted on. 
+        Featurize the data that the model is fitted on.
         """
         # make copy of fitting_data, since we do not want to change the original data
         new_fitting_data = fitting_data.copy()
@@ -79,13 +80,13 @@ class Featurizer(object):
                 x
                 for x in new_fitting_data.columns
                 if x.startswith(tuple([fixed_effect + "_" for fixed_effect in self.fixed_effects]))
-            ]  
+            ]
 
         # all features that the model will be fit on
         self.complete_features = ["intercept"] + self.features + self.expanded_fixed_effects
 
         return new_fitting_data[self.complete_features]
-        
+
     def featurize_heldout_data(self, heldout_data):
         """
         Featurize the data that the model will be applied on.
@@ -120,4 +121,3 @@ class Featurizer(object):
             new_heldout_data = new_heldout_data.join(missing_expanded_fixed_effects_df)
 
         return new_heldout_data[self.complete_features]
-

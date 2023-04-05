@@ -6,6 +6,7 @@ from collections import namedtuple
 import cvxpy
 import numpy as np
 from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
+
 from elexmodel.handlers.data.Featurizer import Featurizer
 
 warnings.filterwarnings("error", category=UserWarning, module="cvxpy")
@@ -18,7 +19,7 @@ LOG = logging.getLogger(__name__)
 class BaseElectionModel(object):
     def __init__(self, model_settings={}):
         self.qr = QuantileRegressionSolver(solver="ECOS")
-        self.features = model_settings.get("features", []) 
+        self.features = model_settings.get("features", [])
         self.fixed_effects = model_settings.get("fixed_effects", [])
         self.featurizer = Featurizer(self.features, self.fixed_effects)
         self.seed = 4191  # set arbitrarily
@@ -205,7 +206,7 @@ class BaseElectionModel(object):
         # bounds for nonreporting data.
         conformalization_data = reporting_units_shuffled[train_rows:].reset_index(drop=True)
         conformalization_data_features = self.featurizer.featurize_heldout_data(conformalization_data)
-        
+
         # we are interested in f(X) - r
         # since later conformity scores care about deviation of bounds from residuals
         conformalization_lower_bounds = (
