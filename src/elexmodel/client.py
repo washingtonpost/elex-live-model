@@ -4,7 +4,6 @@ from itertools import combinations
 import numpy as np
 import pandas as pd
 import scipy.stats as st
-from scipy.stats import multivariate_t
 
 from elexmodel.handlers import s3
 from elexmodel.handlers.config import ConfigHandler
@@ -17,6 +16,9 @@ from elexmodel.models.NonparametricElectionModel import NonparametricElectionMod
 from elexmodel.utils.constants import AGGREGATE_ORDER, VALID_AGGREGATES_MAPPING
 from elexmodel.utils.file_utils import APP_ENV, S3_FILE_PATH, TARGET_BUCKET
 from elexmodel.utils.math_utils import compute_error, compute_frac_within_pi, compute_mean_pi_length
+
+# from scipy.stats import multivariate_t
+
 
 initialize_logging()
 
@@ -212,6 +214,7 @@ class ModelClient(object):
         reporting_units = data.get_reporting_units(
             percent_reporting_threshold, features_to_normalize=features, add_intercept=True
         )
+
         nonreporting_units = data.get_nonreporting_units(
             percent_reporting_threshold, features_to_normalize=features, add_intercept=True
         )
@@ -320,10 +323,29 @@ class ModelClient(object):
     def extend_str_with_list(self, string, list_to_add):
         return [f"{string}_{str(item)}" for item in list_to_add]
 
-    def random_draws(self, mean_vec, cov_matrix, num_observations):
+    # def random_draws(self, mean_vec, cov_matrix, num_observations):
 
-        draws = pd.DataFrame(multivariate_t.rvs(mean_vec, cov_matrix, size=num_observations))
-        return draws.transpose()
+    #     draws = pd.DataFrame(multivariate_t.rvs(mean_vec, cov_matrix, size=num_observations))
+
+    #     return draws.transpose()
+
+    def random_draws(self, mean_vec_dict, cov_matrix_dict, primary_estimand, remaining_est_names, num_observations):
+
+        draws_primary = pd.DataFrame(
+            np.random.multivariate_normal(
+                mean_vec_dict[primary_estimand], cov_matrix_dict[primary_estimand], size=num_observations
+            )
+        ).transpose()
+        draws_remaining = pd.DataFrame(
+            np.random.multivariate_normal(
+                mean_vec_dict[remaining_est_names], cov_matrix_dict[remaining_est_names], size=num_observations
+            )
+        ).transpose()
+        total_drawn = draws_primary + draws_remaining
+        primary_shares = draws_primary / total_drawn
+        # breakpoint()
+
+        return primary_shares
 
     # def random_draws(self, row, alpha, estimands, primary_estimand, estimand):
 
@@ -337,40 +359,78 @@ class ModelClient(object):
     def get_electoral_count_trials(
         self, state_preds, estimands, primary_estimand, agg_model_states_not_used, trials, num_observations, alpha=0.9
     ):
+
         #  states_called = dict(zip(list(ecv_states_called["postal_code"]), list(ecv_states_called["called"])))
         # only make predictions for states that we want in the model
         # (i.e. those in preprocessed data)
         state_preds = state_preds[~state_preds["postal_code"].isin(agg_model_states_not_used)].reset_index()
-        estimand_columns = [col for col in state_preds.columns if "pred" in col]
-        state_preds["total_estimand_votes"] = state_preds[estimand_columns].sum(axis=1)
+        # estimand_columns = [col for col in state_preds.columns if "pred" in col]
+        # state_preds["total_estimand_votes"] = state_preds[estimand_columns].sum(axis=1)
 
-        for estimand in estimands:
-            state_preds[f"pred_{estimand}_share"] = (
-                state_preds["pred_" + estimand] / state_preds["total_estimand_votes"]
-            )
-            state_preds[f"upper_{alpha}_{estimand}_share"] = (
-                state_preds[f"upper_{alpha}_{estimand}"] / state_preds["total_estimand_votes"]
-            )
-            state_preds[f"lower_{alpha}_{estimand}_share"] = (
-                state_preds[f"lower_{alpha}_{estimand}"] / state_preds["total_estimand_votes"]
-            )
-            state_preds[f"var_{estimand}_share"] = (1 / 12) * (
-                state_preds[f"upper_{alpha}_{estimand}_share"] - state_preds[f"lower_{alpha}_{estimand}_share"]
-            ) ** 2
+        # for estimand in estimands:
+        #     state_preds[f"pred_{estimand}_share"] = (
+        #         state_preds["pred_" + estimand] / state_preds["total_estimand_votes"]
+        #     )
+        #     state_preds[f"upper_{alpha}_{estimand}_share"] = (
+        #         state_preds[f"upper_{alpha}_{estimand}"] / state_preds["total_estimand_votes"]
+        #     )
+        #     state_preds[f"lower_{alpha}_{estimand}_share"] = (
+        #         state_preds[f"lower_{alpha}_{estimand}"] / state_preds["total_estimand_votes"]
+        #     )
+        #     state_preds[f"var_{estimand}_share"] = (1 / 12) * (
+        #         state_preds[f"upper_{alpha}_{estimand}_share"] - state_preds[f"lower_{alpha}_{estimand}_share"]
+        #     ) ** 2
 
-        state_preds["var_sum"] = state_preds[[col for col in state_preds if "var_" in col]].sum(axis=1)
-        mean_vec = list(state_preds[f"pred_{primary_estimand}_share"])  # TEMPORARY SUB
+        # state_preds["var_sum"] = state_preds[[col for col in state_preds if "var_" in col]].sum(axis=1)
+        # mean_vec = list(state_preds[f"pred_{primary_estimand}_share"])  # TEMPORARY SUB
 
-        cov_matrix = self.construct_cov_matrix(state_preds)
+        # cov_matrix = self.construct_cov_matrix(state_preds)
+
+        remaining_estimands = [k for k in estimands if k != primary_estimand and k != "turnout"]
+        remaining_est_names = " ".join(remaining_estimands)
+        remaining_estimand_columns = ["pred_" + estimand for estimand in remaining_estimands if estimand != "turnout"]
+        remaining_estimand_columns_lower = [
+            f"lower_{alpha}_{estimand}" for estimand in remaining_estimands if estimand != "turnout"
+        ]
+        remaining_estimand_columns_upper = [
+            f"upper_{alpha}_{estimand}" for estimand in remaining_estimands if estimand != "turnout"
+        ]
+        state_preds["pred_remaining_estimands"] = state_preds[remaining_estimand_columns].sum(axis=1)
+
+        state_preds[f"lower_{alpha}_remaining_estimands"] = state_preds[remaining_estimand_columns_lower].sum(axis=1)
+        state_preds[f"upper_{alpha}_remaining_estimands"] = state_preds[remaining_estimand_columns_upper].sum(axis=1)
+
+        mean_vec_dict = {
+            primary_estimand: list(state_preds[f"pred_{primary_estimand}"]),
+            remaining_est_names: list(state_preds["pred_remaining_estimands"]),
+        }
+
+        # This estimate for var is so dumb:
+        var_dict = {
+            primary_estimand: (1 / 12)
+            * (state_preds[f"upper_{alpha}_{primary_estimand}"] - state_preds[f"lower_{alpha}_{primary_estimand}"])
+            ** 2,
+            remaining_est_names: (1 / 12)
+            * (state_preds[f"upper_{alpha}_remaining_estimands"] - state_preds[f"lower_{alpha}_remaining_estimands"])
+            ** 2,
+        }
+
+        # no interstate correlations yet:
+        cov_matrix_dict = {
+            primary_estimand: np.diag(var_dict[primary_estimand]),
+            remaining_est_names: np.diag(var_dict[remaining_est_names]),
+        }
 
         wins_df = state_preds[["postal_code"]]
-        remaining_estimands = [k for k in estimands if k != primary_estimand]
+
         ecv_vote_totals_by_trial = {primary_estimand: [], " ".join(remaining_estimands): []}
         for k in range(trials):
 
-            observation_batch = self.random_draws(mean_vec, cov_matrix, num_observations)
-            if num_observations == 1:
-                observation_batch = observation_batch.transpose()
+            observation_batch = self.random_draws(
+                mean_vec_dict, cov_matrix_dict, primary_estimand, remaining_est_names, num_observations
+            )
+            #  if num_observations == 1:
+            #      observation_batch = observation_batch.transpose()
 
             wins_df[["obs_" + str(n) for n in range(num_observations)]] = observation_batch
             wins_votes_df = pd.merge(wins_df, ecv_data, on="postal_code")
@@ -383,7 +443,7 @@ class ModelClient(object):
             ecv_vote_totals_by_trial[primary_estimand].append(primary_estimand_trial_ecv_mean)
 
         total_ecv = sum(wins_votes_df["vote"])
-        ecv_vote_totals_by_trial[" ".join(remaining_estimands)] = [
+        ecv_vote_totals_by_trial[remaining_est_names] = [
             total_ecv - iter_ecv for iter_ecv in ecv_vote_totals_by_trial[primary_estimand]
         ]
 
@@ -479,6 +539,9 @@ class ModelClient(object):
         std_dev_diag_matrix = np.diag(std_vec)
         cov_matrix = std_dev_diag_matrix @ corr_matrix @ std_dev_diag_matrix
         # REMOVE FOLLOWING LINE - TEMP SUB
+        #    cov_matrix = np.diag(var_vec)
+        # cov_matrix = np.identity(n = len(states_in_use))
+
         cov_matrix = np.diag(var_vec)
         return cov_matrix
 
