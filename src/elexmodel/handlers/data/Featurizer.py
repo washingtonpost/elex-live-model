@@ -58,6 +58,8 @@ class Featurizer(object):
     def featurize_fitting_data(self, fitting_data, center_features=True, add_intercept=True):
         """
         Featurize the data that the model is fitted on.
+        In our case fitting_data is either the reporting_units (when fitting a model for the point predictions)
+        or training_data (when fitting the model for the prediction intervals)
         """
         # make copy of fitting_data, since we do not want to change the original data
         new_fitting_data = fitting_data.copy()
@@ -90,6 +92,8 @@ class Featurizer(object):
     def featurize_heldout_data(self, heldout_data):
         """
         Featurize the data that the model will be applied on.
+        In our case the heldout_data is either the nonreporting_units (when applying the model for the point predictions)
+        or conformalization_data/nonreporting_units (when applying the model for the prediction intervals)
         """
         new_heldout_data = heldout_data.copy()
 

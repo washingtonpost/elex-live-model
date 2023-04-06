@@ -50,6 +50,8 @@ class BaseElectionModel(object):
         # compute the means of both reporting_units and nonreporting_units for centering (part of featurizing)
         # we want them both, since together they are the subunit population
         self.featurizer.compute_means_for_centering(reporting_units, nonreporting_units)
+        # reporting_units_features and nonreporting_units_features should have the same 
+        # features. Specifically also the same fixed effect columns.
         reporting_units_features = self.featurizer.featurize_fitting_data(reporting_units)
         nonreporting_units_features = self.featurizer.featurize_heldout_data(nonreporting_units)
 
@@ -191,6 +193,8 @@ class BaseElectionModel(object):
 
         # specifying self.features extracts the correct columns and makes sure they are in the correct
         # order. Necessary when fitting and predicting on the model.
+        # the fixed effects in train_data will be a subset of the fixed effect of reporting_units since all
+        # units from one fixed effect category might be in the conformalization data.
         train_data_features = self.featurizer.featurize_fitting_data(train_data)
         train_data_residuals = train_data[f"residuals_{estimand}"]
         train_data_weights = train_data[f"total_voters_{estimand}"]
@@ -205,6 +209,7 @@ class BaseElectionModel(object):
         # apply to conformalization data. Conformalization bounds will later tell us how much to adjust lower/upper
         # bounds for nonreporting data.
         conformalization_data = reporting_units_shuffled[train_rows:].reset_index(drop=True)
+        # conformalization features will be the same as the features in train_data
         conformalization_data_features = self.featurizer.featurize_heldout_data(conformalization_data)
 
         # we are interested in f(X) - r
@@ -221,6 +226,8 @@ class BaseElectionModel(object):
         conformalization_data["lower_bounds"] = conformalization_lower_bounds
 
         # apply lower/upper models to nonreporting data
+        # now the features of teh nonreporting_units will be the same as the train_data features
+        # they might differ slightly from the features used when fitting the median prediction
         nonreporting_units_features = self.featurizer.featurize_heldout_data(nonreporting_units)
         nonreporting_lower_bounds = lower_qr.predict(nonreporting_units_features)
         nonreporting_upper_bounds = upper_qr.predict(nonreporting_units_features)
