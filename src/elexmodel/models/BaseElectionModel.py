@@ -50,7 +50,7 @@ class BaseElectionModel(object):
         # compute the means of both reporting_units and nonreporting_units for centering (part of featurizing)
         # we want them both, since together they are the subunit population
         self.featurizer.compute_means_for_centering(reporting_units, nonreporting_units)
-        # reporting_units_features and nonreporting_units_features should have the same 
+        # reporting_units_features and nonreporting_units_features should have the same
         # features. Specifically also the same fixed effect columns.
         reporting_units_features = self.featurizer.featurize_fitting_data(reporting_units)
         nonreporting_units_features = self.featurizer.featurize_heldout_data(nonreporting_units)
