@@ -194,7 +194,10 @@ class BaseElectionModel(object):
         # specifying self.features extracts the correct columns and makes sure they are in the correct
         # order. Necessary when fitting and predicting on the model.
         # the fixed effects in train_data will be a subset of the fixed effect of reporting_units since all
-        # units from one fixed effect category might be in the conformalization data.
+        # units from one fixed effect category might be in the conformalization data. Note that we are
+        # overwritting featurizer.expanded_fixed_effects by doing this (which is what we want), since we
+        # want the expanded_fixed_effects from train_data to be used by conformalization_data and nonreporting_data
+        # in this function.
         train_data_features = self.featurizer.featurize_fitting_data(train_data)
         train_data_residuals = train_data[f"residuals_{estimand}"]
         train_data_weights = train_data[f"total_voters_{estimand}"]
@@ -226,7 +229,7 @@ class BaseElectionModel(object):
         conformalization_data["lower_bounds"] = conformalization_lower_bounds
 
         # apply lower/upper models to nonreporting data
-        # now the features of teh nonreporting_units will be the same as the train_data features
+        # now the features of the nonreporting_units will be the same as the train_data features
         # they might differ slightly from the features used when fitting the median prediction
         nonreporting_units_features = self.featurizer.featurize_heldout_data(nonreporting_units)
         nonreporting_lower_bounds = lower_qr.predict(nonreporting_units_features)

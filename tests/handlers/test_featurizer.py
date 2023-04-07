@@ -44,6 +44,13 @@ def test_centering_features():
     featurizer._center_features(df)
     assert df.equals(pd.DataFrame({"a": [-1.0, 0.0, 1.0], "b": [-3.0, -1.0, 4.0]}))
 
+    # confirm that when the function is used properly we would not subtract the
+    # means twice
+    df = pd.DataFrame({"a": [1, 2, 3], "b": [2, 4, 9]})
+    featurizer.featurize_fitting_data(df, center_features=True)
+    df2 = featurizer.featurize_fitting_data(df, center_features=True)
+    assert df2.equals(pd.DataFrame({"intercept": [1, 1, 1], "a": [-1.0, 0.0, 1.0], "b": [-3.0, -1.0, 4.0]}))
+
 
 def test_adding_intercept():
     features = ["a", "b", "c"]
@@ -56,6 +63,66 @@ def test_adding_intercept():
 
     assert "intercept" in df.columns
     assert df.intercept.equals(pd.Series([1, 1, 1, 1]))
+
+
+def test_column_names():
+    """
+    This function tests to make sure that the featurizer returns the right columns
+    """
+    features = ["a", "b", "c"]
+    fixed_effects = ["fe_a"]
+    featurizer = Featurizer(features, fixed_effects)
+
+    df_fitting = pd.DataFrame(
+        {
+            "x": [5, 3, 1, 5],
+            "a": [2, 2, 2, 2],
+            "b": [3, 3, 3, 3],
+            "c": [1, 2, 3, 4],
+            "fe_a": ["a", "a", "b", "c"],
+            "fe_b": ["1", "x", "7", "y"],
+        }
+    )
+    df_heldout = pd.DataFrame(
+        {
+            "a": [2, 2, 2, 2],
+            "b": [3, 3, 3, 3],
+            "c": [1, 2, 3, 4],
+            "d": [5, 3, 1, 5],
+            "fe_a": ["a", "a", "b", "d"],
+            "fe_b": ["1", "x", "7", "y"],
+        }
+    )
+
+    featurizer.compute_means_for_centering(df_fitting, df_heldout)
+    # since only a, b and c are "features" specified above we would expect "x" from df_fitting and "d" from df_heldout to be dropped
+    # similarly we would expect the same from fe_b (since only fe_a is specified as a fixed effect)
+    df_fitting_features = featurizer.featurize_fitting_data(df_fitting)
+    df_heldout_features = featurizer.featurize_heldout_data(df_heldout)
+
+    assert (df_fitting_features.columns == df_heldout_features.columns).all()
+
+    assert "a" in df_fitting_features.columns
+    assert "b" in df_fitting_features.columns
+    assert "c" in df_fitting_features.columns
+    assert "fe_a_a" not in df_fitting_features.columns  # since drop_first is true
+    assert "fe_a_b" in df_fitting_features.columns
+    assert "fe_a_c" in df_fitting_features.columns
+    assert "x" not in df_fitting_features.columns  # not a feature
+    assert "fe_b_1" not in df_fitting_features.columns  # not a fixed effect
+    assert "fe_b_x" not in df_fitting_features.columns  # not a fixed effect
+
+    assert "a" in df_heldout_features.columns
+    assert "b" in df_heldout_features.columns
+    assert "c" in df_heldout_features.columns
+    assert (
+        "fe_a_a" not in df_heldout_features.columns
+    )  # drop_first is False for heldout, but "fe_a_a" is not in expanded_fixed_effects because dropped by fitting_data expansion
+    assert "fe_a_b" in df_heldout_features.columns
+    assert "fe_a_c" in df_heldout_features.columns  # this column should have been addded manually
+    assert "fe_a_d" not in df_heldout_features.columns  # not in expanded_fixed_effects since not fitting_datas
+    assert "fe_b_1" not in df_heldout_features.columns  # not a fixed effect
+    assert "fe_b_x" not in df_heldout_features.columns  # not a fixed effect
 
 
 def test_expanding_fixed_effects_basic():
