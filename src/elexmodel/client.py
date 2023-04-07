@@ -407,11 +407,15 @@ class ModelClient(object):
 
         # This estimate for var is so dumb:
         var_dict = {
-            primary_estimand: (1 / 12)
-            * (state_preds[f"upper_{alpha}_{primary_estimand}"] - state_preds[f"lower_{alpha}_{primary_estimand}"])
+            primary_estimand: (
+                (state_preds[f"upper_{alpha}_{primary_estimand}"] - state_preds[f"lower_{alpha}_{primary_estimand}"])
+                / (2 * 1.645)
+            )
             ** 2,
-            remaining_est_names: (1 / 12)
-            * (state_preds[f"upper_{alpha}_remaining_estimands"] - state_preds[f"lower_{alpha}_remaining_estimands"])
+            remaining_est_names: (
+                (state_preds[f"upper_{alpha}_remaining_estimands"] - state_preds[f"lower_{alpha}_remaining_estimands"])
+                / (2 * 1.645)
+            )
             ** 2,
         }
 
