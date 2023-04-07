@@ -161,6 +161,7 @@ class ModelClient(object):
             "beta": beta,
             "robust": robust,
             "features": features,
+            "fixed_effects": fixed_effects,
             "save_conformalization": save_conformalization,
         }
 
@@ -207,7 +208,6 @@ class ModelClient(object):
             current_data,
             estimands,
             geographic_unit_type,
-            fixed_effects=fixed_effects,
             handle_unreporting=handle_unreporting,
         )
 
@@ -232,7 +232,6 @@ class ModelClient(object):
             model_settings,
         )
 
-        model_settings["expanded_fixed_effects"] = data.expanded_fixed_effects
         if pi_method == "nonparametric":
             model = NonparametricElectionModel(model_settings=model_settings)
         elif pi_method == "gaussian":
