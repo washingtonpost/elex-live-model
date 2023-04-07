@@ -90,7 +90,7 @@ def test_column_names():
             "c": [1, 2, 3, 4],
             "d": [5, 3, 1, 5],
             "fe_a": ["a", "a", "b", "d"],
-            "fe_b": ["1", "x", "7", "y"],
+            "fe_c": ["1", "a", "7", "y"],
         }
     )
 
@@ -111,6 +111,7 @@ def test_column_names():
     assert "x" not in df_fitting_features.columns  # not a feature
     assert "fe_b_1" not in df_fitting_features.columns  # not a fixed effect
     assert "fe_b_x" not in df_fitting_features.columns  # not a fixed effect
+    assert "fe_c_a" not in df_fitting_features.columns  # not a fixed effect
 
     assert "a" in df_heldout_features.columns
     assert "b" in df_heldout_features.columns
@@ -123,6 +124,7 @@ def test_column_names():
     assert "fe_a_d" not in df_heldout_features.columns  # not in expanded_fixed_effects since not fitting_datas
     assert "fe_b_1" not in df_heldout_features.columns  # not a fixed effect
     assert "fe_b_x" not in df_heldout_features.columns  # not a fixed effect
+    assert "fe_c_a" not in df_heldout_features.columns  # not a fixed effect
 
 
 def test_expanding_fixed_effects_basic():
