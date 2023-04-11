@@ -34,9 +34,10 @@ aggregates = ["unit", "postal_code"]
 fixed_effects = ["postal_code"]
 
 # agg_model params:
+agg_model_estimates = True
 agg_model_states_not_used = ["AK"]
-ci_method = "t_dist_mean"  # percentile or normal_dist_mean (this is CI for mean)
-num_observations = 100  # if set to 1, result is same as one batch of draws, not bootstrapped
+ci_method = "percentile"  # percentile or normal_dist_mean (this is CI for mean)
+num_observations = 1  # if set to 1, result is same as one batch of draws, not bootstrapped
 
 # if using standard preprocessed data for current or historical election
 data_handler = MockLiveDataHandler(
@@ -64,11 +65,15 @@ if not historical:
         geographic_unit_type,
         pi_method="gaussian",
         aggregates=aggregates,
+        agg_model_estimates=agg_model_estimates,
+        agg_model_states_not_used=agg_model_states_not_used,
+        ci_method=ci_method,
+        num_observations=num_observations,
     )
 
-    ecv_estimates = model_client.get_electoral_count_estimates(
-        result["state_data"], estimands, agg_model_states_not_used, num_observations, ci_method, 0.9
-    )
+    if agg_model_estimates:
+        print("Agg results", model_client.ecv_estimates)
+
 
 if historical:
     model_client = HistoricalModelClient()

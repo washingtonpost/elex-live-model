@@ -17,6 +17,7 @@ class CombinedDataHandler(object):
         geographic_unit_type,
         handle_unreporting="drop",
     ):
+
         self.estimands = estimands
         # if we're running this for a past election, drop results columns from preprocessed data
         # so we use results_{estimand} numbers from current_data

@@ -1,9 +1,7 @@
 import logging
-from itertools import combinations
 
 import numpy as np
 import pandas as pd
-import scipy.stats as st
 
 from elexmodel.handlers import s3
 from elexmodel.handlers.config import ConfigHandler
@@ -17,17 +15,9 @@ from elexmodel.utils.constants import AGGREGATE_ORDER, VALID_AGGREGATES_MAPPING
 from elexmodel.utils.file_utils import APP_ENV, S3_FILE_PATH, TARGET_BUCKET
 from elexmodel.utils.math_utils import compute_error, compute_frac_within_pi, compute_mean_pi_length
 
-# from scipy.stats import multivariate_t
-
-
 initialize_logging()
 
 LOG = logging.getLogger(__name__)
-
-ecv_data = pd.read_csv("data_for_agg_model/ec_votes_by_state.csv").drop("state", axis=1)
-ecv_states_called = pd.read_csv("data_for_agg_model/ec_votes_called.csv").drop("state", axis=1).dropna()
-
-ecv_cov_matrix_data = pd.read_csv("data_for_agg_model/covar_matrix_data.csv").dropna()
 
 
 class ModelClientException(Exception):
@@ -47,6 +37,7 @@ class ModelClient(object):
         super().__init__()
         self.conformalization_data_unit_dict = None
         self.conformalization_data_agg_dict = None
+        self.ecv_estimates = None
 
     def _check_input_parameters(
         self,
@@ -127,6 +118,10 @@ class ModelClient(object):
         prediction_intervals=[0.7, 0.9],
         percent_reporting_threshold=100,
         geographic_unit_type="county",
+        agg_model_estimates=False,
+        agg_model_states_not_used=[],
+        ci_method="percentile",
+        num_observations=1,
         raw_config=None,
         preprocessed_data=None,
         **kwargs,
@@ -317,236 +312,17 @@ class ModelClient(object):
         if APP_ENV != "local" and save_results:
             results_handler.write_data(election_id, office, geographic_unit_type)
 
+        if agg_model_estimates:
+            self.ecv_estimates = model.get_electoral_count_estimates(
+                results_handler.final_results["state_data"],
+                estimands,
+                agg_model_states_not_used,
+                num_observations,
+                ci_method,
+                0.9,
+            )
+
         return results_handler.final_results
-
-    def extend_str_with_list(self, string, list_to_add):
-        return [f"{string}_{str(item)}" for item in list_to_add]
-
-    # def random_draws(self, mean_vec, cov_matrix, num_observations):
-
-    #     draws = pd.DataFrame(multivariate_t.rvs(mean_vec, cov_matrix, size=num_observations))
-
-    #     return draws.transpose()
-
-    def random_draws(self, mean_vec_dict, cov_matrix_dict, primary_estimand, remaining_est_names, num_observations):
-
-        draws_primary = pd.DataFrame(
-            np.random.multivariate_normal(
-                mean_vec_dict[primary_estimand], cov_matrix_dict[primary_estimand], size=num_observations
-            )
-        ).transpose()
-        draws_remaining = pd.DataFrame(
-            np.random.multivariate_normal(
-                mean_vec_dict[remaining_est_names], cov_matrix_dict[remaining_est_names], size=num_observations
-            )
-        ).transpose()
-        total_drawn = draws_primary + draws_remaining
-        primary_shares = draws_primary / total_drawn
-        # breakpoint()
-
-        return primary_shares
-
-    # def random_draws(self, row, alpha, estimands, primary_estimand, estimand):
-
-    #     estimand_draws = {}
-    #     for estimand in estimands:
-    #         estimand_draws[estimand] = np.random.uniform(
-    #             row[f"lower_{alpha}_" + estimand], row[f"upper_{alpha}_" + estimand], size=1
-    #         ).astype(int)[0]
-    #     return max(estimand_draws, key=estimand_draws.get)
-
-    def get_electoral_count_trials(
-        self, state_preds, estimands, primary_estimand, agg_model_states_not_used, trials, num_observations, alpha=0.9
-    ):
-
-        #  states_called = dict(zip(list(ecv_states_called["postal_code"]), list(ecv_states_called["called"])))
-        # only make predictions for states that we want in the model
-        # (i.e. those in preprocessed data)
-        state_preds = state_preds[~state_preds["postal_code"].isin(agg_model_states_not_used)].reset_index()
-        # estimand_columns = [col for col in state_preds.columns if "pred" in col]
-        # state_preds["total_estimand_votes"] = state_preds[estimand_columns].sum(axis=1)
-
-        # for estimand in estimands:
-        #     state_preds[f"pred_{estimand}_share"] = (
-        #         state_preds["pred_" + estimand] / state_preds["total_estimand_votes"]
-        #     )
-        #     state_preds[f"upper_{alpha}_{estimand}_share"] = (
-        #         state_preds[f"upper_{alpha}_{estimand}"] / state_preds["total_estimand_votes"]
-        #     )
-        #     state_preds[f"lower_{alpha}_{estimand}_share"] = (
-        #         state_preds[f"lower_{alpha}_{estimand}"] / state_preds["total_estimand_votes"]
-        #     )
-        #     state_preds[f"var_{estimand}_share"] = (1 / 12) * (
-        #         state_preds[f"upper_{alpha}_{estimand}_share"] - state_preds[f"lower_{alpha}_{estimand}_share"]
-        #     ) ** 2
-
-        # state_preds["var_sum"] = state_preds[[col for col in state_preds if "var_" in col]].sum(axis=1)
-        # mean_vec = list(state_preds[f"pred_{primary_estimand}_share"])  # TEMPORARY SUB
-
-        # cov_matrix = self.construct_cov_matrix(state_preds)
-
-        remaining_estimands = [k for k in estimands if k != primary_estimand and k != "turnout"]
-        remaining_est_names = " ".join(remaining_estimands)
-        remaining_estimand_columns = ["pred_" + estimand for estimand in remaining_estimands if estimand != "turnout"]
-        remaining_estimand_columns_lower = [
-            f"lower_{alpha}_{estimand}" for estimand in remaining_estimands if estimand != "turnout"
-        ]
-        remaining_estimand_columns_upper = [
-            f"upper_{alpha}_{estimand}" for estimand in remaining_estimands if estimand != "turnout"
-        ]
-        state_preds["pred_remaining_estimands"] = state_preds[remaining_estimand_columns].sum(axis=1)
-
-        state_preds[f"lower_{alpha}_remaining_estimands"] = state_preds[remaining_estimand_columns_lower].sum(axis=1)
-        state_preds[f"upper_{alpha}_remaining_estimands"] = state_preds[remaining_estimand_columns_upper].sum(axis=1)
-
-        mean_vec_dict = {
-            primary_estimand: list(state_preds[f"pred_{primary_estimand}"]),
-            remaining_est_names: list(state_preds["pred_remaining_estimands"]),
-        }
-
-        # This estimate for var is so dumb:
-        var_dict = {
-            primary_estimand: (
-                (state_preds[f"upper_{alpha}_{primary_estimand}"] - state_preds[f"lower_{alpha}_{primary_estimand}"])
-                / (2 * 1.645)
-            )
-            ** 2,
-            remaining_est_names: (
-                (state_preds[f"upper_{alpha}_remaining_estimands"] - state_preds[f"lower_{alpha}_remaining_estimands"])
-                / (2 * 1.645)
-            )
-            ** 2,
-        }
-
-        # no interstate correlations yet:
-        cov_matrix_dict = {
-            primary_estimand: np.diag(var_dict[primary_estimand]),
-            remaining_est_names: np.diag(var_dict[remaining_est_names]),
-        }
-
-        wins_df = state_preds[["postal_code"]]
-
-        ecv_vote_totals_by_trial = {primary_estimand: [], " ".join(remaining_estimands): []}
-        for k in range(trials):
-
-            observation_batch = self.random_draws(
-                mean_vec_dict, cov_matrix_dict, primary_estimand, remaining_est_names, num_observations
-            )
-            #  if num_observations == 1:
-            #      observation_batch = observation_batch.transpose()
-
-            wins_df[["obs_" + str(n) for n in range(num_observations)]] = observation_batch
-            wins_votes_df = pd.merge(wins_df, ecv_data, on="postal_code")
-
-            primary_estimand_wins = (wins_votes_df[["obs_" + str(n) for n in range(num_observations)]] > 0.5).multiply(
-                wins_votes_df["vote"], axis="index"
-            )
-
-            primary_estimand_trial_ecv_mean = np.mean(list(primary_estimand_wins.sum(axis=0)))
-            ecv_vote_totals_by_trial[primary_estimand].append(primary_estimand_trial_ecv_mean)
-
-        total_ecv = sum(wins_votes_df["vote"])
-        ecv_vote_totals_by_trial[remaining_est_names] = [
-            total_ecv - iter_ecv for iter_ecv in ecv_vote_totals_by_trial[primary_estimand]
-        ]
-
-        return pd.DataFrame(data=ecv_vote_totals_by_trial)
-
-    def get_electoral_count_estimates(
-        self, state_preds, estimands, agg_model_states_not_used, num_observations, ci_method, alpha, **kwargs
-    ):
-        # options for method are percentile, normal_dist (which is just standard approach for large sample size > n = 30)
-        # or t- distribution
-        trials = kwargs.get("trials", 1000)
-        primary_estimand = kwargs.get("primary_estimand", "dem")
-
-        trials_df = self.get_electoral_count_trials(
-            state_preds, estimands, primary_estimand, agg_model_states_not_used, trials, num_observations
-        )
-        if ci_method == "normal_dist_mean":
-            # in case of num_oberservations = 1, this gives PI around dem ecv estimate iteself
-            # in case of num_observations > 1, this is CI of sample mean of dem ecv
-            est_means = trials_df.mean().round(2)
-            est_sem = trials_df.sem().round(2)
-            est_CI = {
-                estimand: st.norm.interval(confidence=alpha, loc=est_means[estimand], scale=est_sem[estimand])
-                for estimand in estimands
-            }
-
-            est_mean_CI = {
-                estimand: [est_means[estimand], round(est_CI[estimand][0], 2), round(est_CI[estimand][1], 2)]
-                for estimand in estimands
-            }
-
-        if ci_method == "t_dist_mean":
-            # in case of num_oberservations = 1, this gives PI around dem ecv estimate iteself
-            # in case of num_observations > 1, this is CI of sample mean of dem ecv
-            est_means = trials_df.mean().round(2)
-            est_sem = trials_df.sem().round(2)
-            est_CI = {
-                estimand: st.t.interval(
-                    alpha=alpha, df=len(trials_df) - 1, loc=est_means[estimand], scale=est_sem[estimand]
-                )
-                for estimand in estimands
-            }
-
-            est_mean_CI = {
-                estimand: [est_means[estimand], round(est_CI[estimand][0], 2), round(est_CI[estimand][1], 2)]
-                for estimand in estimands
-            }
-
-        elif ci_method == "percentile":
-            # either percentile in group of ecv draws, or percentile in distribution of ecv mean
-            est_means = trials_df.mean().round(2)
-            ci_tail = (1 - alpha) / 2
-            est_lb = trials_df.quantile(ci_tail, axis=0).round(2)
-            est_ub = trials_df.quantile(1 - ci_tail, axis=0).round(2)
-
-            est_mean_CI = {
-                estimand: [est_means[estimand], round(est_lb[estimand], 2), round(est_ub[estimand], 2)]
-                for estimand in estimands
-            }
-
-        return est_mean_CI
-
-    def construct_cov_matrix(self, state_preds):
-        states_in_use = state_preds["postal_code"]
-        var_vec = list(state_preds["var_sum"])
-        std_vec = [np.sqrt(k) for k in var_vec]
-        blue_states = [state for state in list(ecv_cov_matrix_data["blue_state"]) if state in states_in_use.to_list()]
-        red_states = [state for state in list(ecv_cov_matrix_data["red_state"]) if state in states_in_use.to_list()]
-        swing_states = [state for state in list(ecv_cov_matrix_data["swing_state"]) if state in states_in_use.to_list()]
-
-        corr_matrix = np.zeros((len(states_in_use), len(states_in_use)))
-
-        for pair in combinations(blue_states, 2):
-            pair_indices = [
-                states_in_use[states_in_use == pair[0]].index[0],
-                states_in_use[states_in_use == pair[1]].index[0],
-            ]
-            corr_matrix[pair_indices] = 0.8
-        for pair in combinations(red_states, 2):
-            pair_indices = [
-                states_in_use[states_in_use == pair[0]].index[0],
-                states_in_use[states_in_use == pair[1]].index[0],
-            ]
-            corr_matrix[pair_indices] = 0.9
-        for pair in combinations(swing_states, 2):
-            pair_indices = [
-                states_in_use[states_in_use == pair[0]].index[0],
-                states_in_use[states_in_use == pair[1]].index[0],
-            ]
-            corr_matrix[pair_indices] = 0.7
-
-        np.fill_diagonal(corr_matrix, 1)
-        std_dev_diag_matrix = np.diag(std_vec)
-        cov_matrix = std_dev_diag_matrix @ corr_matrix @ std_dev_diag_matrix
-        # REMOVE FOLLOWING LINE - TEMP SUB
-        #    cov_matrix = np.diag(var_vec)
-        # cov_matrix = np.identity(n = len(states_in_use))
-
-        cov_matrix = np.diag(var_vec)
-        return cov_matrix
 
 
 class HistoricalModelClient(ModelClient):
