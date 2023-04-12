@@ -72,7 +72,7 @@ if not historical:
     )
 
     if agg_model_estimates:
-        print("Agg results", model_client.ecv_estimates)
+        print("Agg results", model_client.get_electoral_votes_estimates())
 
 
 if historical:

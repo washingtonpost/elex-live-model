@@ -109,6 +109,13 @@ class ModelClient(object):
         """
         return self.all_conformalization_data_agg_dict
 
+    def get_electoral_votes_estimates(self):
+        """
+        For presidential elections, this function returns the predicted electoral votes per
+        estimand, and their confidence intervals.
+        """
+        return self.ecv_estimates
+
     def get_estimates(
         self,
         current_data,  # list of lists
