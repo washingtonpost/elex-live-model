@@ -2,6 +2,7 @@ import logging
 
 import numpy as np
 import pandas as pd
+from elexstatic import STATES
 
 from elexmodel.handlers import s3
 from elexmodel.handlers.config import ConfigHandler
@@ -18,6 +19,9 @@ from elexmodel.utils.math_utils import compute_error, compute_frac_within_pi, co
 initialize_logging()
 
 LOG = logging.getLogger(__name__)
+
+states_extra = ["USA", "DA", "AS", "FM", "GU", "MH", "MP", "PW", "PR", "VI"]
+states = [state for state in STATES.keys() if state not in states_extra]
 
 
 class ModelClientException(Exception):
@@ -37,7 +41,7 @@ class ModelClient(object):
         super().__init__()
         self.conformalization_data_unit_dict = None
         self.conformalization_data_agg_dict = None
-        self.ecv_estimates = None
+        self.nat_sum_estimates = None
 
     def _check_input_parameters(
         self,
@@ -109,12 +113,12 @@ class ModelClient(object):
         """
         return self.all_conformalization_data_agg_dict
 
-    def get_electoral_votes_estimates(self):
+    def get_national_summary_votes_estimates(self):
         """
-        For presidential elections, this function returns the predicted electoral votes per
+        For presidential elections, this function returns the predicted national-summary votes per
         estimand, and their confidence intervals.
         """
-        return self.ecv_estimates
+        return self.nat_sum_estimates
 
     def get_estimates(
         self,
@@ -133,6 +137,7 @@ class ModelClient(object):
         preprocessed_data=None,
         **kwargs,
     ):
+
         """
         Get model estimate for one election, office and estimand.
         This function assumes that election_id is valid and in the format <date>_<state_postal>_<race_type>
@@ -155,6 +160,7 @@ class ModelClient(object):
         save_config = "config" in save_output
         save_conformalization = "conformalization" in save_output
         handle_unreporting = kwargs.get("handle_unreporting", "drop")
+        nat_sum_data_dict = kwargs.get("nat_sum_data_dict", {state: 1 for state in states})
 
         model_settings = {
             "election_id": election_id,
@@ -320,13 +326,14 @@ class ModelClient(object):
             results_handler.write_data(election_id, office, geographic_unit_type)
 
         if agg_model_estimates:
-            self.ecv_estimates = model.get_electoral_count_estimates(
+            self.nat_sum_estimates = model.get_national_summary_vote_estimates(
                 results_handler.final_results["state_data"],
                 estimands,
                 agg_model_states_not_used,
                 num_observations,
                 ci_method,
                 0.9,
+                nat_sum_data_dict,
             )
 
         return results_handler.final_results

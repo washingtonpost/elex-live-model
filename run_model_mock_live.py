@@ -8,6 +8,7 @@ Created on Wed Aug 24 17:06:09 2022
 
 import os
 
+import pandas as pd
 from dotenv import find_dotenv, load_dotenv
 
 load_dotenv("~/.clokta/elections.env")  # noqa: E402
@@ -38,7 +39,8 @@ agg_model_estimates = True
 agg_model_states_not_used = ["AK"]
 ci_method = "percentile"  # percentile or normal_dist_mean (this is CI for mean)
 num_observations = 1  # if set to 1, result is same as one batch of draws, not bootstrapped
-
+nat_sum_data = pd.read_csv("data_for_agg_model/national_summary_votes_by_state.csv").drop("state", axis=1)
+nat_sum_data_dict = dict(zip(nat_sum_data["postal_code"], nat_sum_data["vote"]))
 # if using standard preprocessed data for current or historical election
 data_handler = MockLiveDataHandler(
     election_id,
@@ -69,10 +71,11 @@ if not historical:
         agg_model_states_not_used=agg_model_states_not_used,
         ci_method=ci_method,
         num_observations=num_observations,
+        nat_sum_data_dict=nat_sum_data_dict,
     )
 
     if agg_model_estimates:
-        print("Agg results", model_client.get_electoral_votes_estimates())
+        print("Agg results", model_client.get_national_summary_votes_estimates())
 
 
 if historical:

@@ -18,10 +18,10 @@ PredictionIntervals = namedtuple("PredictionIntervals", ["lower", "upper", "conf
 
 LOG = logging.getLogger(__name__)
 
-ecv_data = pd.read_csv("data_for_agg_model/ec_votes_by_state.csv").drop("state", axis=1)
-ecv_states_called = pd.read_csv("data_for_agg_model/ec_votes_called.csv").drop("state", axis=1).dropna()
-
-ecv_cov_matrix_data = pd.read_csv("data_for_agg_model/covar_matrix_data.csv").dropna()
+nat_sum_states_called = (
+    pd.read_csv("data_for_agg_model/national_summary_states_called.csv").drop("state", axis=1).dropna()
+)
+nat_sum_cov_matrix_data = pd.read_csv("data_for_agg_model/covar_matrix_data.csv").dropna()
 
 
 class BaseElectionModel(object):
@@ -286,8 +286,16 @@ class BaseElectionModel(object):
     #         ).astype(int)[0]
     #     return max(estimand_draws, key=estimand_draws.get)
 
-    def get_electoral_count_trials(
-        self, state_preds, estimands, primary_estimand, agg_model_states_not_used, trials, num_observations, alpha=0.9
+    def get_national_summary_count_trials(
+        self,
+        state_preds,
+        estimands,
+        primary_estimand,
+        agg_model_states_not_used,
+        trials,
+        num_observations,
+        nat_sum_data_dict,
+        alpha=0.9,
     ):
 
         #  states_called = dict(zip(list(ecv_states_called["postal_code"]), list(ecv_states_called["called"])))
@@ -356,7 +364,7 @@ class BaseElectionModel(object):
 
         wins_df = state_preds[["postal_code"]]
 
-        ecv_vote_totals_by_trial = {primary_estimand: [], " ".join(remaining_estimands): []}
+        nat_sum_vote_totals_by_trial = {primary_estimand: [], " ".join(remaining_estimands): []}
         for k in range(trials):
 
             observation_batch = self.random_draws(
@@ -366,36 +374,52 @@ class BaseElectionModel(object):
             #      observation_batch = observation_batch.transpose()
 
             wins_df[["obs_" + str(n) for n in range(num_observations)]] = observation_batch
-            wins_votes_df = pd.merge(wins_df, ecv_data, on="postal_code")
+            wins_df["vote"] = wins_df["postal_code"].map(nat_sum_data_dict)
+            wins_votes_df = wins_df
 
             primary_estimand_wins = (wins_votes_df[["obs_" + str(n) for n in range(num_observations)]] > 0.5).multiply(
                 wins_votes_df["vote"], axis="index"
             )
 
-            primary_estimand_trial_ecv_mean = np.mean(list(primary_estimand_wins.sum(axis=0)))
-            ecv_vote_totals_by_trial[primary_estimand].append(primary_estimand_trial_ecv_mean)
+            primary_estimand_trial_nat_sum_mean = np.mean(list(primary_estimand_wins.sum(axis=0)))
+            nat_sum_vote_totals_by_trial[primary_estimand].append(primary_estimand_trial_nat_sum_mean)
 
-        total_ecv = sum(wins_votes_df["vote"])
-        ecv_vote_totals_by_trial[remaining_est_names] = [
-            total_ecv - iter_ecv for iter_ecv in ecv_vote_totals_by_trial[primary_estimand]
+        total_nat_sum_votes = sum(wins_votes_df["vote"])
+        nat_sum_vote_totals_by_trial[remaining_est_names] = [
+            total_nat_sum_votes - iter_nat_sum_votes
+            for iter_nat_sum_votes in nat_sum_vote_totals_by_trial[primary_estimand]
         ]
 
-        return pd.DataFrame(data=ecv_vote_totals_by_trial)
+        return pd.DataFrame(data=nat_sum_vote_totals_by_trial)
 
-    def get_electoral_count_estimates(
-        self, state_preds, estimands, agg_model_states_not_used, num_observations, ci_method, alpha, **kwargs
+    def get_national_summary_vote_estimates(
+        self,
+        state_preds,
+        estimands,
+        agg_model_states_not_used,
+        num_observations,
+        ci_method,
+        alpha,
+        nat_sum_data_dict,
+        **kwargs,
     ):
         # options for method are percentile, normal_dist (which is just standard approach for large sample size > n = 30)
         # or t- distribution
         trials = kwargs.get("trials", 1000)
         primary_estimand = kwargs.get("primary_estimand", "dem")
 
-        trials_df = self.get_electoral_count_trials(
-            state_preds, estimands, primary_estimand, agg_model_states_not_used, trials, num_observations
+        trials_df = self.get_national_summary_count_trials(
+            state_preds,
+            estimands,
+            primary_estimand,
+            agg_model_states_not_used,
+            trials,
+            num_observations,
+            nat_sum_data_dict,
         )
         if ci_method == "normal_dist_mean":
-            # in case of num_oberservations = 1, this gives PI around dem ecv estimate iteself
-            # in case of num_observations > 1, this is CI of sample mean of dem ecv
+            # in case of num_oberservations = 1, this gives PI around dem nat-sum estimate iteself
+            # in case of num_observations > 1, this is CI of sample mean of dem nat-sum
             est_means = trials_df.mean().round(2)
             est_sem = trials_df.sem().round(2)
             est_CI = {
@@ -409,8 +433,8 @@ class BaseElectionModel(object):
             }
 
         if ci_method == "t_dist_mean":
-            # in case of num_oberservations = 1, this gives PI around dem ecv estimate iteself
-            # in case of num_observations > 1, this is CI of sample mean of dem ecv
+            # in case of num_oberservations = 1, this gives PI around dem nat-sum estimate iteself
+            # in case of num_observations > 1, this is CI of sample mean of dem nat-sum
             est_means = trials_df.mean().round(2)
             est_sem = trials_df.sem().round(2)
             est_CI = {
@@ -426,7 +450,7 @@ class BaseElectionModel(object):
             }
 
         elif ci_method == "percentile":
-            # either percentile in group of ecv draws, or percentile in distribution of ecv mean
+            # either percentile in group of national summary draws, or percentile in distribution of nat-sum mean
             est_means = trials_df.mean().round(2)
             ci_tail = (1 - alpha) / 2
             est_lb = trials_df.quantile(ci_tail, axis=0).round(2)
@@ -443,9 +467,13 @@ class BaseElectionModel(object):
         states_in_use = state_preds["postal_code"]
         var_vec = list(state_preds["var_sum"])
         std_vec = [np.sqrt(k) for k in var_vec]
-        blue_states = [state for state in list(ecv_cov_matrix_data["blue_state"]) if state in states_in_use.to_list()]
-        red_states = [state for state in list(ecv_cov_matrix_data["red_state"]) if state in states_in_use.to_list()]
-        swing_states = [state for state in list(ecv_cov_matrix_data["swing_state"]) if state in states_in_use.to_list()]
+        blue_states = [
+            state for state in list(nat_sum_cov_matrix_data["blue_state"]) if state in states_in_use.to_list()
+        ]
+        red_states = [state for state in list(nat_sum_cov_matrix_data["red_state"]) if state in states_in_use.to_list()]
+        swing_states = [
+            state for state in list(nat_sum_cov_matrix_data["swing_state"]) if state in states_in_use.to_list()
+        ]
 
         corr_matrix = np.zeros((len(states_in_use), len(states_in_use)))
 
