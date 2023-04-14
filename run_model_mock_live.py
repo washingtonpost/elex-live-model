@@ -65,7 +65,7 @@ if not historical:
         prediction_intervals,
         percent_reporting_threshold,
         geographic_unit_type,
-        pi_method="gaussian",
+        pi_method="nonparametric",
         aggregates=aggregates,
         agg_model_estimates=agg_model_estimates,
         agg_model_states_not_used=agg_model_states_not_used,
