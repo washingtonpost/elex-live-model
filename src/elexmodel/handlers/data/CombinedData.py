@@ -53,7 +53,7 @@ class CombinedDataHandler(object):
         for estimand in self.estimands:
             reporting_units[f"residuals_{estimand}"] = (
                 reporting_units[f"results_{estimand}"] - reporting_units[f"last_election_results_{estimand}"]
-            ) / reporting_units[f"total_voters_{estimand}"]
+            ) / reporting_units[f"last_election_results_{estimand}"]
 
         reporting_units["reporting"] = 1
         return reporting_units
