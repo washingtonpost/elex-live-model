@@ -58,6 +58,19 @@ class BaseElectionModel(object):
         weights = reporting_units[f"last_election_results_{estimand}"]
         reporting_units_residuals = reporting_units[f"residuals_{estimand}"]
 
+        # check if any Nan values are getting fed into the solver. We don't need to repeat this
+        # for the additional lower/upper bound quantile fittings, as they're just using subsets
+        # of the reporting units, which are all being tested here.
+
+        if reporting_units_features.isnull().values.any():
+            warnings.warn("NaN values in reporting_units_features df")
+
+        if reporting_units_residuals.isnull().values.any():
+            warnings.warn("NaN values in reporting_units_residuals")
+
+        if nonreporting_units_features.isnull().values.any():
+            warnings.warn("NaN values in nonreporting_units_features")
+
         self.fit_model(self.qr, reporting_units_features, reporting_units_residuals, 0.5, weights, True)
 
         preds = self.qr.predict(nonreporting_units_features)

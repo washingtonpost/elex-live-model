@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
 
 from elexmodel.models import BaseElectionModel
@@ -23,6 +24,42 @@ def test_fit_model():
 
     assert all(np.abs(qr.predict(df_X) - [8, 8, 8, 15]) <= TOL)
     assert all(np.abs(qr.coefficients - [1, 7]) <= TOL)
+
+
+def test_nan_data_warning(va_governor_precinct_data):
+    """
+    This test checks that warnings are given if model (i.e. solver) inputs have Nan
+    values. It checks both the features df and residuals for reporting units.
+    """
+
+    model_settings = {"features": ["demo_feature"]}
+    model = BaseElectionModel.BaseElectionModel(model_settings)
+    estimand = "turnout"
+
+    df = va_governor_precinct_data[
+        ["postal_code", "geographic_unit_fips", "county_classification", "county_fips", f"results_{estimand}"]
+    ]
+
+    df[f"last_election_results_{estimand}"] = df[f"results_{estimand}"] - 10
+    df["demo_feature"] = np.random.choice([100, 200], size=len(df))
+    df1 = df[:1000].copy()
+    df1["reporting"] = 1
+    df1[f"residuals_{estimand}"] = np.random.choice([0, 1], size=len(df1))
+    df2 = df[1000:2000]
+    df2["reporting"] = 0
+
+    model.get_unit_predictions(df1, df2, estimand)
+    with pytest.warns(None):
+        model.get_unit_predictions(df1, df2, estimand)
+
+    df1.at[5, f"residuals_{estimand}"] = np.nan
+    with pytest.warns(UserWarning):
+        model.get_unit_predictions(df1, df2, estimand)
+
+    df1[f"residuals_{estimand}"] = np.random.choice([0, 1], size=len(df1))
+    df2.at[6, "demo_feature"] = np.nan
+    with pytest.warns(UserWarning):
+        model.get_unit_predictions(df1, df2, estimand)
 
 
 def test_aggregation_simple():
