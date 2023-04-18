@@ -21,6 +21,8 @@ class BaseElectionModel(object):
         self.qr = QuantileRegressionSolver(solver="ECOS")
         self.features = model_settings.get("features", [])
         self.fixed_effects = model_settings.get("fixed_effects", [])
+        self.lambda_ = model_settings.get("lambda_", 0)
+        self.features_to_coefficients = {}
         self.featurizer = Featurizer(self.features, self.fixed_effects)
         self.seed = 4191  # set arbitrarily
 
@@ -37,10 +39,10 @@ class BaseElectionModel(object):
         # where the solver either throws a warning for inaccurate solution or breaks entirely
         # in that case, we catch the error and warning and re-run with normalize_weights false
         try:
-            model.fit(X, y, tau_value=tau, weights=weights, normalize_weights=normalize_weights)
+            model.fit(X, y, tau_value=tau, weights=weights, lambda_=self.lambda_, normalize_weights=normalize_weights)
         except (UserWarning, cvxpy.error.SolverError):
             LOG.warning("Warning: solution was inaccurate or solver broke. Re-running with normalize_weights=False.")
-            model.fit(X, y, tau_value=tau, weights=weights, normalize_weights=False)
+            model.fit(X, y, tau_value=tau, weights=weights, lambda_=self.lambda_, normalize_weights=False)
 
     def get_unit_predictions(self, reporting_units, nonreporting_units, estimand):
         """
@@ -59,6 +61,7 @@ class BaseElectionModel(object):
         reporting_units_residuals = reporting_units[f"residuals_{estimand}"]
 
         self.fit_model(self.qr, reporting_units_features, reporting_units_residuals, 0.5, weights, True)
+        self.features_to_coefficients = dict(zip(self.featurizer.complete_features, self.qr.coefficients))
 
         preds = self.qr.predict(nonreporting_units_features)
 
@@ -245,6 +248,7 @@ class BaseElectionModel(object):
 
     def get_coefficients(self):
         """
-        Returns quantile regression coefficients for prediction model (not lower/upper models)
+        Returns a dictionary of feature/fixed effect names to the quantile regression coefficients
+        These coefficients are for the point prediciton only, not for the lower or upper intervals models.
         """
-        return self.qr.coefficients
+        return self.features_to_coefficients

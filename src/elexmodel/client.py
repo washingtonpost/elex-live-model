@@ -88,7 +88,7 @@ class ModelClient(object):
         if not (isinstance(lambda_, float) or isinstance(lambda_, int)) :
             raise ValueError("lambda is not valid. It has to be numeric.")
         if lambda_ < 0:
-            raise ValueError("lambda_ is not valid. It has to be greater than zero.")
+            raise ValueError("lambda is not valid. It has to be greater than zero.")
         if handle_unreporting not in {"drop", "zero"}:
             raise ValueError("handle_unreporting must be either `drop` or `zero`")
         return True
