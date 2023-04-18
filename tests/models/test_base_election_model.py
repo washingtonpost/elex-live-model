@@ -52,12 +52,12 @@ def test_nan_data_warning(va_governor_precinct_data):
     with pytest.warns(None):
         model.get_unit_predictions(df1, df2, estimand)
 
-    df1.at[5, f"residuals_{estimand}"] = np.nan
+    df1.loc[5, f"residuals_{estimand}"] = np.nan
     with pytest.warns(UserWarning):
         model.get_unit_predictions(df1, df2, estimand)
 
     df1[f"residuals_{estimand}"] = np.random.choice([0, 1], size=len(df1))
-    df2.at[6, "demo_feature"] = np.nan
+    df2.loc[6, "demo_feature"] = np.nan
     with pytest.warns(UserWarning):
         model.get_unit_predictions(df1, df2, estimand)
 
