@@ -580,7 +580,6 @@ def test_get_estimates_no_subunits_reporting(model_client, va_governor_county_da
 
     preprocessed_data = va_governor_county_data.copy()
     preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
-    #   preprocessed_data["last_election_results_turnout"] = preprocessed_data["last_election_results_turnout"] + 1
 
     with pytest.raises(ModelNotEnoughSubunitsException, match="Currently 0 reporting, need at least 20"):
         model_client.get_estimates(
