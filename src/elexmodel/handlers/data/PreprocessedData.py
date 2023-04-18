@@ -90,10 +90,8 @@ class PreprocessedDataHandler(object):
 
         for estimand, pointer in estimand_baselines.items():
             baseline_name = f"baseline_{pointer}"
-            preprocessed_data[f"last_election_results_{estimand}"] = preprocessed_data[baseline_name].copy()
-            # TODO: rename total voters column
             # Adding one to prevent zero divison
-            preprocessed_data[f"total_voters_{estimand}"] = preprocessed_data[f"last_election_results_{estimand}"] + 1
+            preprocessed_data[f"last_election_results_{estimand}"] = preprocessed_data[baseline_name].copy() + 1
 
         return preprocessed_data
 

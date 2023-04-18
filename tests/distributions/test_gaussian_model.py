@@ -140,7 +140,7 @@ def test_fit():
 
     gaussian_model = GaussianModel(model_settings)
 
-    df = pd.DataFrame({f"total_voters_{estimand}": weights, "lower_bounds": lower, "upper_bounds": upper})
+    df = pd.DataFrame({f"last_election_results_{estimand}": weights, "lower_bounds": lower, "upper_bounds": upper})
 
     # all in the same group
     g = gaussian_model._fit(df, estimand, [], alpha, beta)
@@ -168,7 +168,7 @@ def test_fit():
             "geographic_unit_fips": 1,
             "lower_bounds": a,
             "upper_bounds": a,
-            f"total_voters_{estimand}": weights_a,
+            f"last_election_results_{estimand}": weights_a,
         }
     )
     df_a["group"] = "a"
@@ -178,7 +178,7 @@ def test_fit():
             "geographic_unit_fips": 2,
             "lower_bounds": b,
             "upper_bounds": b,
-            f"total_voters_{estimand}": weights_b,
+            f"last_election_results_{estimand}": weights_b,
         }
     )
     df_b["group"] = "b"
@@ -226,7 +226,7 @@ def test_large_and_small_fit():
             "geographic_unit_fips": 1,
             "lower_bounds": a,
             "upper_bounds": a,
-            f"total_voters_{estimand}": weights_a,
+            f"last_election_results_{estimand}": weights_a,
         }
     )
     df_a["group_2"] = "a"
@@ -236,14 +236,14 @@ def test_large_and_small_fit():
             "geographic_unit_fips": 2,
             "lower_bounds": b,
             "upper_bounds": b,
-            f"total_voters_{estimand}": weights_b,
+            f"last_election_results_{estimand}": weights_b,
         }
     )
     df_b["group_2"] = "b"
     df = pd.concat([df_a, df_b])
     df["group_1"] = "general"
     general = df.lower_bounds.values
-    general_weights = df[f"total_voters_{estimand}"].values
+    general_weights = df[f"last_election_results_{estimand}"].values
 
     alpha = 0.9
     beta = 1

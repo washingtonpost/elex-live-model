@@ -92,14 +92,18 @@ class GaussianModel:
             .apply(
                 lambda x: pd.Series(
                     {
-                        "var_inflate": math_utils.compute_inflate(x[f"total_voters_{estimand}"]),
+                        "var_inflate": math_utils.compute_inflate(x[f"last_election_results_{estimand}"]),
                         "mu_lower_bound": math_utils.weighted_median(
                             x.lower_bounds.values,
-                            (x[f"total_voters_{estimand}"] / np.sum(x[f"total_voters_{estimand}"])).to_numpy(),
+                            (
+                                x[f"last_election_results_{estimand}"] / np.sum(x[f"last_election_results_{estimand}"])
+                            ).to_numpy(),
                         ),
                         "mu_upper_bound": math_utils.weighted_median(
                             x.upper_bounds.values,
-                            (x[f"total_voters_{estimand}"] / np.sum(x[f"total_voters_{estimand}"])).to_numpy(),
+                            (
+                                x[f"last_election_results_{estimand}"] / np.sum(x[f"last_election_results_{estimand}"])
+                            ).to_numpy(),
                         ),
                         "sigma_lower_bound": beta * math_utils.boot_sigma(x.lower_bounds.values, conf=(3 + alpha) / 4),
                         "sigma_upper_bound": beta * math_utils.boot_sigma(x.upper_bounds.values, conf=(3 + alpha) / 4),
@@ -204,7 +208,7 @@ class GaussianModel:
                         ["geographic_unit_fips"]
                         + aggregate
                         + [
-                            f"total_voters_{estimand}",
+                            f"last_election_results_{estimand}",
                             "lower_bounds",
                             "upper_bounds",
                         ]
