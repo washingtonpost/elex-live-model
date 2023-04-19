@@ -63,13 +63,13 @@ class BaseElectionModel(object):
         # of the reporting units, which are all being tested here.
 
         if reporting_units_features.isnull().values.any():
-            warnings.warn("NaN values in reporting_units_features df")
+            LOG.warning("Warning: NaN values in reporting_units_features")
 
         if reporting_units_residuals.isnull().values.any():
-            warnings.warn("NaN values in reporting_units_residuals")
-
+            LOG.warning("Warning: NaN values in reporting_units_residuals")
+        print(nonreporting_units_features.head())
         if nonreporting_units_features.isnull().values.any():
-            warnings.warn("NaN values in nonreporting_units_features")
+            LOG.warning("Warning: NaN values in nonreporting_units_features")
 
         self.fit_model(self.qr, reporting_units_features, reporting_units_residuals, 0.5, weights, True)
 

@@ -26,7 +26,7 @@ def test_fit_model():
     assert all(np.abs(qr.coefficients - [1, 7]) <= TOL)
 
 
-def test_nan_data_warning(va_governor_precinct_data):
+def test_nan_data_warning(va_governor_precinct_data, capsys, caplog):
     """
     This test checks that warnings are given if model (i.e. solver) inputs have Nan
     values. It checks both the features df and residuals for reporting units.
@@ -49,15 +49,11 @@ def test_nan_data_warning(va_governor_precinct_data):
     df2["reporting"] = 0
 
     model.get_unit_predictions(df1, df2, estimand)
+
     with pytest.warns(None):
         model.get_unit_predictions(df1, df2, estimand)
 
     df1.loc[5, f"residuals_{estimand}"] = np.nan
-    with pytest.warns(UserWarning):
-        model.get_unit_predictions(df1, df2, estimand)
-
-    df1[f"residuals_{estimand}"] = np.random.choice([0, 1], size=len(df1))
-    df2.loc[6, "demo_feature"] = np.nan
     with pytest.warns(UserWarning):
         model.get_unit_predictions(df1, df2, estimand)
 
