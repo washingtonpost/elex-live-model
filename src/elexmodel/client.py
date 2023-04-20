@@ -72,7 +72,7 @@ class ModelClient(object):
             raise ValueError(f"Aggregate(s): {invalid_aggregates} not valid. Please check config")
         model_fixed_effects = config_handler.get_fixed_effects(office)
         invalid_fixed_effects = [
-            fixed_effect for fixed_effect in fixed_effects if fixed_effect not in model_fixed_effects
+            fixed_effect for fixed_effect in fixed_effects.keys() if fixed_effect not in model_fixed_effects
         ]
         if len(invalid_fixed_effects) > 0:
             raise ValueError(f"Fixed effect(s): {invalid_fixed_effects} not valid. Please check config")
@@ -133,7 +133,7 @@ class ModelClient(object):
             current_data = pd.DataFrame(current_data[1:], columns=column_values)
         features = kwargs.get("features", [])
         aggregates = kwargs.get("aggregates", ["postal_code", "unit"])
-        fixed_effects = kwargs.get("fixed_effects", [])
+        fixed_effects = kwargs.get("fixed_effects", {})
         pi_method = kwargs.get("pi_method", "nonparametric")
         beta = kwargs.get("beta", 1)
         robust = kwargs.get("robust", False)

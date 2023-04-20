@@ -20,7 +20,7 @@ class BaseElectionModel(object):
     def __init__(self, model_settings={}):
         self.qr = QuantileRegressionSolver(solver="ECOS")
         self.features = model_settings.get("features", [])
-        self.fixed_effects = model_settings.get("fixed_effects", [])
+        self.fixed_effects = model_settings.get("fixed_effects", {})
         self.featurizer = Featurizer(self.features, self.fixed_effects)
         self.seed = 4191  # set arbitrarily
 

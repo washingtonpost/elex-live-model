@@ -1,5 +1,6 @@
 import click
 from dotenv import find_dotenv, load_dotenv
+import json
 
 load_dotenv(find_dotenv())
 
@@ -14,7 +15,7 @@ from elexmodel.utils.file_utils import TARGET_BUCKET  # noqa: E402
 @click.argument("election_id")
 @click.option("--estimands", "estimands", default=["turnout"], multiple=True)
 @click.option("--office_id", "office_id")
-@click.option("--fixed_effects", "fixed_effects", default=[], multiple=True)
+@click.option("--fixed_effects", "fixed_effects", default={})
 @click.option("--features", default=[], multiple=True)
 @click.option("--aggregates", default=["postal_code", "unit"], multiple=True)
 @click.option(
@@ -76,7 +77,7 @@ def cli(
 
     kwargs["features"] = list(kwargs["features"])
     kwargs["aggregates"] = list(kwargs["aggregates"])
-    kwargs["fixed_effects"] = list(kwargs["fixed_effects"])
+    kwargs["fixed_effects"] = json.loads(kwargs["fixed_effects"])
 
     prediction_intervals = list(prediction_intervals)
 
