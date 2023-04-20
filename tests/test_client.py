@@ -356,8 +356,7 @@ def test_get_estimates_fully_reporting(model_client, va_governor_county_data, va
     data = data_handler.get_percent_fully_reported(100)
 
     preprocessed_data = va_governor_county_data.copy()
-    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy()
-    preprocessed_data["total_voters_turnout"] = preprocessed_data["last_election_results_turnout"] + 1
+    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
 
     result = model_client.get_estimates(
         data,
@@ -417,8 +416,7 @@ def test_not_including_unit_data(model_client, va_governor_county_data, va_gover
     data = data_handler.get_percent_fully_reported(100)
 
     preprocessed_data = va_governor_county_data.copy()
-    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy()
-    preprocessed_data["total_voters_turnout"] = preprocessed_data["last_election_results_turnout"] + 1
+    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
 
     result = model_client.get_estimates(
         data,
@@ -453,8 +451,7 @@ def test_unexpected_units_no_new_units(model_client, va_governor_precinct_data, 
     data = data_handler.get_percent_fully_reported(100)
 
     preprocessed_data = va_governor_precinct_data.copy()
-    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy()
-    preprocessed_data["total_voters_turnout"] = preprocessed_data["last_election_results_turnout"] + 1
+    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
 
     result = model_client.get_estimates(
         data,
@@ -496,8 +493,7 @@ def test_unexpected_units_new_units(model_client, va_governor_county_data, va_go
     data = data_handler.get_percent_fully_reported(100)
 
     preprocessed_data = va_governor_county_data.copy()
-    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy()
-    preprocessed_data["total_voters_turnout"] = preprocessed_data["last_election_results_turnout"] + 1
+    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
 
     result = model_client.get_estimates(
         data,
@@ -531,8 +527,7 @@ def test_get_estimates_some_reporting(model_client, va_governor_county_data, va_
     data = data_handler.get_percent_fully_reported(70)
 
     preprocessed_data = va_governor_county_data.copy()
-    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy()
-    preprocessed_data["total_voters_turnout"] = preprocessed_data["last_election_results_turnout"] + 1
+    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
 
     result = model_client.get_estimates(
         data,
@@ -545,7 +540,6 @@ def test_get_estimates_some_reporting(model_client, va_governor_county_data, va_
         raw_config=va_governor_config,
         preprocessed_data=preprocessed_data,
     )
-
     assert result["state_data"].shape == (1, 6)
     assert result["unit_data"].shape == (133, 7)
 
@@ -568,11 +562,11 @@ def test_get_estimates_some_reporting(model_client, va_governor_county_data, va_
     ]
 
     assert result["state_data"]["postal_code"][0] == "VA"
-    assert result["state_data"]["pred_turnout"][0] == 2587567.0
+    assert result["state_data"]["pred_turnout"][0] == 2587563.0
     assert result["state_data"]["results_turnout"][0] == 1570077.0
     assert result["state_data"]["reporting"][0] == 94.0
-    assert result["state_data"]["lower_0.9_turnout"][0] == 2443878.0
-    assert result["state_data"]["upper_0.9_turnout"][0] == 2683319.0
+    assert result["state_data"]["lower_0.9_turnout"][0] == 2443849.0
+    assert result["state_data"]["upper_0.9_turnout"][0] == 2683348.0
 
 
 def test_get_estimates_no_subunits_reporting(model_client, va_governor_county_data, va_governor_config):
@@ -591,8 +585,7 @@ def test_get_estimates_no_subunits_reporting(model_client, va_governor_county_da
     data = data_handler.get_percent_fully_reported(0)
 
     preprocessed_data = va_governor_county_data.copy()
-    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy()
-    preprocessed_data["total_voters_turnout"] = preprocessed_data["last_election_results_turnout"] + 1
+    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
 
     with pytest.raises(ModelNotEnoughSubunitsException, match="Currently 0 reporting, need at least 20"):
         model_client.get_estimates(
@@ -624,8 +617,7 @@ def test_get_estimates_not_enough_subunits_reporting(model_client, va_governor_c
     data = data_handler.get_percent_fully_reported(10)
 
     preprocessed_data = va_governor_county_data.copy()
-    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy()
-    preprocessed_data["total_voters_turnout"] = preprocessed_data["last_election_results_turnout"] + 1
+    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
 
     with pytest.raises(ModelNotEnoughSubunitsException, match="Currently 14 reporting, need at least 20"):
         model_client.get_estimates(
@@ -657,8 +649,7 @@ def test_conformalization_data(model_client, va_governor_county_data, va_governo
     data = data_handler.get_percent_fully_reported(70)
 
     preprocessed_data = va_governor_county_data.copy()
-    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy()
-    preprocessed_data["total_voters_turnout"] = preprocessed_data["last_election_results_turnout"] + 1
+    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
 
     model_client.get_estimates(
         data,

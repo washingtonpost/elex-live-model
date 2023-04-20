@@ -32,7 +32,8 @@ class NonparametricElectionModel(BaseElectionModel):
         """
         # calc weights
         weights = (
-            conformalization_data[f"total_voters_{estimand}"] / conformalization_data[f"total_voters_{estimand}"].sum()
+            conformalization_data[f"last_election_results_{estimand}"]
+            / conformalization_data[f"last_election_results_{estimand}"].sum()
         )
         # sort scores and weights by scores
         population_correction = pd.DataFrame({"scores": scores, "weights": weights}).sort_values("scores")
@@ -86,8 +87,8 @@ class NonparametricElectionModel(BaseElectionModel):
         self.nonreporting_upper_bounds = upper
 
         # un-normalize residuals
-        lower *= nonreporting_units[f"total_voters_{estimand}"]
-        upper *= nonreporting_units[f"total_voters_{estimand}"]
+        lower *= nonreporting_units[f"last_election_results_{estimand}"]
+        upper *= nonreporting_units[f"last_election_results_{estimand}"]
 
         # move from residual to vote space
         # max with nonreporting results so that bounds are at least as large as the # of votes seen

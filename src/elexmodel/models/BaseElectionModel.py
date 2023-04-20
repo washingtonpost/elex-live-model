@@ -57,7 +57,7 @@ class BaseElectionModel(object):
         reporting_units_features = self.featurizer.featurize_fitting_data(reporting_units)
         nonreporting_units_features = self.featurizer.featurize_heldout_data(nonreporting_units)
 
-        weights = reporting_units[f"total_voters_{estimand}"]
+        weights = reporting_units[f"last_election_results_{estimand}"]
         reporting_units_residuals = reporting_units[f"residuals_{estimand}"]
 
         self.fit_model(self.qr, reporting_units_features, reporting_units_residuals, 0.5, weights, True)
@@ -66,7 +66,7 @@ class BaseElectionModel(object):
         preds = self.qr.predict(nonreporting_units_features)
 
         # multiply by total voters to get unnormalized residuals
-        preds = preds * nonreporting_units[f"total_voters_{estimand}"]
+        preds = preds * nonreporting_units[f"last_election_results_{estimand}"]
 
         # add in last election results to go from residual to number of votes in this election
         # max with results so that predictions are always at least ars large as actual number of votes
@@ -203,7 +203,7 @@ class BaseElectionModel(object):
         # in this function.
         train_data_features = self.featurizer.featurize_fitting_data(train_data)
         train_data_residuals = train_data[f"residuals_{estimand}"]
-        train_data_weights = train_data[f"total_voters_{estimand}"]
+        train_data_weights = train_data[f"last_election_results_{estimand}"]
 
         # fit lower and upper model to training data. ECOS solver is better than SCS.
         lower_qr = QuantileRegressionSolver(solver="ECOS")
