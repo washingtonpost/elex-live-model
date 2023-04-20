@@ -85,7 +85,7 @@ class ModelClient(object):
             raise ValueError("beta is not valid. Has to be either an integer or a float.")
         if not isinstance(robust, bool):
             raise ValueError("robust is not valid. Has to be a boolean.")
-        if not (isinstance(lambda_, float) or isinstance(lambda_, int)) :
+        if not (isinstance(lambda_, float) or isinstance(lambda_, int)):
             raise ValueError("lambda is not valid. It has to be numeric.")
         if lambda_ < 0:
             raise ValueError("lambda is not valid. It has to be greater than zero.")
