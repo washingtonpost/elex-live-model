@@ -60,7 +60,7 @@ Parameters for the CLI tool:
 | percent_reporting    | numeric | 0-100 |
 | historical           | flag    |       |
 | features             | list    | features to include in the model |
-| fixed_effects        | list    | `postal_code`, `county_classification` or `county_fips`, but really any prepared categorical variable |
+| fixed_effects        | dict    | specified as: `{"<fixed_effect_column>: [which fixed effects to include]}`; to include all effects for a column, use `["all"]`; possible values for the fixed effect variable include: `postal_code`, `county_classification` or `county_fips`, but really any prepared categorical variable |
 | aggregates           | list    | list of geographies for which to calculate predictions beyond the original `postal_code`, `county_fips`, `district`, `county_classification` |
 | pi_method            | string  | method for constructing prediction intervals (`nonparametric` or `gaussian`) |
 | beta                 | numeric | variance inflation for `gaussian` model; | 
