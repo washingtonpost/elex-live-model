@@ -268,7 +268,7 @@ class BaseElectionModel(object):
             ).transpose()
 
         total_votes_matrix = sum(draws_dict.values())
-        shares_dict = {estimand: draws_dict[estimand] / total_votes_matrix}
+        shares_dict = {estimand: draws_dict[estimand] / total_votes_matrix for estimand in estimands}
         return shares_dict
 
     def get_national_summary_count_trials(
@@ -289,11 +289,11 @@ class BaseElectionModel(object):
         state_preds = state_preds[~state_preds["postal_code"].isin(agg_model_states_not_used)].reset_index()
         mean_vec_dict = {estimand: list(state_preds[f"pred_{estimand}"]) for estimand in estimands}
 
-        # no interstate correlations yet:
         cov_matrix_dict = self.construct_cov_matrix_dict(state_preds, estimands)
         wins_df = state_preds[["postal_code"]]
 
         nat_sum_vote_totals_by_trial = {estimand: [] for estimand in estimands}
+
         for k in range(trials):
             estimand_shares_dict = self.random_draws(mean_vec_dict, cov_matrix_dict, estimands, num_observations)
             for estimand in estimands:
