@@ -77,7 +77,10 @@ def cli(
 
     kwargs["features"] = list(kwargs["features"])
     kwargs["aggregates"] = list(kwargs["aggregates"])
-    kwargs["fixed_effects"] = json.loads(kwargs["fixed_effects"])
+    try:
+        kwargs["fixed_effects"] = json.loads(kwargs["fixed_effects"])
+    except json.decoder.JSONDecodeError:
+        kwargs["fixed_effects"] = {kwargs["fixed_effects"]: ["all"]}
 
     prediction_intervals = list(prediction_intervals)
 

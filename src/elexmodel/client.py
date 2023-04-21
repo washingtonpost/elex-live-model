@@ -71,9 +71,12 @@ class ModelClient(object):
         if len(invalid_aggregates) > 0:
             raise ValueError(f"Aggregate(s): {invalid_aggregates} not valid. Please check config")
         model_fixed_effects = config_handler.get_fixed_effects(office)
-        invalid_fixed_effects = [
-            fixed_effect for fixed_effect in fixed_effects.keys() if fixed_effect not in model_fixed_effects
-        ]
+        if type(model_fixed_effects) == "dict":
+            invalid_fixed_effects = [
+                fixed_effect for fixed_effect in fixed_effects.keys() if fixed_effect not in model_fixed_effects
+            ]
+        else:
+            invalid_fixed_effects = [fixed_effect for fixed_effect in fixed_effects if fixed_effects not in model_fixed_effects]
         if len(invalid_fixed_effects) > 0:
             raise ValueError(f"Fixed effect(s): {invalid_fixed_effects} not valid. Please check config")
         if pi_method not in {"gaussian", "nonparametric"}:
