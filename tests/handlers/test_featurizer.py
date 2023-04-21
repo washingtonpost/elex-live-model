@@ -72,8 +72,8 @@ def test_adding_intercept_complex():
 
     df2 = featurizer.featurize_fitting_data(df, center_features=False, add_intercept=True)
     assert featurizer.add_intercept
-    assert 'intercept' in df2.columns
-    assert 'intercept' in featurizer.complete_features
+    assert "intercept" in df2.columns
+    assert "intercept" in featurizer.complete_features
 
 
 def test_column_names():

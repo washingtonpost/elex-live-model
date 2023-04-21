@@ -71,7 +71,7 @@ class Featurizer(object):
 
         self.complete_features = []
         if self.add_intercept:
-            self.complete_features += ['intercept']
+            self.complete_features += ["intercept"]
             self._add_intercept(new_fitting_data)
 
         if len(self.fixed_effects) > 0:
