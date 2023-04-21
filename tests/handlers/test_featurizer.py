@@ -65,6 +65,17 @@ def test_adding_intercept():
     assert df.intercept.equals(pd.Series([1, 1, 1, 1]))
 
 
+def test_adding_intercept_complex():
+    features = ["a", "b", "c"]
+    featurizer = Featurizer(features, [])
+    df = pd.DataFrame({"a": [2, 2, 2, 2], "b": [3, 3, 3, 3], "c": [1, 2, 3, 4]})
+
+    df2 = featurizer.featurize_fitting_data(df, center_features=False, add_intercept=True)
+    assert featurizer.add_intercept
+    assert 'intercept' in df2.columns
+    assert 'intercept' in featurizer.complete_features
+
+
 def test_column_names():
     """
     This function tests to make sure that the featurizer returns the right columns

@@ -69,7 +69,9 @@ class Featurizer(object):
         if self.center_features:
             self._center_features(new_fitting_data)
 
+        self.complete_features = []
         if self.add_intercept:
+            self.complete_features += ['intercept']
             self._add_intercept(new_fitting_data)
 
         if len(self.fixed_effects) > 0:
@@ -85,7 +87,7 @@ class Featurizer(object):
             ]
 
         # all features that the model will be fit on
-        self.complete_features = ["intercept"] + self.features + self.expanded_fixed_effects
+        self.complete_features += self.features + self.expanded_fixed_effects
 
         return new_fitting_data[self.complete_features]
 
