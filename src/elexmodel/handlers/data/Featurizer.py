@@ -48,16 +48,15 @@ class Featurizer(object):
         """
         Convert fixed effect columns into dummy variables.
         """
-        # we concatenate the dummy variables with the original fixed effects, since we need the original fixed
-        # effect columns for aggregation.
         original_fixed_effect_columns = df[self.fixed_effect_cols]
         # set non-included values to other as needed
+        fe_df = df.copy()
         for fe, params in self.fixed_effect_params.items():
             if "all" not in params:
-                df[fe] = np.where(~df[fe].isin(params), "other", df[fe])
+                fe_df[fe] = np.where(~fe_df[fe].isin(params), "other", fe_df[fe])
 
         expanded_fixed_effects = pd.get_dummies(
-            df,
+            fe_df,
             columns=self.fixed_effect_cols,
             prefix=self.fixed_effect_cols,
             prefix_sep="_",
@@ -74,6 +73,8 @@ class Featurizer(object):
                 else:
                     cols_to_drop.append(relevant_cols[0])
 
+        # we concatenate the dummy variables with the original fixed effects, since we need the original fixed
+        # effect columns for aggregation.
         return pd.concat(
             [
                 original_fixed_effect_columns,

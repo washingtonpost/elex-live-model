@@ -161,7 +161,7 @@ def test_expanding_fixed_effects_basic():
         ).sort_index(axis=1),
     )
 
-    fixed_effects = {"c1": ["all"], "c2": "all"}
+    fixed_effects = {"c1": ["all"], "c2": ["all"]}
     featurizer = Featurizer([], fixed_effects)
     expanded = featurizer._expand_fixed_effects(df, drop_first=True)
     pd.testing.assert_frame_equal(
@@ -174,6 +174,57 @@ def test_expanding_fixed_effects_basic():
                 "c2_x": [0, 1, 0, 0],
                 "c2_y": [0, 0, 1, 0],
                 "c2_z": [0, 0, 0, 1],
+                "c1": ["a", "b", "b", "c"],
+                "c2": ["w", "x", "y", "z"],
+            }
+        ).sort_index(axis=1),
+    )
+
+
+def test_expand_fixed_effects_selective():
+    fixed_effects = {"c1": ["a", "b"]}
+    featurizer = Featurizer([], fixed_effects)
+    df = pd.DataFrame({"c1": ["a", "b", "b", "c"], "c2": ["w", "x", "y", "z"], "c3": [2, 4, 1, 9]})
+    expanded = featurizer._expand_fixed_effects(df, drop_first=True)
+    pd.testing.assert_frame_equal(
+        expanded.sort_index(axis=1),
+        pd.DataFrame(
+            {
+                "c2": ["w", "x", "y", "z"],
+                "c3": [2, 4, 1, 9],
+                "c1_a": [1, 0, 0, 0],
+                "c1_b": [0, 1, 1, 0],
+                "c1": ["a", "b", "b", "c"],
+            }
+        ).sort_index(axis=1),
+    )
+
+    expanded = featurizer._expand_fixed_effects(df, drop_first=False)
+    pd.testing.assert_frame_equal(
+        expanded.sort_index(axis=1),
+        pd.DataFrame(
+            {
+                "c2": ["w", "x", "y", "z"],
+                "c3": [2, 4, 1, 9],
+                "c1_a": [1, 0, 0, 0],
+                "c1_b": [0, 1, 1, 0],
+                "c1_other": [0, 0, 0, 1],
+                "c1": ["a", "b", "b", "c"],
+            }
+        ).sort_index(axis=1),
+    )
+
+    fixed_effects = {"c1": ["a"], "c2": ["w", "x"]}
+    featurizer = Featurizer([], fixed_effects)
+    expanded = featurizer._expand_fixed_effects(df, drop_first=True)
+    pd.testing.assert_frame_equal(
+        expanded.sort_index(axis=1),
+        pd.DataFrame(
+            {
+                "c3": [2, 4, 1, 9],
+                "c1_a": [1, 0, 0, 0],
+                "c2_w": [1, 0, 0, 0],
+                "c2_x": [0, 1, 0, 0],
                 "c1": ["a", "b", "b", "c"],
                 "c2": ["w", "x", "y", "z"],
             }
