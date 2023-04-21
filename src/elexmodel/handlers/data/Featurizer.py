@@ -9,12 +9,18 @@ class Featurizer(object):
 
     def __init__(self, features, fixed_effects):
         self.features = features
-        if type(fixed_effects) == "list":
+        if isinstance(fixed_effects, list):
             self.fixed_effect_cols = fixed_effects
             self.fixed_effect_params = {fe: ["all"] for fe in fixed_effects}
         else:
-            self.fixed_effect_params = fixed_effects
             self.fixed_effect_cols = list(fixed_effects.keys())
+            self.fixed_effect_params = {}
+            for fe, params in fixed_effects.items():
+                if params == "all":
+                    self.fixed_effect_params[fe] = ["all"]
+                else:
+                    self.fixed_effect_params[fe] = params
+
         self.expanded_fixed_effects = []
         self.complete_features = None
         self.column_means = None
@@ -47,7 +53,7 @@ class Featurizer(object):
         original_fixed_effect_columns = df[self.fixed_effect_cols]
         # set non-included values to other as needed
         for fe, params in self.fixed_effect_params.items():
-            if params != "all" or "all" not in params:
+            if "all" not in params:
                 df[fe] = np.where(~df[fe].isin(params), "other", df[fe])
 
         expanded_fixed_effects = pd.get_dummies(
