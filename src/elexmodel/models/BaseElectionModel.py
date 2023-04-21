@@ -260,38 +260,22 @@ class BaseElectionModel(object):
     def extend_str_with_list(self, string, list_to_add):
         return [f"{string}_{str(item)}" for item in list_to_add]
 
-    def random_draws(self, mean_vec_dict, cov_matrix_dict, primary_estimand, remaining_estimands, num_observations):
-
-        draws_primary = pd.DataFrame(
-            np.random.multivariate_normal(
-                mean_vec_dict[primary_estimand], cov_matrix_dict[primary_estimand], size=num_observations
-            )
-        ).transpose()
-        total_votes_matrix = draws_primary
-        for estimand in remaining_estimands:
-            new_draws = pd.DataFrame(
+    def random_draws(self, mean_vec_dict, cov_matrix_dict, estimands, num_observations):
+        draws_dict = {}
+        for estimand in estimands:
+            draws_dict[estimand] = pd.DataFrame(
                 np.random.multivariate_normal(mean_vec_dict[estimand], cov_matrix_dict[estimand], size=num_observations)
             ).transpose()
-            total_votes_matrix += new_draws
 
-        primary_shares = draws_primary / total_votes_matrix
-
-        return primary_shares
-
-    # def random_draws(self, row, alpha, estimands, primary_estimand, estimand):
-
-    #     estimand_draws = {}
-    #     for estimand in estimands:
-    #         estimand_draws[estimand] = np.random.uniform(
-    #             row[f"lower_{alpha}_" + estimand], row[f"upper_{alpha}_" + estimand], size=1
-    #         ).astype(int)[0]
-    #     return max(estimand_draws, key=estimand_draws.get)
+        total_votes_matrix = sum(draws_dict.values())
+        shares_dict = {estimand: draws_dict[estimand] / total_votes_matrix}
+        return shares_dict
 
     def get_national_summary_count_trials(
         self,
         state_preds,
         estimands,
-        primary_estimand,
+        #  primary_estimand,
         agg_model_states_not_used,
         trials,
         num_observations,
@@ -303,61 +287,26 @@ class BaseElectionModel(object):
         # only make predictions for states that we want in the model
         # (i.e. those in preprocessed data)
         state_preds = state_preds[~state_preds["postal_code"].isin(agg_model_states_not_used)].reset_index()
-        # estimand_columns = [col for col in state_preds.columns if "pred" in col]
-        # state_preds["total_estimand_votes"] = state_preds[estimand_columns].sum(axis=1)
-
-        # for estimand in estimands:
-        #     state_preds[f"pred_{estimand}_share"] = (
-        #         state_preds["pred_" + estimand] / state_preds["total_estimand_votes"]
-        #     )
-        #     state_preds[f"upper_{alpha}_{estimand}_share"] = (
-        #         state_preds[f"upper_{alpha}_{estimand}"] / state_preds["total_estimand_votes"]
-        #     )
-        #     state_preds[f"lower_{alpha}_{estimand}_share"] = (
-        #         state_preds[f"lower_{alpha}_{estimand}"] / state_preds["total_estimand_votes"]
-        #     )
-        #     state_preds[f"var_{estimand}_share"] = (1 / 12) * (
-        #         state_preds[f"upper_{alpha}_{estimand}_share"] - state_preds[f"lower_{alpha}_{estimand}_share"]
-        #     ) ** 2
-
-        # state_preds["var_sum"] = state_preds[[col for col in state_preds if "var_" in col]].sum(axis=1)
-        # mean_vec = list(state_preds[f"pred_{primary_estimand}_share"])  # TEMPORARY SUB
-
-        # cov_matrix = self.construct_cov_matrix(state_preds)
-
-        remaining_estimands = [k for k in estimands if k != primary_estimand and k != "turnout"]
-        mean_vec_dict = {primary_estimand: list(state_preds[f"pred_{primary_estimand}"])}
-        mean_vec_dict_remaining = {estimand: list(state_preds[f"pred_{estimand}"]) for estimand in remaining_estimands}
-        mean_vec_dict.update(mean_vec_dict_remaining)
+        mean_vec_dict = {estimand: list(state_preds[f"pred_{estimand}"]) for estimand in estimands}
 
         # no interstate correlations yet:
-        cov_matrix_dict = self.construct_cov_matrix_dict(state_preds, primary_estimand, remaining_estimands)
-
+        cov_matrix_dict = self.construct_cov_matrix_dict(state_preds, estimands)
         wins_df = state_preds[["postal_code"]]
 
-        nat_sum_vote_totals_by_trial = {primary_estimand: [], " ".join(remaining_estimands): []}
+        nat_sum_vote_totals_by_trial = {estimand: [] for estimand in estimands}
         for k in range(trials):
+            estimand_shares_dict = self.random_draws(mean_vec_dict, cov_matrix_dict, estimands, num_observations)
+            for estimand in estimands:
+                wins_df[["obs_" + str(n) for n in range(num_observations)]] = estimand_shares_dict[estimand]
+                wins_df["vote"] = wins_df["postal_code"].map(nat_sum_data_dict)
+                wins_votes_df = wins_df
 
-            observation_batch = self.random_draws(
-                mean_vec_dict, cov_matrix_dict, primary_estimand, remaining_estimands, num_observations
-            )
+                estimand_wins = (wins_votes_df[["obs_" + str(n) for n in range(num_observations)]] > 0.5).multiply(
+                    wins_votes_df["vote"], axis="index"
+                )
 
-            wins_df[["obs_" + str(n) for n in range(num_observations)]] = observation_batch
-            wins_df["vote"] = wins_df["postal_code"].map(nat_sum_data_dict)
-            wins_votes_df = wins_df
-
-            primary_estimand_wins = (wins_votes_df[["obs_" + str(n) for n in range(num_observations)]] > 0.5).multiply(
-                wins_votes_df["vote"], axis="index"
-            )
-
-            primary_estimand_trial_nat_sum_mean = np.mean(list(primary_estimand_wins.sum(axis=0)))
-            nat_sum_vote_totals_by_trial[primary_estimand].append(primary_estimand_trial_nat_sum_mean)
-
-        total_nat_sum_votes = sum(wins_votes_df["vote"])
-        nat_sum_vote_totals_by_trial[remaining_estimands] = [
-            total_nat_sum_votes - iter_nat_sum_votes
-            for iter_nat_sum_votes in nat_sum_vote_totals_by_trial[primary_estimand]
-        ]
+                estimand_trial_nat_sum_mean = np.mean(list(estimand_wins.sum(axis=0)))
+                nat_sum_vote_totals_by_trial[estimand].append(estimand_trial_nat_sum_mean)
 
         return pd.DataFrame(data=nat_sum_vote_totals_by_trial)
 
@@ -375,12 +324,12 @@ class BaseElectionModel(object):
         # options for method are percentile, normal_dist (which is just standard approach for large sample size > n = 30)
         # or t- distribution
         trials = kwargs.get("trials", 1000)
-        primary_estimand = kwargs.get("primary_estimand", "dem")
+        #  primary_estimand = kwargs.get("primary_estimand", "dem")
 
         trials_df = self.get_national_summary_count_trials(
             state_preds,
             estimands,
-            primary_estimand,
+            #  primary_estimand,
             agg_model_states_not_used,
             trials,
             num_observations,
@@ -432,23 +381,14 @@ class BaseElectionModel(object):
 
         return est_mean_CI
 
-    def construct_cov_matrix_dict(self, state_preds, primary_estimand, remaining_estimands, alpha=0.9):
+    def construct_cov_matrix_dict(self, state_preds, estimands, alpha=0.9):
         var_dict = {
-            primary_estimand: (
-                (state_preds[f"upper_{alpha}_{primary_estimand}"] - state_preds[f"lower_{alpha}_{primary_estimand}"])
-                / (2 * 1.645)
-            )
-            ** 2
-        }
-        var_remaining_est_dict = {
             estimand: (
-                (state_preds[f"upper_{alpha}_remaining_estimands"] - state_preds[f"lower_{alpha}_remaining_estimands"])
-                / (2 * 1.645)
+                (state_preds[f"upper_{alpha}_{estimand}"] - state_preds[f"lower_{alpha}_{estimand}"]) / (2 * 1.645)
             )
             ** 2
-            for estimand in remaining_estimands
+            for estimand in estimands
         }
-        var_dict.update(var_remaining_est_dict)
 
         std_dev_dict = {k: [np.sqrt(x) for x in var_dict[k]] for k in var_dict.keys()}
         std_dev_matrix_dict = {k: np.diag(std_dev_dict[k]) for k in std_dev_dict.keys()}
@@ -489,9 +429,9 @@ class BaseElectionModel(object):
 
         cov_matrix_dict = {
             estimand: std_dev_matrix_dict[estimand] @ corr_matrix @ std_dev_matrix_dict[estimand]
-            for estimand in std_dev_matrix_dict.keys()
+            for estimand in estimands
         }
 
         # cov_matrix = np.identity(n = len(states_in_use))
-
+        cov_matrix_dict = {estimand: np.diag(var_dict[estimand]) for estimand in estimands}
         return cov_matrix_dict
