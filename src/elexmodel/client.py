@@ -76,7 +76,9 @@ class ModelClient(object):
                 fixed_effect for fixed_effect in fixed_effects.keys() if fixed_effect not in model_fixed_effects
             ]
         else:
-            invalid_fixed_effects = [fixed_effect for fixed_effect in fixed_effects if fixed_effects not in model_fixed_effects]
+            invalid_fixed_effects = [
+                fixed_effect for fixed_effect in fixed_effects if fixed_effects not in model_fixed_effects
+            ]
         if len(invalid_fixed_effects) > 0:
             raise ValueError(f"Fixed effect(s): {invalid_fixed_effects} not valid. Please check config")
         if pi_method not in {"gaussian", "nonparametric"}:

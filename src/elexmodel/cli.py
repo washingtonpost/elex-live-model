@@ -1,6 +1,7 @@
+import json
+
 import click
 from dotenv import find_dotenv, load_dotenv
-import json
 
 load_dotenv(find_dotenv())
 
