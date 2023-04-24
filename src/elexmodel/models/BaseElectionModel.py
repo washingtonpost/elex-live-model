@@ -390,6 +390,7 @@ class BaseElectionModel(object):
         # construct correlation matrix, which is then used in construction
         # of covariance matrix
         corr_matrix = nat_sum_cov_matrix_data
+        breakpoint()
         corr_matrix = corr_matrix.drop(agg_model_states_not_used, axis=0)
         corr_matrix = corr_matrix.drop(agg_model_states_not_used, axis=1).reset_index(drop=True)
         assert list(corr_matrix.index) == list(state_preds["postal_code"])
