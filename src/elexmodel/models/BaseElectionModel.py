@@ -2,7 +2,6 @@ import logging
 import math
 import warnings
 from collections import namedtuple
-from itertools import combinations
 
 import cvxpy
 import numpy as np
@@ -21,7 +20,7 @@ LOG = logging.getLogger(__name__)
 nat_sum_states_called = (
     pd.read_csv("data_for_agg_model/national_summary_states_called.csv").drop("state", axis=1).dropna()
 )
-nat_sum_cov_matrix_data = pd.read_csv("data_for_agg_model/covar_matrix_data.csv").dropna()
+nat_sum_cov_matrix_data = pd.read_csv("data_for_agg_model/corr_matrix.csv").dropna()
 
 
 class BaseElectionModel(object):
@@ -275,7 +274,6 @@ class BaseElectionModel(object):
         self,
         state_preds,
         estimands,
-        #  primary_estimand,
         agg_model_states_not_used,
         trials,
         num_observations,
@@ -288,21 +286,19 @@ class BaseElectionModel(object):
         # (i.e. those in preprocessed data)
         state_preds = state_preds[~state_preds["postal_code"].isin(agg_model_states_not_used)].reset_index()
         mean_vec_dict = {estimand: list(state_preds[f"pred_{estimand}"]) for estimand in estimands}
-
-        cov_matrix_dict = self.construct_cov_matrix_dict(state_preds, estimands)
-        wins_df = state_preds[["postal_code"]]
+        cov_matrix_dict = self.construct_cov_matrix_dict(state_preds, estimands, agg_model_states_not_used)
 
         nat_sum_vote_totals_by_trial = {estimand: [] for estimand in estimands}
 
         for k in range(trials):
             estimand_shares_dict = self.random_draws(mean_vec_dict, cov_matrix_dict, estimands, num_observations)
             for estimand in estimands:
+                wins_df = state_preds[["postal_code"]]
                 wins_df[["obs_" + str(n) for n in range(num_observations)]] = estimand_shares_dict[estimand]
                 wins_df["vote"] = wins_df["postal_code"].map(nat_sum_data_dict)
-                wins_votes_df = wins_df
 
-                estimand_wins = (wins_votes_df[["obs_" + str(n) for n in range(num_observations)]] > 0.5).multiply(
-                    wins_votes_df["vote"], axis="index"
+                estimand_wins = (wins_df[["obs_" + str(n) for n in range(num_observations)]] > 0.5).multiply(
+                    wins_df["vote"], axis="index"
                 )
 
                 estimand_trial_nat_sum_mean = np.mean(list(estimand_wins.sum(axis=0)))
@@ -324,12 +320,10 @@ class BaseElectionModel(object):
         # options for method are percentile, normal_dist (which is just standard approach for large sample size > n = 30)
         # or t- distribution
         trials = kwargs.get("trials", 1000)
-        #  primary_estimand = kwargs.get("primary_estimand", "dem")
 
         trials_df = self.get_national_summary_count_trials(
             state_preds,
             estimands,
-            #  primary_estimand,
             agg_model_states_not_used,
             trials,
             num_observations,
@@ -381,7 +375,7 @@ class BaseElectionModel(object):
 
         return est_mean_CI
 
-    def construct_cov_matrix_dict(self, state_preds, estimands, alpha=0.9):
+    def construct_cov_matrix_dict(self, state_preds, estimands, agg_model_states_not_used, alpha=0.9):
         var_dict = {
             estimand: (
                 (state_preds[f"upper_{alpha}_{estimand}"] - state_preds[f"lower_{alpha}_{estimand}"]) / (2 * 1.645)
@@ -392,46 +386,21 @@ class BaseElectionModel(object):
 
         std_dev_dict = {k: [np.sqrt(x) for x in var_dict[k]] for k in var_dict.keys()}
         std_dev_matrix_dict = {k: np.diag(std_dev_dict[k]) for k in std_dev_dict.keys()}
-        states_in_use = state_preds["postal_code"]
 
         # construct correlation matrix, which is then used in construction
         # of covariance matrix
-        blue_states = [
-            state for state in list(nat_sum_cov_matrix_data["blue_state"]) if state in states_in_use.to_list()
-        ]
-        red_states = [state for state in list(nat_sum_cov_matrix_data["red_state"]) if state in states_in_use.to_list()]
-        swing_states = [
-            state for state in list(nat_sum_cov_matrix_data["swing_state"]) if state in states_in_use.to_list()
-        ]
-
-        corr_matrix = np.zeros((len(states_in_use), len(states_in_use)))
-
-        for pair in combinations(blue_states, 2):
-            pair_indices = [
-                states_in_use[states_in_use == pair[0]].index[0],
-                states_in_use[states_in_use == pair[1]].index[0],
-            ]
-            corr_matrix[pair_indices] = 0.8
-        for pair in combinations(red_states, 2):
-            pair_indices = [
-                states_in_use[states_in_use == pair[0]].index[0],
-                states_in_use[states_in_use == pair[1]].index[0],
-            ]
-            corr_matrix[pair_indices] = 0.9
-        for pair in combinations(swing_states, 2):
-            pair_indices = [
-                states_in_use[states_in_use == pair[0]].index[0],
-                states_in_use[states_in_use == pair[1]].index[0],
-            ]
-            corr_matrix[pair_indices] = 0.7
-
-        np.fill_diagonal(corr_matrix, 1)
-
+        corr_matrix = nat_sum_cov_matrix_data
+        corr_matrix = corr_matrix.drop(agg_model_states_not_used, axis=0)
+        corr_matrix = corr_matrix.drop(agg_model_states_not_used, axis=1).reset_index(drop=True)
+        assert list(corr_matrix.index) == list(state_preds["postal_code"])
+        assert list(corr_matrix.columns) == list(state_preds["postal_code"])
+        corr_matrix = np.array(corr_matrix)
+        breakpoint()
+        # plug correlation matrix back in to compute covariance matrices for each estimand
         cov_matrix_dict = {
             estimand: std_dev_matrix_dict[estimand] @ corr_matrix @ std_dev_matrix_dict[estimand]
             for estimand in estimands
         }
 
-        # cov_matrix = np.identity(n = len(states_in_use))
         cov_matrix_dict = {estimand: np.diag(var_dict[estimand]) for estimand in estimands}
         return cov_matrix_dict
