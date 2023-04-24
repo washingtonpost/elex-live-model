@@ -74,8 +74,8 @@ class GaussianElectionModel(BaseElectionModel):
         upper = prediction_intervals.upper + upper_correction
 
         # un-normalize residuals
-        lower *= nonreporting_units[f"total_voters_{estimand}"]
-        upper *= nonreporting_units[f"total_voters_{estimand}"]
+        lower *= nonreporting_units[f"last_election_results_{estimand}"]
+        upper *= nonreporting_units[f"last_election_results_{estimand}"]
 
         # move from residual to vote space
         # max with nonreporting results so that bounds are at least as large as the # of votes seen
@@ -158,13 +158,13 @@ class GaussianElectionModel(BaseElectionModel):
                 lambda x: pd.Series(
                     {
                         "nonreporting_aggregate_lower_bound": np.sum(
-                            x[f"total_voters_{estimand}"] * x.nonreporting_lower_bounds
+                            x[f"last_election_results_{estimand}"] * x.nonreporting_lower_bounds
                         ),
                         "nonreporting_aggregate_upper_bound": np.sum(
-                            x[f"total_voters_{estimand}"] * x.nonreporting_upper_bounds
+                            x[f"last_election_results_{estimand}"] * x.nonreporting_upper_bounds
                         ),
-                        "nonreporting_weight_sum": np.sum(x[f"total_voters_{estimand}"]),
-                        "nonreporting_weight_ssum": np.sum(np.power(x[f"total_voters_{estimand}"], 2)),
+                        "nonreporting_weight_sum": np.sum(x[f"last_election_results_{estimand}"]),
+                        "nonreporting_weight_ssum": np.sum(np.power(x[f"last_election_results_{estimand}"], 2)),
                     }
                 )
             )

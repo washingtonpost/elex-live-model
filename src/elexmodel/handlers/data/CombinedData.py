@@ -1,5 +1,3 @@
-import numpy as np
-
 from elexmodel.handlers import s3
 from elexmodel.utils.file_utils import S3_FILE_PATH, TARGET_BUCKET, convert_df_to_csv
 
@@ -54,21 +52,20 @@ class CombinedDataHandler(object):
         for estimand in self.estimands:
             reporting_units[f"residuals_{estimand}"] = (
                 reporting_units[f"results_{estimand}"] - reporting_units[f"last_election_results_{estimand}"]
-            ) / reporting_units[f"total_voters_{estimand}"]
+            ) / reporting_units[f"last_election_results_{estimand}"]
 
         reporting_units["reporting"] = 1
+
         return reporting_units
 
     def get_nonreporting_units(self, percent_reporting_threshold, features_to_normalize=[], add_intercept=True):
         """
         Get nonreporting data. These are units where expected vote is less than the percent reporting threshold
         """
-        nonreporting_units = (
-            self.data.query(
-                "percent_expected_vote < @percent_reporting_threshold"
-            )  # not checking if results.isnull() anymore across multiple estimands
-            .reset_index(drop=True)
-            .assign(residuals=np.nan)
+        nonreporting_units = self.data.query(
+            "percent_expected_vote < @percent_reporting_threshold"
+        ).reset_index(  # not checking if results.isnull() anymore across multiple estimands
+            drop=True
         )
 
         nonreporting_units["reporting"] = 0
