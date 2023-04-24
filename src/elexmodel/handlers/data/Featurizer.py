@@ -9,7 +9,18 @@ class Featurizer(object):
 
     def __init__(self, features, fixed_effects):
         self.features = features
-        self.fixed_effects = fixed_effects
+        if isinstance(fixed_effects, list):
+            self.fixed_effect_cols = fixed_effects
+            self.fixed_effect_params = {fe: ["all"] for fe in fixed_effects}
+        else:
+            self.fixed_effect_cols = list(fixed_effects.keys())
+            self.fixed_effect_params = {}
+            for fe, params in fixed_effects.items():
+                if params == "all":
+                    self.fixed_effect_params[fe] = ["all"]
+                else:
+                    self.fixed_effect_params[fe] = params
+
         self.expanded_fixed_effects = []
         self.complete_features = None
         self.column_means = None
@@ -33,27 +44,34 @@ class Featurizer(object):
     def _add_intercept(self, df):
         df["intercept"] = 1
 
-    def _expand_fixed_effects(self, df, drop_first):
+    def _expand_fixed_effects(self, df: pd.DataFrame, drop_first: bool) -> pd.DataFrame:
         """
         Convert fixed effect columns into dummy variables.
         """
+        original_fixed_effect_columns = df[self.fixed_effect_cols]
+        # set non-included values to other as needed
+        fe_df = df.copy()
+        for fe, params in self.fixed_effect_params.items():
+            if "all" not in params:
+                fe_df[fe] = np.where(~fe_df[fe].isin(params), "other", fe_df[fe])
+
+        expanded_fixed_effects = pd.get_dummies(
+            fe_df, columns=self.fixed_effect_cols, prefix=self.fixed_effect_cols, prefix_sep="_", dtype=np.int64
+        )
+
+        # drop first column or "other" column if drop_first is true
+        cols_to_drop = []
+        if drop_first:
+            for fixed_effect in self.fixed_effect_cols:
+                relevant_cols = [col for col in expanded_fixed_effects.columns if col.startswith(fixed_effect)]
+                if f"{fixed_effect}_other" in relevant_cols:
+                    cols_to_drop.append(f"{fixed_effect}_other")
+                else:
+                    cols_to_drop.append(relevant_cols[0])
+
         # we concatenate the dummy variables with the original fixed effects, since we need the original fixed
         # effect columns for aggregation.
-        original_fixed_effect_columns = df[self.fixed_effects]
-        return pd.concat(
-            [
-                pd.get_dummies(
-                    df,
-                    columns=self.fixed_effects,
-                    prefix=self.fixed_effects,
-                    prefix_sep="_",
-                    dtype=np.int64,
-                    drop_first=drop_first,
-                ),
-                original_fixed_effect_columns,
-            ],
-            axis=1,
-        )
+        return pd.concat([original_fixed_effect_columns, expanded_fixed_effects.drop(cols_to_drop, axis=1)], axis=1)
 
     def featurize_fitting_data(self, fitting_data, center_features=True, add_intercept=True):
         """
@@ -72,7 +90,7 @@ class Featurizer(object):
         if self.add_intercept:
             self._add_intercept(new_fitting_data)
 
-        if len(self.fixed_effects) > 0:
+        if len(self.fixed_effect_cols) > 0:
             # drop_first is True for fitting_data (e.g. reporting_units) since we want to avoid the design matrix with
             # expanded fixed effects to be linearly dependent
             new_fitting_data = self._expand_fixed_effects(new_fitting_data, drop_first=True)
@@ -81,7 +99,7 @@ class Featurizer(object):
             self.expanded_fixed_effects = [
                 x
                 for x in new_fitting_data.columns
-                if x.startswith(tuple([fixed_effect + "_" for fixed_effect in self.fixed_effects]))
+                if x.startswith(tuple([fixed_effect + "_" for fixed_effect in self.fixed_effect_cols]))
             ]
 
         # all features that the model will be fit on
@@ -103,7 +121,7 @@ class Featurizer(object):
         if self.add_intercept:
             self._add_intercept(new_heldout_data)
 
-        if len(self.fixed_effects) > 0:
+        if len(self.fixed_effect_cols) > 0:
             missing_expanded_fixed_effects = []
             new_heldout_data = self._expand_fixed_effects(new_heldout_data, drop_first=False)
             # if all units from one fixed effect are reporting they will not appear in the heldout_data (e.g. nonreporting_units) and won't

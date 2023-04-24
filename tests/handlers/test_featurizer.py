@@ -12,7 +12,7 @@ def compute_testing_mean_for_centering():
     Test whether computing the column mean for centering works.
     """
     features = ["a", "b", "c"]
-    featurizer = Featurizer(features, [])
+    featurizer = Featurizer(features, {})
 
     # test with one dataframe
     df = pd.DataFrame({"a": [1, 1, 1, 1], "b": [2, 2, 2, 2], "c": [3, 3, 3, 3], "d": [1, 2, 3, 4]})
@@ -35,7 +35,7 @@ def test_centering_features():
     Test whether centering the features works
     """
     features = ["a", "b"]
-    featurizer = Featurizer(features, [])
+    featurizer = Featurizer(features, {})
 
     # test with one dataframe
     df = pd.DataFrame({"a": [1, 2, 3], "b": [2, 4, 9]})
@@ -54,7 +54,7 @@ def test_centering_features():
 
 def test_adding_intercept():
     features = ["a", "b", "c"]
-    featurizer = Featurizer(features, [])
+    featurizer = Featurizer(features, {})
 
     # test with one dataframe
     df = pd.DataFrame({"a": [2, 2, 2, 2], "b": [3, 3, 3, 3], "c": [1, 2, 3, 4]})
@@ -70,7 +70,7 @@ def test_column_names():
     This function tests to make sure that the featurizer returns the right columns
     """
     features = ["a", "b", "c"]
-    fixed_effects = ["fe_a"]
+    fixed_effects = {"fe_a": ["all"]}
     featurizer = Featurizer(features, fixed_effects)
 
     df_fitting = pd.DataFrame(
@@ -128,12 +128,12 @@ def test_column_names():
 
 
 def test_expanding_fixed_effects_basic():
-    fixed_effects = ["c1"]
+    fixed_effects = {"c1": ["all"]}
     featurizer = Featurizer([], fixed_effects)
     df = pd.DataFrame({"c1": ["a", "b", "b", "c"], "c2": ["w", "x", "y", "z"], "c3": [2, 4, 1, 9]})
     expanded = featurizer._expand_fixed_effects(df, drop_first=True)
     pd.testing.assert_frame_equal(
-        expanded,
+        expanded.sort_index(axis=1),
         pd.DataFrame(
             {
                 "c2": ["w", "x", "y", "z"],
@@ -142,13 +142,13 @@ def test_expanding_fixed_effects_basic():
                 "c1_c": [0, 0, 0, 1],
                 "c1": ["a", "b", "b", "c"],
             }
-        ),
+        ).sort_index(axis=1),
     )
 
     df = pd.DataFrame({"c1": ["a", "b", "b", "c"], "c2": ["w", "x", "y", "z"], "c3": [2, 4, 1, 9]})
     expanded = featurizer._expand_fixed_effects(df, drop_first=False)
     pd.testing.assert_frame_equal(
-        expanded,
+        expanded.sort_index(axis=1),
         pd.DataFrame(
             {
                 "c2": ["w", "x", "y", "z"],
@@ -158,14 +158,14 @@ def test_expanding_fixed_effects_basic():
                 "c1_c": [0, 0, 0, 1],
                 "c1": ["a", "b", "b", "c"],
             }
-        ),
+        ).sort_index(axis=1),
     )
 
-    fixed_effects = ["c1", "c2"]
+    fixed_effects = {"c1": ["all"], "c2": ["all"]}
     featurizer = Featurizer([], fixed_effects)
     expanded = featurizer._expand_fixed_effects(df, drop_first=True)
     pd.testing.assert_frame_equal(
-        expanded,
+        expanded.sort_index(axis=1),
         pd.DataFrame(
             {
                 "c3": [2, 4, 1, 9],
@@ -177,7 +177,58 @@ def test_expanding_fixed_effects_basic():
                 "c1": ["a", "b", "b", "c"],
                 "c2": ["w", "x", "y", "z"],
             }
-        ),
+        ).sort_index(axis=1),
+    )
+
+
+def test_expand_fixed_effects_selective():
+    fixed_effects = {"c1": ["a", "b"]}
+    featurizer = Featurizer([], fixed_effects)
+    df = pd.DataFrame({"c1": ["a", "b", "b", "c"], "c2": ["w", "x", "y", "z"], "c3": [2, 4, 1, 9]})
+    expanded = featurizer._expand_fixed_effects(df, drop_first=True)
+    pd.testing.assert_frame_equal(
+        expanded.sort_index(axis=1),
+        pd.DataFrame(
+            {
+                "c2": ["w", "x", "y", "z"],
+                "c3": [2, 4, 1, 9],
+                "c1_a": [1, 0, 0, 0],
+                "c1_b": [0, 1, 1, 0],
+                "c1": ["a", "b", "b", "c"],
+            }
+        ).sort_index(axis=1),
+    )
+
+    expanded = featurizer._expand_fixed_effects(df, drop_first=False)
+    pd.testing.assert_frame_equal(
+        expanded.sort_index(axis=1),
+        pd.DataFrame(
+            {
+                "c2": ["w", "x", "y", "z"],
+                "c3": [2, 4, 1, 9],
+                "c1_a": [1, 0, 0, 0],
+                "c1_b": [0, 1, 1, 0],
+                "c1_other": [0, 0, 0, 1],
+                "c1": ["a", "b", "b", "c"],
+            }
+        ).sort_index(axis=1),
+    )
+
+    fixed_effects = {"c1": ["a"], "c2": ["w", "x"]}
+    featurizer = Featurizer([], fixed_effects)
+    expanded = featurizer._expand_fixed_effects(df, drop_first=True)
+    pd.testing.assert_frame_equal(
+        expanded.sort_index(axis=1),
+        pd.DataFrame(
+            {
+                "c3": [2, 4, 1, 9],
+                "c1_a": [1, 0, 0, 0],
+                "c2_w": [1, 0, 0, 0],
+                "c2_x": [0, 1, 0, 0],
+                "c1": ["a", "b", "b", "c"],
+                "c2": ["w", "x", "y", "z"],
+            }
+        ).sort_index(axis=1),
     )
 
 
@@ -212,7 +263,7 @@ def test_generate_fixed_effects(va_governor_county_data):
     reporting_data = combined_data_handler.get_reporting_units(99)
     nonreporting_data = combined_data_handler.get_nonreporting_units(99)
 
-    featurizer = Featurizer([], ["county_classification"])
+    featurizer = Featurizer([], {"county_classification": "all"})
     featurizer.compute_means_for_centering(reporting_data, nonreporting_data)
 
     reporting_data_features = featurizer.featurize_fitting_data(reporting_data)
@@ -227,7 +278,7 @@ def test_generate_fixed_effects(va_governor_county_data):
     assert "county_classification_nova" in reporting_data_features.columns
     assert "county_classification_nova" in nonreporting_data_features.columns
 
-    assert "county_classification" in featurizer.fixed_effects
+    assert "county_classification" in featurizer.fixed_effect_cols
     assert len(featurizer.expanded_fixed_effects) == 5  # 6 - 1
 
     combined_data_handler = CombinedDataHandler(
@@ -238,7 +289,7 @@ def test_generate_fixed_effects(va_governor_county_data):
         handle_unreporting="drop",
     )
 
-    featurizer = Featurizer([], ["county_classification", "county_fips"])
+    featurizer = Featurizer([], {"county_classification": ["all"], "county_fips": ["all"]})
     featurizer.compute_means_for_centering(reporting_data, nonreporting_data)
 
     reporting_data = combined_data_handler.get_reporting_units(99)
@@ -259,8 +310,8 @@ def test_generate_fixed_effects(va_governor_county_data):
     assert "county_fips_51790" in reporting_data_features.columns
     assert "county_fips_51790" in nonreporting_data_features.columns
 
-    assert "county_classification" in featurizer.fixed_effects
-    assert "county_fips" in featurizer.fixed_effects
+    assert "county_classification" in featurizer.fixed_effect_cols
+    assert "county_fips" in featurizer.fixed_effect_cols
     assert len(featurizer.expanded_fixed_effects) == 137  # 6 + 133 - 2
 
 
@@ -295,7 +346,7 @@ def test_generate_fixed_effects_not_all_reporting(va_governor_county_data):
     reporting_data = combined_data_handler.get_reporting_units(99)
     nonreporting_data = combined_data_handler.get_nonreporting_units(99)
 
-    featurizer = Featurizer([], ["county_fips"])
+    featurizer = Featurizer([], {"county_fips": ["all"]})
     featurizer.compute_means_for_centering(reporting_data, nonreporting_data)
 
     reporting_data_features = featurizer.featurize_fitting_data(reporting_data)
@@ -320,7 +371,7 @@ def test_generate_fixed_effects_not_all_reporting(va_governor_county_data):
         "county_fips_51790" not in nonreporting_data_features.columns
     )  # not in here because not in featurizer.complete_features
 
-    assert "county_fips" in featurizer.fixed_effects
+    assert "county_fips" in featurizer.fixed_effect_cols
     assert len(featurizer.expanded_fixed_effects) == n - 1
 
     assert not reporting_data_features["county_fips_51009"].isnull().any()
@@ -387,5 +438,5 @@ def test_generate_fixed_effects_mixed_reporting(va_governor_precinct_data):
         "county_fips_51790" not in nonreporting_data_features.columns
     )  # not in here because not in featurizer.complete_features
 
-    assert "county_fips" in featurizer.fixed_effects
+    assert "county_fips" in featurizer.fixed_effect_cols
     assert len(featurizer.expanded_fixed_effects) == 7 - 1
