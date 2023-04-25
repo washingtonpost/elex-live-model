@@ -20,7 +20,7 @@ LOG = logging.getLogger(__name__)
 nat_sum_states_called = (
     pd.read_csv("data_for_agg_model/national_summary_states_called.csv").drop("state", axis=1).dropna()
 )
-nat_sum_cov_matrix_data = pd.read_csv("data_for_agg_model/corr_matrix.csv").dropna()
+nat_sum_cov_matrix_data = pd.read_csv("data_for_agg_model/corr_matrix_gop_share_change_ratio.csv").dropna()
 
 
 class BaseElectionModel(object):
@@ -284,7 +284,7 @@ class BaseElectionModel(object):
         #  states_called = dict(zip(list(ecv_states_called["postal_code"]), list(ecv_states_called["called"])))
         # only make predictions for states that we want in the model
         # (i.e. those in preprocessed data)
-        state_preds = state_preds[~state_preds["postal_code"].isin(agg_model_states_not_used)].reset_index()
+        state_preds = state_preds[~state_preds["postal_code"].isin(agg_model_states_not_used)].reset_index(drop=True)
         mean_vec_dict = {estimand: list(state_preds[f"pred_{estimand}"]) for estimand in estimands}
         cov_matrix_dict = self.construct_cov_matrix_dict(state_preds, estimands, agg_model_states_not_used)
 
@@ -389,19 +389,21 @@ class BaseElectionModel(object):
 
         # construct correlation matrix, which is then used in construction
         # of covariance matrix
-        corr_matrix = nat_sum_cov_matrix_data
-        breakpoint()
+        corr_matrix = nat_sum_cov_matrix_data.set_index("postal_code")
         corr_matrix = corr_matrix.drop(agg_model_states_not_used, axis=0)
-        corr_matrix = corr_matrix.drop(agg_model_states_not_used, axis=1).reset_index(drop=True)
+        corr_matrix = corr_matrix.drop(agg_model_states_not_used, axis=1)
+
         assert list(corr_matrix.index) == list(state_preds["postal_code"])
         assert list(corr_matrix.columns) == list(state_preds["postal_code"])
+
+        corr_matrix = corr_matrix.reset_index(drop=True)
         corr_matrix = np.array(corr_matrix)
-        breakpoint()
+
         # plug correlation matrix back in to compute covariance matrices for each estimand
         cov_matrix_dict = {
             estimand: std_dev_matrix_dict[estimand] @ corr_matrix @ std_dev_matrix_dict[estimand]
             for estimand in estimands
         }
 
-        cov_matrix_dict = {estimand: np.diag(var_dict[estimand]) for estimand in estimands}
+        #   cov_matrix_dict = {estimand: np.diag(var_dict[estimand]) for estimand in estimands}
         return cov_matrix_dict
