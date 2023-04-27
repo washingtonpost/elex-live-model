@@ -186,7 +186,7 @@ def test_check_input_parameters_aggregates(model_client, va_governor_config):
         )
 
 
-def test_check_input_parameters_fixed_effect(model_client, va_governor_config):
+def test_check_input_parameters_fixed_effect_list(model_client, va_governor_config):
     election_id = "2017-11-07_VA_G"
     config_handler = ConfigHandler(election_id, config=va_governor_config)
 
@@ -205,6 +205,24 @@ def test_check_input_parameters_fixed_effect(model_client, va_governor_config):
             handle_unreporting,
         )
 
+def test_check_input_parameters_fixed_effect_dict(model_client, va_governor_config):
+    election_id = "2017-11-07_VA_G"
+    config_handler = ConfigHandler(election_id, config=va_governor_config)
+
+    with pytest.raises(ValueError):
+        model_client._check_input_parameters(
+            config_handler,
+            office,
+            estimands,
+            geographic_unit_type,
+            features,
+            aggregates,
+            {"bad_fixed_effect": ['a', 'b']},
+            pi_method,
+            beta,
+            robust,
+            handle_unreporting,
+        )
 
 def test_check_input_parameters_beta(model_client, va_governor_config):
     election_id = "2017-11-07_VA_G"
