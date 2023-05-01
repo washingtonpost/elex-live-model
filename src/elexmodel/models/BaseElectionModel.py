@@ -20,7 +20,7 @@ LOG = logging.getLogger(__name__)
 nat_sum_states_called = (
     pd.read_csv("data_for_agg_model/national_summary_states_called.csv").drop("state", axis=1).dropna()
 )
-nat_sum_cov_matrix_data = pd.read_csv("data_for_agg_model/corr_matrix_gop_share_change_ratio.csv").dropna()
+nat_sum_cov_matrix_data = pd.read_csv("data_for_agg_model/corr_matrix_economist.csv").dropna()
 
 
 class BaseElectionModel(object):
