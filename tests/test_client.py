@@ -17,36 +17,10 @@ fixed_effects = []
 pi_method = "gaussian"
 beta = 3
 robust = True
+lambda_ = 0
 handle_unreporting = "drop"
 
 
-@pytest.fixture(scope="session")
-def test_check_default_parameters(model_client, va_governor_config):
-    # checking default parameters using the input_parameters function
-    election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler("2017-11-07_VA_G", config=va_governor_config)
-
-    office_id = "G"
-    estimands = ["turnout"]
-    geographic_unit_type = "county"
-    features = []
-    aggregates = ["postal_code"]
-    fixed_effects = []
-
-    model_client._check_input_parameters(
-        config_handler,
-        election_id,
-        geographic_unit_type,
-        office_id,
-        estimands,
-        fixed_effects,
-        aggregates,
-        geographic_unit_type,
-        features,
-    )
-
-
-@pytest.fixture(scope="session")
 def test_check_input_parameters(model_client, va_governor_config):
     election_id = "2017-11-07_VA_G"
     config_handler = ConfigHandler(election_id, config=va_governor_config)
@@ -62,6 +36,7 @@ def test_check_input_parameters(model_client, va_governor_config):
         pi_method,
         beta,
         robust,
+        lambda_,
         handle_unreporting,
     )
 
@@ -82,6 +57,7 @@ def test_check_input_parameters_office(model_client, va_governor_config):
             pi_method,
             beta,
             robust,
+            lambda_,
             handle_unreporting,
         )
 
@@ -102,6 +78,7 @@ def test_check_input_parameters_pi_method(model_client, va_governor_config):
             "bad_pi_method",
             beta,
             robust,
+            lambda_,
             handle_unreporting,
         )
 
@@ -122,6 +99,7 @@ def test_check_input_parameters_estimand(model_client, va_governor_config):
             pi_method,
             beta,
             robust,
+            lambda_,
             handle_unreporting,
         )
 
@@ -142,6 +120,7 @@ def test_check_input_parameters_geographic_unit_type(model_client, va_governor_c
             pi_method,
             beta,
             robust,
+            lambda_,
             handle_unreporting,
         )
 
@@ -162,6 +141,7 @@ def test_check_input_parameters_features(model_client, va_governor_config):
             pi_method,
             beta,
             robust,
+            lambda_,
             handle_unreporting,
         )
 
@@ -182,6 +162,7 @@ def test_check_input_parameters_aggregates(model_client, va_governor_config):
             pi_method,
             beta,
             robust,
+            lambda_,
             handle_unreporting,
         )
 
@@ -202,6 +183,7 @@ def test_check_input_parameters_fixed_effect_list(model_client, va_governor_conf
             pi_method,
             beta,
             robust,
+            lambda_,
             handle_unreporting,
         )
 
@@ -222,6 +204,7 @@ def test_check_input_parameters_fixed_effect_dict(model_client, va_governor_conf
             pi_method,
             beta,
             robust,
+            lambda_,
             handle_unreporting,
         )
 
@@ -242,6 +225,7 @@ def test_check_input_parameters_beta(model_client, va_governor_config):
             pi_method,
             "bad_beta",
             robust,
+            lambda_,
             handle_unreporting,
         )
 
@@ -262,6 +246,28 @@ def test_check_input_parameters_robust(model_client, va_governor_config):
             pi_method,
             beta,
             "bad_robust",
+            lambda_,
+            handle_unreporting,
+        )
+
+
+def test_check_input_parameters_lambda_(model_client, va_governor_config):
+    election_id = "2017-11-07_VA_G"
+    config_handler = ConfigHandler(election_id, config=va_governor_config)
+
+    with pytest.raises(ValueError):
+        model_client._check_input_parameters(
+            config_handler,
+            office,
+            estimands,
+            geographic_unit_type,
+            features,
+            aggregates,
+            fixed_effects,
+            pi_method,
+            beta,
+            robust,
+            -1,
             handle_unreporting,
         )
 
@@ -282,6 +288,7 @@ def test_check_input_parameters_handle_unreporting(model_client, va_governor_con
             pi_method,
             beta,
             robust,
+            lambda_,
             "bad_handle_unreporting",
         )
 

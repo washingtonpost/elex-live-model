@@ -40,6 +40,7 @@ from elexmodel.utils.file_utils import TARGET_BUCKET  # noqa: E402
 )
 @click.option("--beta", "beta", default=1, type=int, help="manually add variance to Gaussian model")
 @click.option("--robust", "robust", is_flag=True, help="robust prediction intervals for nonparametric model")
+@click.option("--lambda", "lambda", default=0, type=float, help="regularization parameter")
 @click.option(
     "--percent_reporting",
     "percent_reporting",

@@ -50,6 +50,7 @@ class ModelClient(object):
         pi_method,
         beta,
         robust,
+        lambda_,
         handle_unreporting,
     ):
         offices = config_handler.get_offices()
@@ -89,6 +90,10 @@ class ModelClient(object):
             raise ValueError("beta is not valid. Has to be either an integer or a float.")
         if not isinstance(robust, bool):
             raise ValueError("robust is not valid. Has to be a boolean.")
+        if not (isinstance(lambda_, float) or isinstance(lambda_, int)):
+            raise ValueError("lambda is not valid. It has to be numeric.")
+        if lambda_ < 0:
+            raise ValueError("lambda is not valid. It has to be greater than zero.")
         if handle_unreporting not in {"drop", "zero"}:
             raise ValueError("handle_unreporting must be either `drop` or `zero`")
         return True
@@ -142,6 +147,7 @@ class ModelClient(object):
         pi_method = kwargs.get("pi_method", "nonparametric")
         beta = kwargs.get("beta", 1)
         robust = kwargs.get("robust", False)
+        lambda_ = kwargs.get("lambda", 0)
         save_output = kwargs.get("save_output", ["results"])
         save_results = "results" in save_output
         save_data = "data" in save_output
@@ -155,6 +161,7 @@ class ModelClient(object):
             "geographic_unit_type": geographic_unit_type,
             "beta": beta,
             "robust": robust,
+            "lambda_": lambda_,
             "features": features,
             "fixed_effects": fixed_effects,
             "save_conformalization": save_conformalization,
@@ -175,6 +182,7 @@ class ModelClient(object):
             pi_method,
             beta,
             robust,
+            lambda_,
             handle_unreporting,
         )
         states_with_election = config_handler.get_states(office)
