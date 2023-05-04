@@ -204,6 +204,7 @@ def test_check_input_parameters_fixed_effect_dict(model_client, va_governor_conf
             pi_method,
             beta,
             robust,
+            lambda_,
             handle_unreporting,
         )
 
