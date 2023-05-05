@@ -25,6 +25,25 @@ def test_fit_model():
     assert all(np.abs(qr.coefficients - [1, 7]) <= TOL)
 
 
+def test_get_unit_predictions():
+    model_settings = {"lambda_": 1, "features": ["b"]}
+    model = BaseElectionModel.BaseElectionModel(model_settings)
+    df_X = pd.DataFrame(
+        {
+            "residuals_a": [1, 2, 3, 4],
+            "total_voters_a": [4, 2, 9, 5],
+            "last_election_results_a": [5, 1, 4, 2],
+            "results_a": [0, 0, 0, 1],
+            "b": [2, 3, 4, 5],
+        }
+    )
+    model.get_unit_predictions(df_X, df_X, estimand="a")
+
+    "intercept" in model.features_to_coefficients
+    "b" in model.features_to_coefficients
+    model.features_to_coefficients["intercept"] > 0
+
+
 def test_aggregation_simple():
     """
     This test is a basic test for aggregating reporting votes. We have have two data frames, reporting votes and
