@@ -340,6 +340,8 @@ class ModelClient(object):
 
         if agg_model_estimates:
             self.nat_sum_estimates = model.get_national_summary_vote_estimates(
+                election_id,
+                office,
                 results_handler.final_results["state_data"],
                 estimands,
                 agg_model_states_not_used,

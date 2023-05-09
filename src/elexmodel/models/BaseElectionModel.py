@@ -17,9 +17,26 @@ PredictionIntervals = namedtuple("PredictionIntervals", ["lower", "upper", "conf
 
 LOG = logging.getLogger(__name__)
 
-nat_sum_states_called = (
-    pd.read_csv("data_for_agg_model/national_summary_states_called.csv").drop("state", axis=1).dropna()
-)
+
+def get_nat_sum_states_called(election_id, office_id):
+    year = election_id.split("-")[0]
+    nat_sum_states_called = (
+        pd.read_csv("data_for_agg_model/national_summary_states_called_{}_{}.csv".format(year, office_id))
+        .drop("state", axis=1)
+        .dropna()
+    )
+    return nat_sum_states_called
+
+
+def get_nat_sum_base_values(election_id, office_id):
+    year = election_id.split("-")[0]
+    nat_sum_base_values = pd.read_csv(
+        "data_for_agg_model/national_summary_base_values_{}_{}.csv".format(year, office_id)
+    )
+    nat_sum_base_values_dict = nat_sum_base_values.set_index("estimand")["base_value"].to_dict()
+    return nat_sum_base_values_dict
+
+
 nat_sum_cov_matrix_data = pd.read_csv("data_for_agg_model/corr_matrix_economist.csv").dropna()
 
 
@@ -287,12 +304,14 @@ class BaseElectionModel(object):
 
     def get_national_summary_count_trials(
         self,
+        office,
         state_preds,
         estimands,
         agg_model_states_not_used,
         trials,
         num_observations,
         nat_sum_data_dict,
+        states_called,
         alpha=0.9,
     ):
 
@@ -310,12 +329,19 @@ class BaseElectionModel(object):
             for estimand in estimands:
                 wins_df = state_preds[["postal_code"]]
                 wins_df[["obs_" + str(n) for n in range(num_observations)]] = estimand_shares_dict[estimand]
-                wins_df["vote"] = wins_df["postal_code"].map(nat_sum_data_dict)
 
+                # do called-state adjustments
+                wins_df = wins_df.set_index("postal_code")
+                for state in list(states_called["postal_code"]):
+                    wins_df.loc[state] = (
+                        1 if states_called[states_called["postal_code"] == state]["called"].values[0] == estimand else 0
+                    )
+                wins_df = wins_df.reset_index()
+
+                wins_df["vote"] = wins_df["postal_code"].map(nat_sum_data_dict)
                 estimand_wins = (wins_df[["obs_" + str(n) for n in range(num_observations)]] > 0.5).multiply(
                     wins_df["vote"], axis="index"
                 )
-
                 estimand_trial_nat_sum_mean = np.mean(list(estimand_wins.sum(axis=0)))
                 nat_sum_vote_totals_by_trial[estimand].append(estimand_trial_nat_sum_mean)
 
@@ -323,6 +349,8 @@ class BaseElectionModel(object):
 
     def get_national_summary_vote_estimates(
         self,
+        election_id,
+        office,
         state_preds,
         estimands,
         agg_model_states_not_used,
@@ -335,14 +363,16 @@ class BaseElectionModel(object):
         # options for method are percentile, normal_dist (which is just standard approach for large sample size > n = 30)
         # or t- distribution
         trials = kwargs.get("trials", 1000)
-
+        states_called = get_nat_sum_states_called(election_id, office)
         trials_df = self.get_national_summary_count_trials(
+            office,
             state_preds,
             estimands,
             agg_model_states_not_used,
             trials,
             num_observations,
             nat_sum_data_dict,
+            states_called,
         )
         if ci_method == "normal_dist_mean":
             # in case of num_oberservations = 1, this gives PI around dem nat-sum estimate iteself
@@ -385,6 +415,13 @@ class BaseElectionModel(object):
 
             est_mean_CI = {
                 estimand: [est_means[estimand], round(est_lb[estimand], 2), round(est_ub[estimand], 2)]
+                for estimand in estimands
+            }
+
+        if "S_" in office:
+            nat_sum_base_values_dict = get_nat_sum_base_values(election_id, office)
+            est_mean_CI = {
+                estimand: [k + nat_sum_base_values_dict[estimand] for k in est_mean_CI[estimand]]
                 for estimand in estimands
             }
 
