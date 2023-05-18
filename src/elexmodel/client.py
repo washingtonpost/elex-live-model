@@ -164,7 +164,7 @@ class ModelClient(object):
         pi_method = kwargs.get("pi_method", "nonparametric")
         beta = kwargs.get("beta", 1)
         robust = kwargs.get("robust", False)
-        lambda_ = kwargs.get("lambda", 0)
+        lambda_ = kwargs.get("lambda_", 0)
         save_output = kwargs.get("save_output", ["results"])
         save_results = "results" in save_output
         save_data = "data" in save_output
