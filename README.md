@@ -11,6 +11,11 @@ The first iteration of this model is written in R in [this repo](https://github.
 * We recommend that you set up a virtualenv and activate it (IE ``mkvirtualenv elex-model`` via http://virtualenvwrapper.readthedocs.io/en/latest/).
 * Run ``pip install elex-model``
 
+Note: if you have an Apple with an ARM chip (M1, M2, etc) and are running into
+installation errors related to the `qldl` package, in a clean environment, run
+`conda install -c conda-forge qdldl-python` and then run pip install (requires
+having conda installed)
+
 ## Usage
 
 We can run the model with a CLI or with Python.
