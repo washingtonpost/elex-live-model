@@ -315,7 +315,6 @@ class BaseElectionModel(object):
         alpha=0.9,
     ):
 
-        #  states_called = dict(zip(list(ecv_states_called["postal_code"]), list(ecv_states_called["called"])))
         # only make predictions for states that we want in the model
         # (i.e. those in preprocessed data)
         state_preds = state_preds[~state_preds["postal_code"].isin(agg_model_states_not_used)].reset_index(drop=True)
@@ -442,6 +441,7 @@ class BaseElectionModel(object):
         # construct correlation matrix, which is then used in construction
         # of covariance matrix
         corr_matrix = nat_sum_cov_matrix_data.set_index("postal_code")
+
         corr_matrix = corr_matrix.drop(agg_model_states_not_used, axis=0)
         corr_matrix = corr_matrix.drop(agg_model_states_not_used, axis=1)
 
