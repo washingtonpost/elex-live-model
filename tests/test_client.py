@@ -389,6 +389,7 @@ def test_get_estimates_fully_reporting(model_client, va_governor_county_data, va
         geographic_unit_type,
         raw_config=va_governor_config,
         preprocessed_data=preprocessed_data,
+        save_output=[]
     )
 
     assert result["state_data"].shape == (1, 6)
@@ -450,6 +451,7 @@ def test_not_including_unit_data(model_client, va_governor_county_data, va_gover
         aggregates=aggregates,
         raw_config=va_governor_config,
         preprocessed_data=preprocessed_data,
+        save_output=[]
     )
     assert "unit_data" not in result.keys()
 
@@ -485,6 +487,7 @@ def test_unexpected_units_no_new_units(model_client, va_governor_precinct_data, 
         aggregates=aggregates,
         raw_config=va_governor_config,
         preprocessed_data=preprocessed_data,
+        save_output=[]
     )
     va_counties_count = va_governor_precinct_data[["county_fips"]].drop_duplicates().shape[0]
     assert result["county_data"].shape[0] == va_counties_count
@@ -527,6 +530,7 @@ def test_unexpected_units_new_units(model_client, va_governor_county_data, va_go
         aggregates=aggregates,
         raw_config=va_governor_config,
         preprocessed_data=preprocessed_data,
+        save_output=[]
     )
     va_counties_count = va_governor_county_data[["county_fips"]].drop_duplicates().shape[0]
     assert result["county_data"].shape[0] == va_counties_count + unexpected_units
@@ -560,6 +564,7 @@ def test_get_estimates_some_reporting(model_client, va_governor_county_data, va_
         geographic_unit_type,
         raw_config=va_governor_config,
         preprocessed_data=preprocessed_data,
+        save_output=[]
     )
     assert result["state_data"].shape == (1, 6)
     assert result["unit_data"].shape == (133, 7)
@@ -619,6 +624,7 @@ def test_get_estimates_no_subunits_reporting(model_client, va_governor_county_da
             geographic_unit_type,
             raw_config=va_governor_config,
             preprocessed_data=preprocessed_data,
+            save_output=[]
         )
 
 
@@ -651,6 +657,7 @@ def test_get_estimates_not_enough_subunits_reporting(model_client, va_governor_c
             geographic_unit_type,
             raw_config=va_governor_config,
             preprocessed_data=preprocessed_data,
+            save_output=[]
         )
 
 
@@ -683,6 +690,7 @@ def test_conformalization_data(model_client, va_governor_county_data, va_governo
         raw_config=va_governor_config,
         preprocessed_data=preprocessed_data,
         pi_method="gaussian",
+        save_output=[]
     )
 
     conform_unit = model_client.get_all_conformalization_data_unit()
@@ -710,6 +718,7 @@ def test_conformalization_data(model_client, va_governor_county_data, va_governo
         raw_config=va_governor_config,
         preprocessed_data=preprocessed_data,
         pi_method="nonparametric",
+        save_output=[]
     )
 
     conform_unit = model_client.get_all_conformalization_data_unit()
