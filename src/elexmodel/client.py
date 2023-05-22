@@ -140,7 +140,6 @@ class ModelClient(object):
         percent_reporting_threshold=100,
         geographic_unit_type="county",
         agg_model_estimates=False,
-        agg_model_states_not_used=[],
         ci_method="percentile",
         num_observations=1,
         raw_config=None,
@@ -339,21 +338,11 @@ class ModelClient(object):
             results_handler.write_data(election_id, office, geographic_unit_type)
 
         if agg_model_estimates:
-            # Not only do we not want to run the agg model on states we've manually
-            # indicated to leave out (e.g. Alaska or Maine), there may be issues
-            # like Illinois or Florida where we decide later to drop them from
-            # the model, or whose data is mistakenly not coming in for some reason.
-            # We want to update our initial list of agg_model_states_not_used to
-            # include these as well.
             state_outputs = results_handler.final_results["state_data"]
 
             states_w_preds = list(state_outputs["postal_code"])
-            add_states_to_drop = [
-                state for state in states if state not in states_w_preds and state not in agg_model_states_not_used
-            ]
 
-            agg_model_states_not_used += add_states_to_drop
-
+            agg_model_states_not_used = [state for state in states if state not in states_w_preds]
             self.nat_sum_estimates = model.get_national_summary_vote_estimates(
                 election_id,
                 office,
