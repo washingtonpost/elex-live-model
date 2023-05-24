@@ -49,9 +49,18 @@ class CombinedDataHandler(object):
 
         # residualize + normalize
         for estimand in self.estimands:
-            reporting_units[f"residuals_{estimand}"] = (
-                reporting_units[f"results_{estimand}"] - reporting_units[f"last_election_results_{estimand}"]
-            ) / reporting_units[f"last_election_results_{estimand}"]
+            if estimand != "turnout":
+                reporting_units[f"pp_change_{estimand}"] = (
+                    reporting_units[f"results_{estimand}"] / reporting_units["results_turnout"]
+                ) - (
+                    reporting_units[f"last_election_results_{estimand}"]
+                    / reporting_units["last_election_results_turnout"]
+                )
+
+            else:
+                reporting_units[f"pp_change_{estimand}"] = (
+                    reporting_units[f"results_{estimand}"] / reporting_units["total_age_voters"]
+                ) - (reporting_units[f"last_election_results_{estimand}"] / reporting_units["total_age_voters"])
 
         reporting_units["reporting"] = 1
 
@@ -67,6 +76,16 @@ class CombinedDataHandler(object):
             drop=True
         )
 
+        for estimand in self.estimands:
+            if estimand != "turnout":
+                nonreporting_units[f"last_election_share_{estimand}"] = (
+                    nonreporting_units[f"last_election_results_{estimand}"]
+                    / nonreporting_units["last_election_results_turnout"]
+                )
+            else:
+                nonreporting_units["last_election_share_turnout"] = (
+                    nonreporting_units["last_election_results_turnout"] / nonreporting_units["total_age_voters"]
+                )
         nonreporting_units["reporting"] = 0
 
         return nonreporting_units

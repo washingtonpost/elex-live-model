@@ -275,6 +275,11 @@ class ModelClient(object):
         self.all_conformalization_data_unit_dict = {alpha: {} for alpha in prediction_intervals}
         self.all_conformalization_data_agg_dict = {alpha: {} for alpha in prediction_intervals}
         for estimand in estimands:
+            # For turnout, predict a raw number of total votes
+            # for now from one past election, but maybe change to blend of turnout PERCENT
+            # of past elections, where turnout percent is share of total pop or something
+            # (need additional data for this, e.g. total pop or CVAP on each unit)
+            # For other estimands, we now regress on blended-election share as baseline.
             unit_predictions = model.get_unit_predictions(reporting_units, nonreporting_units, estimand)
             results_handler.add_unit_predictions(estimand, unit_predictions)
             # gets prediciton intervals for each alpha

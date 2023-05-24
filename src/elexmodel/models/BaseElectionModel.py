@@ -69,21 +69,24 @@ class BaseElectionModel(object):
         nonreporting_units_features = self.featurizer.featurize_heldout_data(nonreporting_units)
 
         weights = reporting_units[f"last_election_results_{estimand}"]
-        reporting_units_residuals = reporting_units[f"residuals_{estimand}"]
+        reporting_units_pp_changes = reporting_units[f"pp_change_{estimand}"]
 
-        self.fit_model(self.qr, reporting_units_features, reporting_units_residuals, 0.5, weights, True)
+        self.fit_model(self.qr, reporting_units_features, reporting_units_pp_changes, 0.5, weights, True)
         self.features_to_coefficients = dict(zip(self.featurizer.complete_features, self.qr.coefficients))
 
         preds = self.qr.predict(nonreporting_units_features)
+        # Must run turnout first!
+        # We now get the final RAW number of predicted votes for an estimand by adding the
+        # preds (which are expected percentage-point change) to the baseline's estimand
+        # share, and multiplying the result by the current year's predicted turnout
+        if estimand == "turnout":
+            preds = (preds + nonreporting_units["last_election_share_turnout"]) * nonreporting_units["total_age_voters"]
+            self.raw_turnout_preds = preds.copy()
 
-        # multiply by total voters to get unnormalized residuals
-        preds = preds * nonreporting_units[f"last_election_results_{estimand}"]
+        else:
+            preds = (preds + nonreporting_units[f"last_election_share_{estimand}"]) * self.raw_turnout_preds
 
-        # add in last election results to go from residual to number of votes in this election
-        # max with results so that predictions are always at least ars large as actual number of votes
-        preds = np.maximum(
-            preds + nonreporting_units[f"last_election_results_{estimand}"], nonreporting_units[f"results_{estimand}"]
-        )
+        preds = np.maximum(preds, nonreporting_units[f"results_{estimand}"])
 
         # round since we don't need the artificial precision
         return preds.round(decimals=0)
