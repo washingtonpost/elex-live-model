@@ -86,18 +86,18 @@ class NonparametricElectionModel(BaseElectionModel):
         self.nonreporting_lower_bounds = lower
         self.nonreporting_upper_bounds = upper
 
-        # un-normalize residuals
-        lower *= nonreporting_units[f"last_election_results_{estimand}"]
-        upper *= nonreporting_units[f"last_election_results_{estimand}"]
+        if estimand == "turnout":
+            lower = (lower + nonreporting_units["last_election_share_turnout"]) * nonreporting_units["total_age_voters"]
+            upper = (upper + nonreporting_units["last_election_share_turnout"]) * nonreporting_units["total_age_voters"]
+
+        else:
+            lower = (lower + nonreporting_units[f"last_election_share_{estimand}"]) * self.raw_turnout_preds
+            upper = (upper + nonreporting_units[f"last_election_share_{estimand}"]) * self.raw_turnout_preds
 
         # move from residual to vote space
         # max with nonreporting results so that bounds are at least as large as the # of votes seen
-        lower = np.maximum(
-            lower + nonreporting_units[f"last_election_results_{estimand}"], nonreporting_units[f"results_{estimand}"]
-        )
-        upper = np.maximum(
-            upper + nonreporting_units[f"last_election_results_{estimand}"], nonreporting_units[f"results_{estimand}"]
-        )
+        lower = np.maximum(lower, nonreporting_units[f"results_{estimand}"])
+        upper = np.maximum(upper, nonreporting_units[f"results_{estimand}"])
 
         return PredictionIntervals(
             lower.round(decimals=0), upper.round(decimals=0), prediction_intervals.conformalization

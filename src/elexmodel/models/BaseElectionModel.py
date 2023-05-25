@@ -75,6 +75,7 @@ class BaseElectionModel(object):
         self.features_to_coefficients = dict(zip(self.featurizer.complete_features, self.qr.coefficients))
 
         preds = self.qr.predict(nonreporting_units_features)
+
         # Must run turnout first!
         # We now get the final RAW number of predicted votes for an estimand by adding the
         # preds (which are expected percentage-point change) to the baseline's estimand
@@ -216,15 +217,16 @@ class BaseElectionModel(object):
         # want the expanded_fixed_effects from train_data to be used by conformalization_data and nonreporting_data
         # in this function.
         train_data_features = self.featurizer.featurize_fitting_data(train_data, add_intercept=self.add_intercept)
-        train_data_residuals = train_data[f"residuals_{estimand}"]
+
+        train_data_pp_changes = train_data[f"pp_change_{estimand}"]
         train_data_weights = train_data[f"last_election_results_{estimand}"]
 
         # fit lower and upper model to training data. ECOS solver is better than SCS.
         lower_qr = QuantileRegressionSolver(solver="ECOS")
-        self.fit_model(lower_qr, train_data_features, train_data_residuals, lower_bound, train_data_weights, True)
+        self.fit_model(lower_qr, train_data_features, train_data_pp_changes, lower_bound, train_data_weights, True)
 
         upper_qr = QuantileRegressionSolver(solver="ECOS")
-        self.fit_model(upper_qr, train_data_features, train_data_residuals, upper_bound, train_data_weights, True)
+        self.fit_model(upper_qr, train_data_features, train_data_pp_changes, upper_bound, train_data_weights, True)
 
         # apply to conformalization data. Conformalization bounds will later tell us how much to adjust lower/upper
         # bounds for nonreporting data.
@@ -235,9 +237,9 @@ class BaseElectionModel(object):
         # we are interested in f(X) - r
         # since later conformity scores care about deviation of bounds from residuals
         conformalization_lower_bounds = (
-            lower_qr.predict(conformalization_data_features) - conformalization_data[f"residuals_{estimand}"].values
+            lower_qr.predict(conformalization_data_features) - conformalization_data[f"pp_change_{estimand}"].values
         )
-        conformalization_upper_bounds = conformalization_data[f"residuals_{estimand}"].values - upper_qr.predict(
+        conformalization_upper_bounds = conformalization_data[f"pp_change_{estimand}"].values - upper_qr.predict(
             conformalization_data_features
         )
 
@@ -251,7 +253,6 @@ class BaseElectionModel(object):
         nonreporting_units_features = self.featurizer.featurize_heldout_data(nonreporting_units)
         nonreporting_lower_bounds = lower_qr.predict(nonreporting_units_features)
         nonreporting_upper_bounds = upper_qr.predict(nonreporting_units_features)
-
         return PredictionIntervals(nonreporting_lower_bounds, nonreporting_upper_bounds, conformalization_data)
 
     def get_unit_prediction_intervals(self):
