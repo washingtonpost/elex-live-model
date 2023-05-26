@@ -73,13 +73,13 @@ class GaussianElectionModel(BaseElectionModel):
         lower = prediction_intervals.lower - lower_correction
         upper = prediction_intervals.upper + upper_correction
 
-        if estimand == "turnout":
-            lower = (lower + nonreporting_units["last_election_share_turnout"]) * nonreporting_units["total_age_voters"]
-            upper = (upper + nonreporting_units["last_election_share_turnout"]) * nonreporting_units["total_age_voters"]
+        # if estimand == "turnout":
+        #     lower = (lower + nonreporting_units["last_election_share_turnout"]) * nonreporting_units["total_age_voters"]
+        #     upper = (upper + nonreporting_units["last_election_share_turnout"]) * nonreporting_units["total_age_voters"]
 
-        else:
-            lower = (lower + nonreporting_units[f"last_election_share_{estimand}"]) * self.raw_turnout_preds
-            upper = (upper + nonreporting_units[f"last_election_share_{estimand}"]) * self.raw_turnout_preds
+        # else:
+        #     lower = (lower + nonreporting_units[f"last_election_share_{estimand}"]) * self.raw_turnout_preds
+        #     upper = (upper + nonreporting_units[f"last_election_share_{estimand}"]) * self.raw_turnout_preds
 
         # move from residual to vote space
         # max with nonreporting results so that bounds are at least as large as the # of votes seen
