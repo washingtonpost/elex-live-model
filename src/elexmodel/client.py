@@ -118,6 +118,17 @@ class ModelClient(object):
         """
         return self.all_conformalization_data_agg_dict
 
+    def get_sample_new_baseline_data(self, election_id, office):
+        """
+        This function reads in sample new baseline data, which will be subbed in to replace the baseline
+        data columns that are already stored in preprocessed_data.
+        """
+        year = election_id.split("-")[0]
+        new_baseline = pd.read_csv(
+            "new_baseline_data_{}_{}.csv".format(office, year), dtype={"geographic_unit_fips": str}
+        )
+        return new_baseline
+
     def get_estimates(
         self,
         current_data,  # list of lists
@@ -202,6 +213,11 @@ class ModelClient(object):
             preprocessed_data_handler.data, states_with_election
         )
         preprocessed_data = preprocessed_data_handler.data
+
+        new_baseline_data = self.get_sample_new_baseline_data(election_id, office)
+        preprocessed_data = preprocessed_data.drop([f"baseline_{estimand}" for estimand in estimands], axis=1)
+        preprocessed_data = pd.merge(preprocessed_data, new_baseline_data, on="geographic_unit_fips")
+
         if save_data:
             preprocessed_data_handler.save_data(preprocessed_data)
 
