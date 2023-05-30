@@ -59,8 +59,8 @@ class CombinedDataHandler(object):
 
             else:
                 reporting_units[f"pp_change_{estimand}"] = (
-                    reporting_units[f"results_{estimand}"] / reporting_units["total_age_voters"]
-                ) - (reporting_units[f"last_election_results_{estimand}"] / reporting_units["total_age_voters"])
+                    reporting_units[f"results_{estimand}"] / reporting_units["total_people"]
+                ) - (reporting_units[f"last_election_results_{estimand}"] / reporting_units["total_people"])
 
         reporting_units["reporting"] = 1
 
@@ -84,7 +84,7 @@ class CombinedDataHandler(object):
                 )
             else:
                 nonreporting_units["last_election_share_turnout"] = (
-                    nonreporting_units["last_election_results_turnout"] / nonreporting_units["total_age_voters"]
+                    nonreporting_units["last_election_results_turnout"] / nonreporting_units["total_people"]
                 )
         nonreporting_units["reporting"] = 0
 

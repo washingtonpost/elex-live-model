@@ -81,7 +81,7 @@ class BaseElectionModel(object):
         # preds (which are expected percentage-point change) to the baseline's estimand
         # share, and multiplying the result by the current year's predicted turnout
         if estimand == "turnout":
-            preds = (preds + nonreporting_units["last_election_share_turnout"]) * nonreporting_units["total_age_voters"]
+            preds = (preds + nonreporting_units["last_election_share_turnout"]) * nonreporting_units["total_people"]
             self.raw_turnout_preds = preds.copy()
 
         else:

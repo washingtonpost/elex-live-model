@@ -87,8 +87,8 @@ class NonparametricElectionModel(BaseElectionModel):
         self.nonreporting_upper_bounds = upper
 
         if estimand == "turnout":
-            lower = (lower + nonreporting_units["last_election_share_turnout"]) * nonreporting_units["total_age_voters"]
-            upper = (upper + nonreporting_units["last_election_share_turnout"]) * nonreporting_units["total_age_voters"]
+            lower = (lower + nonreporting_units["last_election_share_turnout"]) * nonreporting_units["total_people"]
+            upper = (upper + nonreporting_units["last_election_share_turnout"]) * nonreporting_units["total_people"]
 
         else:
             lower = (lower + nonreporting_units[f"last_election_share_{estimand}"]) * self.raw_turnout_preds
