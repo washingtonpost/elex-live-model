@@ -7,31 +7,31 @@ import pandas as pd
 
 # president
 pres_12 = pd.read_csv(
-    "../../elex-live-model-data-processing/2012-11-06_USA_G/final_processed_data/P/data_county.csv",
+    "../elex-live-model-data-processing/2012-11-06_USA_G/final_processed_data/P/data_county.csv",
     dtype={"geographic_unit_fips": str},
 )
 pres_16 = pd.read_csv(
-    "../../elex-live-model-data-processing/2016-11-08_USA_G/final_processed_data/P/data_county.csv",
+    "../elex-live-model-data-processing/2016-11-08_USA_G/final_processed_data/P/data_county.csv",
     dtype={"geographic_unit_fips": str},
 )
 pres_20 = pd.read_csv(
-    "../../elex-live-model-data-processing/2020-11-03_USA_G/final_processed_data/P/data_county.csv",
+    "../elex-live-model-data-processing/2020-11-03_USA_G/final_processed_data/P/data_county.csv",
     dtype={"geographic_unit_fips": str},
 )
 
 # senate
 sen_16 = pd.read_csv(
-    "../../elex-live-model-data-processing/2016-11-08_USA_G/final_processed_data/S_county/data_county.csv",
+    "../elex-live-model-data-processing/2016-11-08_USA_G/final_processed_data/S_county/data_county.csv",
     dtype={"geographic_unit_fips": str},
 )
 
 # governor
 gov_18 = pd.read_csv(
-    "../../elex-live-model-data-processing/2018-11-06_USA_G/final_processed_data/G_county/data_county.csv",
+    "../elex-live-model-data-processing/2018-11-06_USA_G/final_processed_data/G_county/data_county.csv",
     dtype={"geographic_unit_fips": str},
 )
 gov_16 = pd.read_csv(
-    "../../elex-live-model-data-processing/2016-11-08_USA_G/final_processed_data/G/data_county.csv",
+    "../elex-live-model-data-processing/2016-11-08_USA_G/final_processed_data/G/data_county.csv",
     dtype={"geographic_unit_fips": str},
 )
 
