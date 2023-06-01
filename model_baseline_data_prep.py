@@ -4,6 +4,7 @@ import pandas as pd
 # pull in county-level data for blending
 # we are interested in county-town level data for statewide elections
 # over multiple years
+# Note, we don't actually need the 2022 data for this blending script
 
 # president
 pres_12 = pd.read_csv(
@@ -39,6 +40,7 @@ list_of_dfs = [pres_12, pres_16, pres_20, sen_16, gov_18, gov_16]
 all_results = pd.concat(list_of_dfs).reset_index(drop=True)
 
 all_results = all_results.drop(["baseline_dem", "baseline_gop", "baseline_turnout"], axis=1)
+# CHECK HERE TURNOUT THING
 all_results["results_dem_share"] = all_results["results_dem"] / (all_results["results_turnout"])
 all_results["results_gop_share"] = all_results["results_gop"] / (all_results["results_turnout"])
 all_results["results_turnout_share"] = all_results["results_turnout"] / (all_results["total_people"])
