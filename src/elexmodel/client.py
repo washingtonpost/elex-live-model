@@ -50,6 +50,7 @@ class ModelClient(object):
         pi_method,
         beta,
         robust,
+        lambda_,
         handle_unreporting,
     ):
         offices = config_handler.get_offices()
@@ -71,9 +72,14 @@ class ModelClient(object):
         if len(invalid_aggregates) > 0:
             raise ValueError(f"Aggregate(s): {invalid_aggregates} not valid. Please check config")
         model_fixed_effects = config_handler.get_fixed_effects(office)
-        invalid_fixed_effects = [
-            fixed_effect for fixed_effect in fixed_effects if fixed_effect not in model_fixed_effects
-        ]
+        if isinstance(fixed_effects, dict):
+            invalid_fixed_effects = [
+                fixed_effect for fixed_effect in fixed_effects.keys() if fixed_effect not in model_fixed_effects
+            ]
+        else:
+            invalid_fixed_effects = [
+                fixed_effect for fixed_effect in fixed_effects if fixed_effect not in model_fixed_effects
+            ]
         if len(invalid_fixed_effects) > 0:
             raise ValueError(f"Fixed effect(s): {invalid_fixed_effects} not valid. Please check config")
         if pi_method not in {"gaussian", "nonparametric"}:
@@ -84,6 +90,10 @@ class ModelClient(object):
             raise ValueError("beta is not valid. Has to be either an integer or a float.")
         if not isinstance(robust, bool):
             raise ValueError("robust is not valid. Has to be a boolean.")
+        if not (isinstance(lambda_, float) or isinstance(lambda_, int)):
+            raise ValueError("lambda is not valid. It has to be numeric.")
+        if lambda_ < 0:
+            raise ValueError("lambda is not valid. It has to be greater than zero.")
         if handle_unreporting not in {"drop", "zero"}:
             raise ValueError("handle_unreporting must be either `drop` or `zero`")
         return True
@@ -133,10 +143,11 @@ class ModelClient(object):
             current_data = pd.DataFrame(current_data[1:], columns=column_values)
         features = kwargs.get("features", [])
         aggregates = kwargs.get("aggregates", ["postal_code", "unit"])
-        fixed_effects = kwargs.get("fixed_effects", [])
+        fixed_effects = kwargs.get("fixed_effects", {})
         pi_method = kwargs.get("pi_method", "nonparametric")
         beta = kwargs.get("beta", 1)
         robust = kwargs.get("robust", False)
+        lambda_ = kwargs.get("lambda_", 0)
         save_output = kwargs.get("save_output", ["results"])
         save_results = "results" in save_output
         save_data = "data" in save_output
@@ -150,7 +161,9 @@ class ModelClient(object):
             "geographic_unit_type": geographic_unit_type,
             "beta": beta,
             "robust": robust,
+            "lambda_": lambda_,
             "features": features,
+            "fixed_effects": fixed_effects,
             "save_conformalization": save_conformalization,
         }
 
@@ -169,6 +182,7 @@ class ModelClient(object):
             pi_method,
             beta,
             robust,
+            lambda_,
             handle_unreporting,
         )
         states_with_election = config_handler.get_states(office)
@@ -197,7 +211,6 @@ class ModelClient(object):
             current_data,
             estimands,
             geographic_unit_type,
-            fixed_effects=fixed_effects,
             handle_unreporting=handle_unreporting,
         )
 
@@ -221,7 +234,6 @@ class ModelClient(object):
             model_settings,
         )
 
-        model_settings["expanded_fixed_effects"] = data.expanded_fixed_effects
         if pi_method == "nonparametric":
             model = NonparametricElectionModel(model_settings=model_settings)
         elif pi_method == "gaussian":

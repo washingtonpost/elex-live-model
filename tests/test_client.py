@@ -17,36 +17,10 @@ fixed_effects = []
 pi_method = "gaussian"
 beta = 3
 robust = True
+lambda_ = 0
 handle_unreporting = "drop"
 
 
-@pytest.fixture(scope="session")
-def test_check_default_parameters(model_client, va_governor_config):
-    # checking default parameters using the input_parameters function
-    election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler("2017-11-07_VA_G", config=va_governor_config)
-
-    office_id = "G"
-    estimands = ["turnout"]
-    geographic_unit_type = "county"
-    features = []
-    aggregates = ["postal_code"]
-    fixed_effects = []
-
-    model_client._check_input_parameters(
-        config_handler,
-        election_id,
-        geographic_unit_type,
-        office_id,
-        estimands,
-        fixed_effects,
-        aggregates,
-        geographic_unit_type,
-        features,
-    )
-
-
-@pytest.fixture(scope="session")
 def test_check_input_parameters(model_client, va_governor_config):
     election_id = "2017-11-07_VA_G"
     config_handler = ConfigHandler(election_id, config=va_governor_config)
@@ -62,6 +36,7 @@ def test_check_input_parameters(model_client, va_governor_config):
         pi_method,
         beta,
         robust,
+        lambda_,
         handle_unreporting,
     )
 
@@ -82,6 +57,7 @@ def test_check_input_parameters_office(model_client, va_governor_config):
             pi_method,
             beta,
             robust,
+            lambda_,
             handle_unreporting,
         )
 
@@ -102,6 +78,7 @@ def test_check_input_parameters_pi_method(model_client, va_governor_config):
             "bad_pi_method",
             beta,
             robust,
+            lambda_,
             handle_unreporting,
         )
 
@@ -122,6 +99,7 @@ def test_check_input_parameters_estimand(model_client, va_governor_config):
             pi_method,
             beta,
             robust,
+            lambda_,
             handle_unreporting,
         )
 
@@ -142,6 +120,7 @@ def test_check_input_parameters_geographic_unit_type(model_client, va_governor_c
             pi_method,
             beta,
             robust,
+            lambda_,
             handle_unreporting,
         )
 
@@ -162,6 +141,7 @@ def test_check_input_parameters_features(model_client, va_governor_config):
             pi_method,
             beta,
             robust,
+            lambda_,
             handle_unreporting,
         )
 
@@ -182,11 +162,12 @@ def test_check_input_parameters_aggregates(model_client, va_governor_config):
             pi_method,
             beta,
             robust,
+            lambda_,
             handle_unreporting,
         )
 
 
-def test_check_input_parameters_fixed_effect(model_client, va_governor_config):
+def test_check_input_parameters_fixed_effect_list(model_client, va_governor_config):
     election_id = "2017-11-07_VA_G"
     config_handler = ConfigHandler(election_id, config=va_governor_config)
 
@@ -202,6 +183,28 @@ def test_check_input_parameters_fixed_effect(model_client, va_governor_config):
             pi_method,
             beta,
             robust,
+            lambda_,
+            handle_unreporting,
+        )
+
+
+def test_check_input_parameters_fixed_effect_dict(model_client, va_governor_config):
+    election_id = "2017-11-07_VA_G"
+    config_handler = ConfigHandler(election_id, config=va_governor_config)
+
+    with pytest.raises(ValueError):
+        model_client._check_input_parameters(
+            config_handler,
+            office,
+            estimands,
+            geographic_unit_type,
+            features,
+            aggregates,
+            {"bad_fixed_effect": ["a", "b"]},
+            pi_method,
+            beta,
+            robust,
+            lambda_,
             handle_unreporting,
         )
 
@@ -222,6 +225,7 @@ def test_check_input_parameters_beta(model_client, va_governor_config):
             pi_method,
             "bad_beta",
             robust,
+            lambda_,
             handle_unreporting,
         )
 
@@ -242,6 +246,28 @@ def test_check_input_parameters_robust(model_client, va_governor_config):
             pi_method,
             beta,
             "bad_robust",
+            lambda_,
+            handle_unreporting,
+        )
+
+
+def test_check_input_parameters_lambda_(model_client, va_governor_config):
+    election_id = "2017-11-07_VA_G"
+    config_handler = ConfigHandler(election_id, config=va_governor_config)
+
+    with pytest.raises(ValueError):
+        model_client._check_input_parameters(
+            config_handler,
+            office,
+            estimands,
+            geographic_unit_type,
+            features,
+            aggregates,
+            fixed_effects,
+            pi_method,
+            beta,
+            robust,
+            -1,
             handle_unreporting,
         )
 
@@ -262,6 +288,7 @@ def test_check_input_parameters_handle_unreporting(model_client, va_governor_con
             pi_method,
             beta,
             robust,
+            lambda_,
             "bad_handle_unreporting",
         )
 
@@ -350,8 +377,7 @@ def test_get_estimates_fully_reporting(model_client, va_governor_county_data, va
     data = data_handler.get_percent_fully_reported(100)
 
     preprocessed_data = va_governor_county_data.copy()
-    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy()
-    preprocessed_data["total_voters_turnout"] = preprocessed_data["last_election_results_turnout"] + 1
+    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
 
     result = model_client.get_estimates(
         data,
@@ -363,6 +389,7 @@ def test_get_estimates_fully_reporting(model_client, va_governor_county_data, va
         geographic_unit_type,
         raw_config=va_governor_config,
         preprocessed_data=preprocessed_data,
+        save_output=[],
     )
 
     assert result["state_data"].shape == (1, 6)
@@ -411,8 +438,7 @@ def test_not_including_unit_data(model_client, va_governor_county_data, va_gover
     data = data_handler.get_percent_fully_reported(100)
 
     preprocessed_data = va_governor_county_data.copy()
-    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy()
-    preprocessed_data["total_voters_turnout"] = preprocessed_data["last_election_results_turnout"] + 1
+    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
 
     result = model_client.get_estimates(
         data,
@@ -425,6 +451,7 @@ def test_not_including_unit_data(model_client, va_governor_county_data, va_gover
         aggregates=aggregates,
         raw_config=va_governor_config,
         preprocessed_data=preprocessed_data,
+        save_output=[],
     )
     assert "unit_data" not in result.keys()
 
@@ -447,8 +474,7 @@ def test_unexpected_units_no_new_units(model_client, va_governor_precinct_data, 
     data = data_handler.get_percent_fully_reported(100)
 
     preprocessed_data = va_governor_precinct_data.copy()
-    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy()
-    preprocessed_data["total_voters_turnout"] = preprocessed_data["last_election_results_turnout"] + 1
+    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
 
     result = model_client.get_estimates(
         data,
@@ -461,6 +487,7 @@ def test_unexpected_units_no_new_units(model_client, va_governor_precinct_data, 
         aggregates=aggregates,
         raw_config=va_governor_config,
         preprocessed_data=preprocessed_data,
+        save_output=[],
     )
     va_counties_count = va_governor_precinct_data[["county_fips"]].drop_duplicates().shape[0]
     assert result["county_data"].shape[0] == va_counties_count
@@ -490,8 +517,7 @@ def test_unexpected_units_new_units(model_client, va_governor_county_data, va_go
     data = data_handler.get_percent_fully_reported(100)
 
     preprocessed_data = va_governor_county_data.copy()
-    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy()
-    preprocessed_data["total_voters_turnout"] = preprocessed_data["last_election_results_turnout"] + 1
+    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
 
     result = model_client.get_estimates(
         data,
@@ -504,6 +530,7 @@ def test_unexpected_units_new_units(model_client, va_governor_county_data, va_go
         aggregates=aggregates,
         raw_config=va_governor_config,
         preprocessed_data=preprocessed_data,
+        save_output=[],
     )
     va_counties_count = va_governor_county_data[["county_fips"]].drop_duplicates().shape[0]
     assert result["county_data"].shape[0] == va_counties_count + unexpected_units
@@ -525,8 +552,7 @@ def test_get_estimates_some_reporting(model_client, va_governor_county_data, va_
     data = data_handler.get_percent_fully_reported(70)
 
     preprocessed_data = va_governor_county_data.copy()
-    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy()
-    preprocessed_data["total_voters_turnout"] = preprocessed_data["last_election_results_turnout"] + 1
+    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
 
     result = model_client.get_estimates(
         data,
@@ -538,8 +564,8 @@ def test_get_estimates_some_reporting(model_client, va_governor_county_data, va_
         geographic_unit_type,
         raw_config=va_governor_config,
         preprocessed_data=preprocessed_data,
+        save_output=[],
     )
-
     assert result["state_data"].shape == (1, 6)
     assert result["unit_data"].shape == (133, 7)
 
@@ -562,11 +588,11 @@ def test_get_estimates_some_reporting(model_client, va_governor_county_data, va_
     ]
 
     assert result["state_data"]["postal_code"][0] == "VA"
-    assert result["state_data"]["pred_turnout"][0] == 2587567.0
+    assert result["state_data"]["pred_turnout"][0] == 2587563.0
     assert result["state_data"]["results_turnout"][0] == 1570077.0
     assert result["state_data"]["reporting"][0] == 94.0
-    assert result["state_data"]["lower_0.9_turnout"][0] == 2443878.0
-    assert result["state_data"]["upper_0.9_turnout"][0] == 2683319.0
+    assert result["state_data"]["lower_0.9_turnout"][0] == 2443849.0
+    assert result["state_data"]["upper_0.9_turnout"][0] == 2683348.0
 
 
 def test_get_estimates_no_subunits_reporting(model_client, va_governor_county_data, va_governor_config):
@@ -585,8 +611,7 @@ def test_get_estimates_no_subunits_reporting(model_client, va_governor_county_da
     data = data_handler.get_percent_fully_reported(0)
 
     preprocessed_data = va_governor_county_data.copy()
-    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy()
-    preprocessed_data["total_voters_turnout"] = preprocessed_data["last_election_results_turnout"] + 1
+    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
 
     with pytest.raises(ModelNotEnoughSubunitsException, match="Currently 0 reporting, need at least 20"):
         model_client.get_estimates(
@@ -599,6 +624,7 @@ def test_get_estimates_no_subunits_reporting(model_client, va_governor_county_da
             geographic_unit_type,
             raw_config=va_governor_config,
             preprocessed_data=preprocessed_data,
+            save_output=[],
         )
 
 
@@ -618,8 +644,7 @@ def test_get_estimates_not_enough_subunits_reporting(model_client, va_governor_c
     data = data_handler.get_percent_fully_reported(10)
 
     preprocessed_data = va_governor_county_data.copy()
-    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy()
-    preprocessed_data["total_voters_turnout"] = preprocessed_data["last_election_results_turnout"] + 1
+    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
 
     with pytest.raises(ModelNotEnoughSubunitsException, match="Currently 14 reporting, need at least 20"):
         model_client.get_estimates(
@@ -632,6 +657,7 @@ def test_get_estimates_not_enough_subunits_reporting(model_client, va_governor_c
             geographic_unit_type,
             raw_config=va_governor_config,
             preprocessed_data=preprocessed_data,
+            save_output=[],
         )
 
 
@@ -651,8 +677,7 @@ def test_conformalization_data(model_client, va_governor_county_data, va_governo
     data = data_handler.get_percent_fully_reported(70)
 
     preprocessed_data = va_governor_county_data.copy()
-    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy()
-    preprocessed_data["total_voters_turnout"] = preprocessed_data["last_election_results_turnout"] + 1
+    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
 
     model_client.get_estimates(
         data,
@@ -665,6 +690,7 @@ def test_conformalization_data(model_client, va_governor_county_data, va_governo
         raw_config=va_governor_config,
         preprocessed_data=preprocessed_data,
         pi_method="gaussian",
+        save_output=[],
     )
 
     conform_unit = model_client.get_all_conformalization_data_unit()
@@ -692,6 +718,7 @@ def test_conformalization_data(model_client, va_governor_county_data, va_governo
         raw_config=va_governor_config,
         preprocessed_data=preprocessed_data,
         pi_method="nonparametric",
+        save_output=[],
     )
 
     conform_unit = model_client.get_all_conformalization_data_unit()
