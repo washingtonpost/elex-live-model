@@ -118,6 +118,24 @@ class ModelClient(object):
         """
         return self.all_conformalization_data_agg_dict
 
+    def get_default_aggregates(self, office):
+        if office in {'P', 'S', 'G'}:
+            return ['postal_code', 'unit']
+        elif office in {'P_county', 'S_county', 'G_county', 'P_precinct', 'S_precinct', 'G_precinct'}:
+            return ['postal_code', 'unit']
+        elif office in {'H', 'Y', 'Z'}:
+            return ['postal_code', 'district', 'unit']
+        elif office in {'H_county', 'Y_county', 'Z_county', 'H_precinct', 'Y_precinct', 'Z_precinct'}:
+            return ['postal_code', 'district', 'unit']
+        else:
+            raise ValueError("Cannot get default aggregate because office id not recognized.")
+
+    def get_aggregate_list(self, office, aggregate):
+        default_aggregate = self.get_default_aggregates(office)
+        base_aggregate = default_aggregate[:-1] # remove unit
+        raw_aggregate_list = base_aggregate + [aggregate]
+        return sorted(list(set(raw_aggregate_list)), key=lambda x: AGGREGATE_ORDER.index(x))
+
     def get_estimates(
         self,
         current_data,  # list of lists
@@ -142,7 +160,8 @@ class ModelClient(object):
             column_values = current_data[0]
             current_data = pd.DataFrame(current_data[1:], columns=column_values)
         features = kwargs.get("features", [])
-        aggregates = kwargs.get("aggregates", ["postal_code", "unit"])
+        default_aggregates = self.get_default_aggregates(office)
+        aggregates = kwargs.get("aggregates", default_aggregates)
         fixed_effects = kwargs.get("fixed_effects", {})
         pi_method = kwargs.get("pi_method", "nonparametric")
         beta = kwargs.get("beta", 1)
@@ -288,7 +307,7 @@ class ModelClient(object):
             results_handler.add_unit_intervals(estimand, alpha_to_unit_prediction_intervals)
 
             for aggregate in results_handler.aggregates:
-                aggregate_list = sorted(list(set(["postal_code", aggregate])), key=lambda x: AGGREGATE_ORDER.index(x))
+                aggregate_list = self.get_aggregate_list(office, aggregate)
                 estimates_df = model.get_aggregate_predictions(
                     results_handler.reporting_units,
                     results_handler.nonreporting_units,
