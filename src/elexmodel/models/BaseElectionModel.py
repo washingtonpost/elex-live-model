@@ -418,6 +418,7 @@ class BaseElectionModel(object):
             }
 
         if "S_" in office:
+            estimands = [k for k in estimands if k != "turnout"]
             nat_sum_base_values_dict = get_nat_sum_base_values(election_id, office)
             est_mean_CI = {
                 estimand: [k + nat_sum_base_values_dict[estimand] for k in est_mean_CI[estimand]]
