@@ -49,7 +49,7 @@ def historical_model_client():
 
 
 @pytest.fixture(scope="session")
-def va_governor_config(get_fixture):
+def va_config(get_fixture):
     path = os.path.join("config", "2017-11-07_VA_G.json")
     return get_fixture(path, load=True, pandas=False)
 
@@ -77,6 +77,10 @@ def va_assembly_county_data(get_fixture):
     path = os.path.join("data", "2017-11-07_VA_G", "Y", "data_county-district.csv")
     return get_fixture(path, load=False, pandas=True)
 
+@pytest.fixture(scope="session")
+def va_assembly_precinct_data(get_fixture):
+    path = os.path.join("data", "2017-11-07_VA_G", "Y", "data_precinct-district.csv")
+    return get_fixture(path, load=False, pandas=True)
 
 @pytest.fixture(scope="session")
 def test_path():
