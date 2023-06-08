@@ -119,20 +119,20 @@ class ModelClient(object):
         return self.all_conformalization_data_agg_dict
 
     def get_default_aggregates(self, office):
-        if office in {'P', 'S', 'G'}:
-            return ['postal_code', 'unit']
-        elif office in {'P_county', 'S_county', 'G_county', 'P_precinct', 'S_precinct', 'G_precinct'}:
-            return ['postal_code', 'unit']
-        elif office in {'H', 'Y', 'Z'}:
-            return ['postal_code', 'district', 'unit']
-        elif office in {'H_county', 'Y_county', 'Z_county', 'H_precinct', 'Y_precinct', 'Z_precinct'}:
-            return ['postal_code', 'district', 'unit']
+        if office in {"P", "S", "G"}:
+            return ["postal_code", "unit"]
+        elif office in {"P_county", "S_county", "G_county", "P_precinct", "S_precinct", "G_precinct"}:
+            return ["postal_code", "unit"]
+        elif office in {"H", "Y", "Z"}:
+            return ["postal_code", "district", "unit"]
+        elif office in {"H_county", "Y_county", "Z_county", "H_precinct", "Y_precinct", "Z_precinct"}:
+            return ["postal_code", "district", "unit"]
         else:
             raise ValueError("Cannot get default aggregate because office id not recognized.")
 
     def get_aggregate_list(self, office, aggregate):
         default_aggregate = self.get_default_aggregates(office)
-        base_aggregate = default_aggregate[:-1] # remove unit
+        base_aggregate = default_aggregate[:-1]  # remove unit
         raw_aggregate_list = base_aggregate + [aggregate]
         return sorted(list(set(raw_aggregate_list)), key=lambda x: AGGREGATE_ORDER.index(x))
 
