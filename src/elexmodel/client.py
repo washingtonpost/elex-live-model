@@ -306,7 +306,6 @@ class ModelClient(object):
                         alpha,
                         alpha_to_unit_prediction_intervals[alpha].conformalization,
                         estimand,
-                        model_settings,
                     )
                     self.all_conformalization_data_agg_dict[alpha][estimand] = model.get_all_conformalization_data_agg()
 
