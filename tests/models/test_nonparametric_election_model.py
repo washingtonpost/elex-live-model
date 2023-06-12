@@ -113,14 +113,10 @@ def test_aggregate_prediction_intervals(va_governor_precinct_data):
     df3 = df[2000:].copy()
     df3["reporting"] = 1
 
-    intervals = model.get_aggregate_prediction_intervals(
-        df1, df2, df3, ["postal_code"], alpha, None, estimand
-    )
+    intervals = model.get_aggregate_prediction_intervals(df1, df2, df3, ["postal_code"], alpha, None, estimand)
     assert 2535685.0 == intervals.lower[0]  # total based on summing csv
     assert 2535685.0 == intervals.upper[0]  # total based on summing csv
 
-    intervals = model.get_aggregate_prediction_intervals(
-        df1, df2, df3, ["county_fips"], alpha, None, estimand
-    )
+    intervals = model.get_aggregate_prediction_intervals(df1, df2, df3, ["county_fips"], alpha, None, estimand)
     assert 10664.0 == intervals.lower[0]  # first county based on summing csv
     assert 10664.0 == intervals.upper[0]  # first county based on summing csv
