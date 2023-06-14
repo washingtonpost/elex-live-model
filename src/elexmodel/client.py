@@ -215,6 +215,7 @@ class ModelClient(object):
             data=preprocessed_data,
             s3_client=s3.S3CsvUtil(TARGET_BUCKET),
         )
+
         preprocessed_data_handler.data = preprocessed_data_handler.select_rows_in_states(
             preprocessed_data_handler.data, states_with_election
         )

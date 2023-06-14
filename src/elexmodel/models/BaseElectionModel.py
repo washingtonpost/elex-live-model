@@ -292,6 +292,10 @@ class BaseElectionModel(object):
         return [f"{string}_{str(item)}" for item in list_to_add]
 
     def random_draws(self, mean_vec_dict, cov_matrix_dict, estimands, num_observations):
+        """
+        This function is called once per trial. In each of the 'num_observations' it
+        does a joint multivariate normal draw from the states' confidence intervals.
+        """
         draws_dict = {}
         for estimand in estimands:
             draws_dict[estimand] = pd.DataFrame(
@@ -324,6 +328,10 @@ class BaseElectionModel(object):
         nat_sum_vote_totals_by_trial = {estimand: [] for estimand in estimands}
 
         for k in range(trials):
+            # In each trial we do a multivariate draw across all the states's CI's for each estimand.
+            # The draw gives us the share that each estimand won in the trial.
+            # We can convert that to the number of electoral (or senate) votes each state
+            # got in each trial.
             estimand_shares_dict = self.random_draws(mean_vec_dict, cov_matrix_dict, estimands, num_observations)
             for estimand in estimands:
                 wins_df = state_preds[["postal_code"]]
@@ -428,6 +436,11 @@ class BaseElectionModel(object):
         return est_mean_CI
 
     def construct_cov_matrix_dict(self, state_preds, estimands, agg_model_states_not_used, alpha=0.9):
+        """
+        The results of this function is a covariance_matrix where each value is the
+        covariance of a pair of states. This is used in the 'random_draws()' function
+        to draw from a multi-variate normal distribution across the states.
+        """
         var_dict = {
             estimand: (
                 (state_preds[f"upper_{alpha}_{estimand}"] - state_preds[f"lower_{alpha}_{estimand}"]) / (2 * 1.645)
@@ -458,5 +471,4 @@ class BaseElectionModel(object):
             for estimand in estimands
         }
 
-        #   cov_matrix_dict = {estimand: np.diag(var_dict[estimand]) for estimand in estimands}
         return cov_matrix_dict
