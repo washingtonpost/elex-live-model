@@ -214,8 +214,10 @@ class ModelClient(object):
             handle_unreporting=handle_unreporting,
         )
 
-        #get new lambda value from config
-        lambda_, avg_MAPE = config_handler.compute_lambda([0.05, 0.051, 0.049, 0.04, 0.06, 0.03, 0.055, 0.045, 0.075], preprocessed_data, features, 2) 
+        # get new lambda value from config
+        lambda_, avg_MAPE = config_handler.compute_lambda(
+            [0.05, 0.051, 0.049, 0.04, 0.06, 0.03, 0.055, 0.045, 0.075], preprocessed_data, features, 2
+        )
 
         reporting_units = data.get_reporting_units(
             percent_reporting_threshold, features_to_normalize=features, add_intercept=True
