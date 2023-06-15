@@ -2,18 +2,6 @@ import json
 import logging
 from pathlib import Path
 
-import numpy as np
-from sklearn.metrics import mean_absolute_percentage_error
-from sklearn.model_selection import KFold
-from sklearn.tree import DecisionTreeClassifier
-
-"""
-import pandas as pd
-from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
-from numpy import array
-from elexmodel.models.BaseElectionModel import BaseElectionModel
-"""
-
 from elexmodel.utils.file_utils import create_directory, get_directory_path
 
 LOG = logging.getLogger(__name__)
@@ -118,50 +106,3 @@ class ConfigHandler(object):
         with open(self.local_file_path, "w") as f:
             json.dump(self.config, f)
 
-    def compute_lambda(self, possible_lambda_values, data, features=["gender_f", "median_household_income"], K=5):
-        average_MAPE_sum = 0
-        best_lambda = None
-        best_MAPE = float("inf")
-
-        # prepare data
-        X = data[["gender_f", "median_household_income"]]
-        y = data[["results_turnout"]]
-
-        # for each lambda calculate the MAPE within each fold
-        for lam in possible_lambda_values:
-            MAPE_scores = []
-            kfold = KFold(n_splits=K, shuffle=True, random_state=1)
-
-            # split data into train and test steps
-            for train, test in kfold.split(X):
-                X_train, X_test = X.iloc[train], X.iloc[test]
-                y_train, y_test = y.iloc[train], y.iloc[test]
-
-                model = DecisionTreeClassifier(max_depth=None)
-                model.fit(X_train, y_train)
-
-                """
-                model = BaseElectionModel(model_settings = {})
-                qr = QuantileRegressionSolver(solver="ECOS")
-                weights = pd.DataFrame({"weights": [1, 1, 1, 1]}).weights
-                model.fit_model(qr, X_train, y_train, l, weights, True)
-                """
-
-                y_pred = model.predict(X_test)
-
-                MAPE = mean_absolute_percentage_error(y_test, y_pred)
-                MAPE_scores.append(MAPE)
-
-            average_MAPE = np.mean(MAPE_scores)
-            average_MAPE_sum += average_MAPE
-
-            if average_MAPE < best_MAPE:
-                best_MAPE = average_MAPE
-                best_lambda = lam
-
-        average_MAPE = average_MAPE_sum / len(possible_lambda_values)
-
-        print("best lambda: " + str(best_lambda))
-        print("average MAPE: " + str(average_MAPE))
-
-        return best_lambda, average_MAPE
