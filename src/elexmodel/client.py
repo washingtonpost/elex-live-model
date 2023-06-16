@@ -2,6 +2,10 @@ import logging
 
 import numpy as np
 import pandas as pd
+from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
+from sklearn.metrics import mean_absolute_percentage_error
+from sklearn.model_selection import KFold
+from sklearn.tree import DecisionTreeClassifier
 
 from elexmodel.handlers import s3
 from elexmodel.handlers.config import ConfigHandler
@@ -9,20 +13,12 @@ from elexmodel.handlers.data.CombinedData import CombinedDataHandler
 from elexmodel.handlers.data.ModelResults import ModelResultsHandler
 from elexmodel.handlers.data.PreprocessedData import PreprocessedDataHandler
 from elexmodel.logging import initialize_logging
+from elexmodel.models.BaseElectionModel import BaseElectionModel
 from elexmodel.models.GaussianElectionModel import GaussianElectionModel
 from elexmodel.models.NonparametricElectionModel import NonparametricElectionModel
 from elexmodel.utils.constants import AGGREGATE_ORDER, VALID_AGGREGATES_MAPPING
 from elexmodel.utils.file_utils import APP_ENV, S3_FILE_PATH, TARGET_BUCKET
 from elexmodel.utils.math_utils import compute_error, compute_frac_within_pi, compute_mean_pi_length
-
-import numpy as np
-from sklearn.metrics import mean_absolute_percentage_error
-from sklearn.model_selection import KFold
-from sklearn.tree import DecisionTreeClassifier
-import pandas as pd
-from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
-from numpy import array
-from elexmodel.models.BaseElectionModel import BaseElectionModel
 
 initialize_logging()
 
@@ -127,13 +123,21 @@ class ModelClient(object):
         """
         return self.all_conformalization_data_agg_dict
 
-    def compute_lambda(self,  data, possible_lambda_values : list[float] = 0, 
-                       X_input : list[str] = ['gender_f', 'median_household_income'], 
-                       y_input : list[str] = ['results_turnout'], K = 5):
-        
+    def compute_lambda(
+        self,
+        data,
+        model_settings,
+        possible_lambda_values: list[float] = 0,
+        X_input: list[str] = ["gender_f", "median_household_income"],
+        y_input: list[str] = ["results_turnout"],
+        K=5,
+    ):
+        print(list(data.columns))
+
         average_MAPE_sum = 0
         best_lambda = None
         best_MAPE = float('inf')
+        estimand = 'dem'
 
         # prepare data
         X = data[X_input]
@@ -149,35 +153,30 @@ class ModelClient(object):
                 X_train, X_test = X.iloc[train], X.iloc[test]
                 y_train, y_test = y.iloc[train], y.iloc[test]
 
-                model = DecisionTreeClassifier(max_depth=None)
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_test)
-
-                '''
-                model = BaseElectionModel(model_settings = {})
+                model_settings = {"lambda_": lam}
+                model2 = BaseElectionModel(model_settings=model_settings)
                 qr = QuantileRegressionSolver(solver="ECOS")
-
                 weights = pd.DataFrame({"weights": [1 for element in range(len(X_train))]}).weights
-
-                estimand = X_train[0]
-                print(estimand)
 
                 df_X = pd.DataFrame(
                 {
-                    f"residuals_{estimand}": [],
-                    f"total_voters_{estimand}": [],
-                    f"last_election_results_{estimand}": [],
-                    f"results_{estimand}": [],
-                    f"{estimand}": X_train,
-                })
+                    f"residuals_{estimand}": data['baseline_dem'],
+                    f"total_voters_{estimand}": data['total_gen_voters'],
+                    f"last_election_results_{estimand}": data['last_election_results_dem'],
+                    f"results_{estimand}": data['results_gop'],
+                    f"{estimand}": data['results_dem'],
+                }).fillna(0)
+
+                print(df_X.shape)
 
                 #df_X = pd.DataFrame(X_train)
                 df_y = pd.DataFrame(y_train)
-                model.fit_model(qr, df_X, df_y.squeeze(), 0.5, weights, False)
-                y_pred = model.get_unit_predictions(X_test, y_test)
-
-                '''
+                model2.fit_model(qr, df_X, df_y.squeeze(), 0.5, weights, False)
+                y_pred = model2.get_unit_predictions(X_test, y_test, estimand = estimand)
                 
+                model = DecisionTreeClassifier(max_depth=None)
+                model.fit(X_train, y_train)
+                y_pred = model.predict(X_test)
 
                 MAPE = mean_absolute_percentage_error(y_test, y_pred)
                 MAPE_scores.append(MAPE)
@@ -191,7 +190,6 @@ class ModelClient(object):
 
         average_MAPE = average_MAPE_sum / len(possible_lambda_values)
         return best_lambda, average_MAPE
-
 
     def get_estimates(
         self,
@@ -298,11 +296,9 @@ class ModelClient(object):
         unexpected_units = data.get_unexpected_units(percent_reporting_threshold, aggregates)
 
         # get new lambda value from config
-        new_lambda_, avg_MAPE = self.compute_lambda(preprocessed_data, 
-            [0.05, 0.051, 0.049, 0.04, 0.06, 0.03, 0.055, 0.045, 0.075]
-        )
-        model_settings = {
-            "lambda_": new_lambda_}
+        test_lambdas = [0.05, 0.051, 0.049, 0.04, 0.06, 0.03, 0.055, 0.045, 0.075]
+        new_lambda_, avg_MAPE = self.compute_lambda(preprocessed_data, model_settings, test_lambdas)
+        model_settings = {"lambda_": new_lambda_}
 
         LOG.info(
             "Model parameters: \n geographic_unit_type: %s, prediction intervals: %s, percent reporting threshold: %s, features: %s, pi_method: %s, aggregates: %s, fixed effects: %s, model settings: %s",

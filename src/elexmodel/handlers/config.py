@@ -105,4 +105,3 @@ class ConfigHandler(object):
             create_directory(str(Path(self.local_file_path).parent))
         with open(self.local_file_path, "w") as f:
             json.dump(self.config, f)
-
