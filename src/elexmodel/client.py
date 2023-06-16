@@ -10,6 +10,7 @@ from elexmodel.handlers.data.ModelResults import ModelResultsHandler
 from elexmodel.handlers.data.PreprocessedData import PreprocessedDataHandler
 from elexmodel.logging import initialize_logging
 from elexmodel.models.GaussianElectionModel import GaussianElectionModel
+from elexmodel.models.BootstrapElectionModel import BootstrapElectionModel
 from elexmodel.models.NonparametricElectionModel import NonparametricElectionModel
 from elexmodel.utils.constants import AGGREGATE_ORDER, VALID_AGGREGATES_MAPPING
 from elexmodel.utils.file_utils import APP_ENV, S3_FILE_PATH, TARGET_BUCKET
@@ -171,6 +172,7 @@ class ModelClient(object):
         config_handler = ConfigHandler(
             election_id, config=raw_config, s3_client=s3.S3JsonUtil(TARGET_BUCKET), save=save_config
         )
+        '''
         self._check_input_parameters(
             config_handler,
             office,
@@ -185,8 +187,11 @@ class ModelClient(object):
             lambda_,
             handle_unreporting,
         )
+        '''
         states_with_election = config_handler.get_states(office)
         estimand_baselines = config_handler.get_estimand_baselines(office, estimands)
+        if 'margin' in estimands:
+            estimand_baselines['margin'] = 'margin'
 
         LOG.info("Getting preprocessed data: %s", election_id)
         preprocessed_data_handler = PreprocessedDataHandler(
@@ -238,6 +243,8 @@ class ModelClient(object):
             model = NonparametricElectionModel(model_settings=model_settings)
         elif pi_method == "gaussian":
             model = GaussianElectionModel(model_settings=model_settings)
+        elif pi_method == 'bootstrap':
+            model = BootstrapElectionModel(model_settings=model_settings)
 
         minimum_reporting_units_max = 0
         for alpha in prediction_intervals:

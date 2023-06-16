@@ -87,11 +87,22 @@ class PreprocessedDataHandler(object):
             # the historical election results of the currently reporting units.
             # so we don't care about the total voters or the baseline election.
             return preprocessed_data
+        
+        if 'margin' in estimand_baselines:
+            preprocessed_data['weights'] = preprocessed_data.baseline_dem + preprocessed_data.baseline_gop + 1
+            preprocessed_data['baseline_margin'] = preprocessed_data.baseline_dem - preprocessed_data.baseline_gop
+            preprocessed_data['baseline_normalized_margin'] = (preprocessed_data.baseline_dem - preprocessed_data.baseline_gop) / preprocessed_data.weights
 
+            # can't always guarantee that these results exist in preprocessed data but TODO: change preprocessed data generation code
+            preprocessed_data['normalized_margin'] = preprocessed_data.results_dem - preprocessed_data.results_gop
+            preprocessed_data['normalized_margin'] /= (preprocessed_data.results_dem + preprocessed_data.results_gop)
+
+            preprocessed_data['results_margin'] = preprocessed_data.results_dem - preprocessed_data.results_gop
         for estimand, pointer in estimand_baselines.items():
             baseline_name = f"baseline_{pointer}"
             # Adding one to prevent zero divison
             preprocessed_data[f"last_election_results_{estimand}"] = preprocessed_data[baseline_name].copy() + 1
+ 
 
         return preprocessed_data
 

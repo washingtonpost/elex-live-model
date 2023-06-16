@@ -27,6 +27,7 @@ from elexmodel.utils.file_utils import TARGET_BUCKET  # noqa: E402
         [
             "gaussian",
             "nonparametric",
+            "bootstrap"
         ]
     ),
 )
@@ -143,5 +144,6 @@ def cli(
             geographic_unit_type,
             **kwargs
         )
+        import pdb; pdb.set_trace()
         for aggregate_level, estimates in result.items():
             print(aggregate_level, "\n", estimates, "\n")

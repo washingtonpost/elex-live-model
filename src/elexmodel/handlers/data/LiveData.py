@@ -85,7 +85,13 @@ class MockLiveDataHandler(object):
 
     def load_data(self, data, estimands, historical):
         columns_to_return = ["postal_code", "geographic_unit_fips"]
-        for estimand in estimands:
+        if 'margin' in estimands:
+            estimands_to_use = ['dem', 'gop']
+            columns_to_return.extend(["results_margin", "normalized_margin"])
+        else:
+            estimands_to_use = estimands
+
+        for estimand in estimands_to_use:
             if historical:
                 data[f"results_{estimand}"] = np.nan
             results_column_names = [x for x in data.columns if x.startswith("results")]
@@ -96,7 +102,13 @@ class MockLiveDataHandler(object):
             if f"results_{estimand}" not in results_column_names:
                 raise MockLiveDataHandlerException("This is missing results data for estimand: ", estimand)
             columns_to_return.append(f"results_{estimand}")
+        if 'margin' in estimands:
+            data['results_margin'] = data.results_dem - data.results_gop
+            # TODO: figure out what to do about the +1
+            data['normalized_margin'] = (data.results_dem - data.results_gop) / (data.results_dem + data.results_gop + 1)
+
         self.shuffle_dataframe = data[self.shuffle_columns].copy()
+
         return data[columns_to_return].copy()
 
     def shuffle(self, seed=None, upweight={}, enforce=[]):
@@ -160,7 +172,6 @@ class MockLiveDataHandler(object):
         expected_n = n - self.unexpected_rows
         self.data_reporting = self.data[:expected_n].copy()
         self.data_nonreporting = self.data[expected_n:].copy()
-
         for estimand in self.estimands:
             self.data_reporting[f"raw_results_{estimand}"] = self.data[f"results_{estimand}"]
             self.data_nonreporting[f"raw_results_{estimand}"] = self.data_nonreporting[f"results_{estimand}"]

@@ -68,7 +68,6 @@ class Featurizer(object):
                     cols_to_drop.append(f"{fixed_effect}_other")
                 else:
                     cols_to_drop.append(relevant_cols[0])
-
         # we concatenate the dummy variables with the original fixed effects, since we need the original fixed
         # effect columns for aggregation.
         return pd.concat([original_fixed_effect_columns, expanded_fixed_effects.drop(cols_to_drop, axis=1)], axis=1)
@@ -106,8 +105,9 @@ class Featurizer(object):
 
         # all features that the model will be fit on
         self.complete_features += self.features + self.expanded_fixed_effects
+        new_fitting_data = new_fitting_data[self.complete_features]
 
-        return new_fitting_data[self.complete_features]
+        return new_fitting_data
 
     def featurize_heldout_data(self, heldout_data):
         """
@@ -145,3 +145,7 @@ class Featurizer(object):
             new_heldout_data = new_heldout_data.join(missing_expanded_fixed_effects_df)
 
         return new_heldout_data[self.complete_features]
+
+    def get_all_strata(self, total_units):
+        strata = pd.get_dummies(total_units, columns=self.fixed_effect_cols, prefix=self.fixed_effect_cols, prefix_sep="_", dtype=np.int64)
+        return strata[[c for c in strata.columns if any(c.startswith(fixed_effect) for fixed_effect in self.fixed_effect_cols)]]
