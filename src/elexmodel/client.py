@@ -131,11 +131,11 @@ class ModelClient(object):
         y_input: list[str] = ["results_turnout"],
         K=5,
     ):
-        #print(list(data.columns))
+        # print(list(data.columns))
         average_MAPE_sum = 0
         best_lambda = None
-        best_MAPE = float('inf')
-        estimand = 'dem'
+        best_MAPE = float("inf")
+        estimand = "dem"
 
         # prepare data
         X = data[X_input]
@@ -157,17 +157,22 @@ class ModelClient(object):
                 weights = pd.DataFrame({"weights": [1 for element in range(len(X_train))]}).weights
 
                 df_y = pd.DataFrame(y_train)
-                df_X = pd.DataFrame(
-                {
-                    f"residuals_{estimand}": data['baseline_gop'],
-                    f"total_voters_{estimand}": data['baseline_dem'],
-                    f"last_election_results_{estimand}": data['last_election_results_dem'],
-                    f"results_{estimand}": data['results_dem'],
-                    f"{estimand}": data['results_turnout'],
-                }).fillna(0).head(len(X_train))
+                df_X = (
+                    pd.DataFrame(
+                        {
+                            f"residuals_{estimand}": data["baseline_gop"],
+                            f"total_voters_{estimand}": data["baseline_dem"],
+                            f"last_election_results_{estimand}": data["last_election_results_dem"],
+                            f"results_{estimand}": data["results_dem"],
+                            f"{estimand}": data["results_turnout"],
+                        }
+                    )
+                    .fillna(0)
+                    .head(len(X_train))
+                )
 
                 model.fit_model(qr, df_X, df_y.squeeze(), 0.5, weights, False)
-                y_pred = model.get_unit_predictions(X_test, y_test, estimand = estimand)
+                y_pred = model.get_unit_predictions(X_test, y_test, estimand=estimand)
 
                 MAPE = mean_absolute_percentage_error(y_test, y_pred)
                 MAPE_scores.append(MAPE)
