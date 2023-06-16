@@ -18,7 +18,6 @@ from elexmodel.models.NonparametricElectionModel import NonparametricElectionMod
 from elexmodel.utils.constants import AGGREGATE_ORDER, VALID_AGGREGATES_MAPPING
 from elexmodel.utils.file_utils import APP_ENV, S3_FILE_PATH, TARGET_BUCKET
 from elexmodel.utils.math_utils import compute_error, compute_frac_within_pi, compute_mean_pi_length
-from sklearn.tree import DecisionTreeClassifier
 
 initialize_logging()
 
@@ -128,72 +127,53 @@ class ModelClient(object):
         data,
         model_settings,
         possible_lambda_values: list[float] = 0,
-        X_input: list[str] = ["gender_f", "median_household_income"],
-        y_input: list[str] = ["results_turnout"],
-        K=5,
+        features: list[str] = ["gender_f", "median_household_income"],
+        estimands=[],
+        K=3,
     ):
-        # print(list(data.columns)) #todo: remove
         average_MAPE_sum = 0
         best_lambda = None
         best_MAPE = float("inf")
-        estimand = "dem"
+        estimand = estimands[0]
 
-        # prepare data
-        X = data[X_input]
-        y = data[y_input]
+        kfold = KFold(n_splits=K, shuffle=True, random_state=1)
+        # get the data section indexes that we will be training/testing on
+        for train_index, test_index in kfold.split(data):
+            size = len(train_index)
+            data_set = data.iloc[train_index].reset_index(drop=True)
 
-        # for each lambda calculate the MAPE within each fold
-        for lam in possible_lambda_values:
-            MAPE_scores = []
-            kfold = KFold(n_splits=K, shuffle=True, random_state=1)
+            df_X = pd.DataFrame(
+                {
+                    f"total_voters_{estimand}": data_set[f"baseline_{estimand}"],
+                    f"last_election_results_{estimand}": data_set[f"last_election_results_{estimand}"],
+                    f"results_{estimand}": data_set[f"results_{estimand}"],
+                    f"residuals_{estimand}": data_set["results_gop"],
+                    "gender_f": data_set["gender_f"],
+                    "median_household_income": data_set["median_household_income"],
+                }
+            ).fillna(0)
 
-            # split data into train and test steps
-            for train, test in kfold.split(X):
-                X_train, X_test = X.iloc[train], X.iloc[test]
-                y_train, y_test = y.iloc[train], y.iloc[test]
+            df_y = pd.DataFrame(df_X[f"results_{estimand}"])
 
-                '''
-                model_settings = {"lambda_": lam, "features": X_input}
+            # loop through each lambda
+            for lam in possible_lambda_values:
+                # build model with custom lambda
+                model_settings = {"lambda_": lam, "features": features}
                 model = BaseElectionModel(model_settings=model_settings)
                 qr = QuantileRegressionSolver(solver="ECOS")
-                weights = pd.DataFrame({"weights": [1 for element in range(len(X_train))]}).weights
 
-                df_y = pd.DataFrame(y_train)
-                df_X = (
-                    pd.DataFrame(
-                        {
-                            f"residuals_{estimand}": (abs(data["results_dem"] - data["baseline_dem"])),
-                            f"total_voters_{estimand}": data["baseline_dem"],
-                            f"last_election_results_{estimand}": data["last_election_results_dem"],
-                            f"results_{estimand}": data["results_dem"],
-                            "gop": data["results_gop"],
-                        }
-                    )
-                    .fillna(0)
-                    .head(len(X_train))
-                )
-                print(df_X)  # todo: remove
+                weights = pd.DataFrame({"weights": [1 for element in range(size)]}).weights
 
-                model.fit_model(qr, df_X, df_y.squeeze(), 0.5, weights, False)
+                model.fit_model(qr, df_X, df_y.squeeze(), 0.5, weights, True)
                 y_pred = model.get_unit_predictions(df_X, df_X, estimand=estimand)
-                '''
 
-                model = DecisionTreeClassifier(max_depth=None)
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_test)
-
-                MAPE = mean_absolute_percentage_error(y_test, y_pred)
-                MAPE_scores.append(MAPE)
-
-            average_MAPE = np.mean(MAPE_scores)
-            average_MAPE_sum += average_MAPE
-
-            if average_MAPE < best_MAPE:
-                best_MAPE = average_MAPE
-                best_lambda = lam
+                MAPE = mean_absolute_percentage_error(df_y, y_pred)
+                average_MAPE_sum += MAPE
+                if MAPE < best_MAPE:
+                    best_MAPE = MAPE
+                    best_lambda = lam
 
         average_MAPE = average_MAPE_sum / len(possible_lambda_values)
-        # print(best_lambda) #todo: remove
         return best_lambda, average_MAPE
 
     def get_estimates(
@@ -302,7 +282,9 @@ class ModelClient(object):
 
         # get new lambda value from config
         test_lambdas = [0.05, 0.051, 0.049, 0.04, 0.06, 0.03, 0.055, 0.045, 0.075]
-        new_lambda_, avg_MAPE = self.compute_lambda(preprocessed_data, model_settings, test_lambdas)
+        new_lambda_, avg_MAPE = self.compute_lambda(
+            preprocessed_data, model_settings, test_lambdas, estimands=estimands
+        )
         model_settings = {"lambda_": new_lambda_}
 
         LOG.info(
