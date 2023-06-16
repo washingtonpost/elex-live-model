@@ -126,12 +126,13 @@ class ModelClient(object):
         self,
         data,
         model_settings,
-        possible_lambda_values: list[float] = 0,
+        possible_lambda_values: list[float] = [0],
         features: list[str] = ["gender_f", "median_household_income"],
         estimands=["dem"],
         K=3,
     ):
         average_MAPE_sum = 0
+        counter = 0
         best_lambda = None
         best_MAPE = float("inf")
         estimand = estimands[0]
@@ -140,20 +141,33 @@ class ModelClient(object):
         # get the data section indexes that we will be training/testing on
         for train_index, test_index in kfold.split(data):
             size = len(train_index)
-            data_set = data.iloc[train_index].reset_index(drop=True)
 
-            df_X = pd.DataFrame(
+            X_train = data.iloc[train_index].reset_index(drop=True)
+            df_X_train = pd.DataFrame(
                 {
-                    f"total_voters_{estimand}": data_set[f"baseline_{estimand}"],
-                    f"last_election_results_{estimand}": data_set[f"last_election_results_{estimand}"],
-                    f"results_{estimand}": data_set[f"results_{estimand}"],
-                    f"residuals_{estimand}": abs(data_set[f"results_{estimand}"] - data_set[f"baseline_{estimand}"]),
-                    "gender_f": data_set["gender_f"],
-                    "median_household_income": data_set["median_household_income"],
+                    f"total_voters_{estimand}": X_train[f"baseline_{estimand}"],
+                    f"last_election_results_{estimand}": X_train[f"last_election_results_{estimand}"],
+                    f"results_{estimand}": X_train[f"results_{estimand}"],
+                    f"residuals_{estimand}": abs(X_train[f"results_{estimand}"] - X_train[f"baseline_{estimand}"]),
+                    "gender_f": X_train["gender_f"],
+                    "median_household_income": X_train["median_household_income"],
                 }
             ).fillna(0)
 
-            df_y = pd.DataFrame(df_X[f"results_{estimand}"])
+            X_test = data.iloc[test_index].reset_index(drop=True)
+            df_X_test = pd.DataFrame(
+                {
+                    f"total_voters_{estimand}": X_test[f"baseline_{estimand}"],
+                    f"last_election_results_{estimand}": X_test[f"last_election_results_{estimand}"],
+                    f"results_{estimand}": X_test[f"results_{estimand}"],
+                    f"residuals_{estimand}": abs(X_test[f"results_{estimand}"] - X_test[f"baseline_{estimand}"]),
+                    "gender_f": X_test["gender_f"],
+                    "median_household_income": X_test["median_household_income"],
+                }
+            ).fillna(0)
+
+            df_y_train = pd.DataFrame(df_X_train[f"results_{estimand}"])
+            df_y_test = pd.DataFrame(df_X_test[f"results_{estimand}"])
 
             # loop through each lambda
             for lam in possible_lambda_values:
@@ -161,19 +175,21 @@ class ModelClient(object):
                 model_settings = {"lambda_": lam, "features": features}
                 model = BaseElectionModel(model_settings=model_settings)
                 qr = QuantileRegressionSolver(solver="ECOS")
-
                 weights = pd.DataFrame({"weights": [1 for element in range(size)]}).weights
 
-                model.fit_model(qr, df_X, df_y.squeeze(), 0.5, weights, True)
-                y_pred = model.get_unit_predictions(df_X, df_X, estimand=estimand)
+                #fit model
+                model.fit_model(qr, df_X_train, df_y_train.squeeze(), 0.5, weights, True)
+                y_pred = model.get_unit_predictions(df_X_train, df_X_test, estimand=f"{estimand}")
+                MAPE = mean_absolute_percentage_error(df_y_test, y_pred)
 
-                MAPE = mean_absolute_percentage_error(df_y, y_pred)
+                #determine average and best
                 average_MAPE_sum += MAPE
+                counter += 1
                 if MAPE < best_MAPE:
                     best_MAPE = MAPE
                     best_lambda = lam
 
-        average_MAPE = average_MAPE_sum / len(possible_lambda_values)
+        average_MAPE = average_MAPE_sum / counter
         return best_lambda, average_MAPE
 
     def get_estimates(
@@ -285,6 +301,8 @@ class ModelClient(object):
         new_lambda_, avg_MAPE = self.compute_lambda(
             preprocessed_data, model_settings, test_lambdas, estimands=estimands
         )
+        print(new_lambda_)
+        print(avg_MAPE)
         model_settings = {"lambda_": new_lambda_}
 
         LOG.info(
