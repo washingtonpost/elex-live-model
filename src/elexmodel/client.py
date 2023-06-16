@@ -18,6 +18,7 @@ from elexmodel.models.NonparametricElectionModel import NonparametricElectionMod
 from elexmodel.utils.constants import AGGREGATE_ORDER, VALID_AGGREGATES_MAPPING
 from elexmodel.utils.file_utils import APP_ENV, S3_FILE_PATH, TARGET_BUCKET
 from elexmodel.utils.math_utils import compute_error, compute_frac_within_pi, compute_mean_pi_length
+from sklearn.tree import DecisionTreeClassifier
 
 initialize_logging()
 
@@ -131,7 +132,7 @@ class ModelClient(object):
         y_input: list[str] = ["results_turnout"],
         K=5,
     ):
-        # print(list(data.columns))
+        # print(list(data.columns)) #todo: remove
         average_MAPE_sum = 0
         best_lambda = None
         best_MAPE = float("inf")
@@ -151,6 +152,7 @@ class ModelClient(object):
                 X_train, X_test = X.iloc[train], X.iloc[test]
                 y_train, y_test = y.iloc[train], y.iloc[test]
 
+                '''
                 model_settings = {"lambda_": lam, "features": X_input}
                 model = BaseElectionModel(model_settings=model_settings)
                 qr = QuantileRegressionSolver(solver="ECOS")
@@ -160,19 +162,25 @@ class ModelClient(object):
                 df_X = (
                     pd.DataFrame(
                         {
-                            f"residuals_{estimand}": data["baseline_gop"],
+                            f"residuals_{estimand}": (abs(data["results_dem"] - data["baseline_dem"])),
                             f"total_voters_{estimand}": data["baseline_dem"],
                             f"last_election_results_{estimand}": data["last_election_results_dem"],
                             f"results_{estimand}": data["results_dem"],
-                            f"{estimand}": data["results_turnout"],
+                            "gop": data["results_gop"],
                         }
                     )
                     .fillna(0)
                     .head(len(X_train))
                 )
+                print(df_X)  # todo: remove
 
                 model.fit_model(qr, df_X, df_y.squeeze(), 0.5, weights, False)
-                y_pred = model.get_unit_predictions(X_test, y_test, estimand=estimand)
+                y_pred = model.get_unit_predictions(df_X, df_X, estimand=estimand)
+                '''
+
+                model = DecisionTreeClassifier(max_depth=None)
+                model.fit(X_train, y_train)
+                y_pred = model.predict(X_test)
 
                 MAPE = mean_absolute_percentage_error(y_test, y_pred)
                 MAPE_scores.append(MAPE)
@@ -185,6 +193,7 @@ class ModelClient(object):
                 best_lambda = lam
 
         average_MAPE = average_MAPE_sum / len(possible_lambda_values)
+        # print(best_lambda) #todo: remove
         return best_lambda, average_MAPE
 
     def get_estimates(
