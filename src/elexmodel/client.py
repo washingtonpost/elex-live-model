@@ -5,7 +5,6 @@ import pandas as pd
 from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
 from sklearn.metrics import mean_absolute_percentage_error
 from sklearn.model_selection import KFold
-from sklearn.tree import DecisionTreeClassifier
 
 from elexmodel.handlers import s3
 from elexmodel.handlers.config import ConfigHandler
@@ -132,8 +131,7 @@ class ModelClient(object):
         y_input: list[str] = ["results_turnout"],
         K=5,
     ):
-        print(list(data.columns))
-
+        #print(list(data.columns))
         average_MAPE_sum = 0
         best_lambda = None
         best_MAPE = float('inf')
@@ -153,30 +151,23 @@ class ModelClient(object):
                 X_train, X_test = X.iloc[train], X.iloc[test]
                 y_train, y_test = y.iloc[train], y.iloc[test]
 
-                model_settings = {"lambda_": lam}
-                model2 = BaseElectionModel(model_settings=model_settings)
+                model_settings = {"lambda_": lam, "features": X_input}
+                model = BaseElectionModel(model_settings=model_settings)
                 qr = QuantileRegressionSolver(solver="ECOS")
                 weights = pd.DataFrame({"weights": [1 for element in range(len(X_train))]}).weights
 
+                df_y = pd.DataFrame(y_train)
                 df_X = pd.DataFrame(
                 {
-                    f"residuals_{estimand}": data['baseline_dem'],
-                    f"total_voters_{estimand}": data['total_gen_voters'],
+                    f"residuals_{estimand}": data['baseline_gop'],
+                    f"total_voters_{estimand}": data['baseline_dem'],
                     f"last_election_results_{estimand}": data['last_election_results_dem'],
-                    f"results_{estimand}": data['results_gop'],
-                    f"{estimand}": data['results_dem'],
-                }).fillna(0)
+                    f"results_{estimand}": data['results_dem'],
+                    f"{estimand}": data['results_turnout'],
+                }).fillna(0).head(len(X_train))
 
-                print(df_X.shape)
-
-                #df_X = pd.DataFrame(X_train)
-                df_y = pd.DataFrame(y_train)
-                model2.fit_model(qr, df_X, df_y.squeeze(), 0.5, weights, False)
-                y_pred = model2.get_unit_predictions(X_test, y_test, estimand = estimand)
-                
-                model = DecisionTreeClassifier(max_depth=None)
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_test)
+                model.fit_model(qr, df_X, df_y.squeeze(), 0.5, weights, False)
+                y_pred = model.get_unit_predictions(X_test, y_test, estimand = estimand)
 
                 MAPE = mean_absolute_percentage_error(y_test, y_pred)
                 MAPE_scores.append(MAPE)
