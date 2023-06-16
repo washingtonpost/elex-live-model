@@ -147,7 +147,7 @@ class ModelClient(object):
                     f"total_voters_{estimand}": data_set[f"baseline_{estimand}"],
                     f"last_election_results_{estimand}": data_set[f"last_election_results_{estimand}"],
                     f"results_{estimand}": data_set[f"results_{estimand}"],
-                    f"residuals_{estimand}": abs(data_set[f"results_{estimand}"]-data_set[f"baseline_{estimand}"]),
+                    f"residuals_{estimand}": abs(data_set[f"results_{estimand}"] - data_set[f"baseline_{estimand}"]),
                     "gender_f": data_set["gender_f"],
                     "median_household_income": data_set["median_household_income"],
                 }
