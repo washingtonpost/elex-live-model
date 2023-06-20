@@ -95,6 +95,8 @@ class ModelClient(object):
         if not isinstance(robust, bool):
             raise ValueError("robust is not valid. Has to be a boolean.")
         if not isinstance(lambda_, list):
+            raise ValueError("lambda is not valid. It has to be a list.")
+        if not all(isinstance(e, (int, float)) for e in lambda_) and len(lambda_) > 0:
             raise ValueError("lambda is not valid. It has to be a list of numbers.")
         if len(lambda_) < 0:
             raise ValueError("lambda is not valid. It has to be greater than zero.")

@@ -293,6 +293,68 @@ def test_check_input_parameters_handle_unreporting(model_client, va_governor_con
         )
 
 
+def test_check_input_parameters_lambda_empty(model_client, va_governor_config):
+    election_id = "2017-11-07_VA_G"
+    config_handler = ConfigHandler(election_id, config=va_governor_config)
+
+    assert model_client._check_input_parameters(
+        config_handler,
+        office,
+        estimands,
+        geographic_unit_type,
+        features,
+        aggregates,
+        fixed_effects,
+        pi_method,
+        beta,
+        robust,
+        [],
+        handle_unreporting,
+    )
+
+
+def test_check_input_parameters_lambda_bad_values(model_client, va_governor_config):
+    election_id = "2017-11-07_VA_G"
+    config_handler = ConfigHandler(election_id, config=va_governor_config)
+
+    with pytest.raises(ValueError):
+        model_client._check_input_parameters(
+            config_handler,
+            office,
+            estimands,
+            geographic_unit_type,
+            features,
+            aggregates,
+            fixed_effects,
+            pi_method,
+            beta,
+            robust,
+            ["bad_lambda"],
+            handle_unreporting,
+        )
+
+
+def test_check_input_parameters_lambda_bad_type(model_client, va_governor_config):
+    election_id = "2017-11-07_VA_G"
+    config_handler = ConfigHandler(election_id, config=va_governor_config)
+
+    with pytest.raises(ValueError):
+        model_client._check_input_parameters(
+            config_handler,
+            office,
+            estimands,
+            geographic_unit_type,
+            features,
+            aggregates,
+            fixed_effects,
+            pi_method,
+            beta,
+            robust,
+            "bad_lambda",
+            handle_unreporting,
+        )
+
+
 def test_compute_evaluation(historical_model_client):
     random_number_generator = np.random.RandomState(42)
     raw_results = random_number_generator.randint(low=0, high=10, size=6)
