@@ -126,7 +126,7 @@ class ModelClient(object):
         self,
         data,
         model_settings,
-        possible_lambda_values: list[float] = [],
+        possible_lambda_values=[],
         features: list[str] = [],
         estimands: list[str] = [],
         K=3,
