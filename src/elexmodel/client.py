@@ -126,14 +126,14 @@ class ModelClient(object):
         self,
         data,
         model_settings,
-        possible_lambda_values: list[float] = [0],
+        possible_lambda_values: list[float] = [],
         features: list[str] = [],
         estimands: list[str] = [],
         K=3,
     ):
-        if len(features) == 0 or len(estimands) == 0:
+        if len(features) == 0 or len(estimands) == 0 or len(possible_lambda_values) == 0:
             return 0, 0
-        
+
         average_MAPE_sum = 0
         counter = 0
         best_lambda = None
@@ -180,12 +180,12 @@ class ModelClient(object):
                 qr = QuantileRegressionSolver(solver="ECOS")
                 weights = pd.DataFrame({"weights": [1 for element in range(size)]}).weights
 
-                #fit model
+                # fit model
                 model.fit_model(qr, df_X_train, df_y_train.squeeze(), 0.5, weights, True)
                 y_pred = model.get_unit_predictions(df_X_train, df_X_test, estimand=f"{estimand}")
                 MAPE = mean_absolute_percentage_error(df_y_test, y_pred)
 
-                #determine average and best
+                # determine average and best
                 average_MAPE_sum += MAPE
                 counter += 1
                 if MAPE < best_MAPE:
@@ -300,13 +300,18 @@ class ModelClient(object):
         unexpected_units = data.get_unexpected_units(percent_reporting_threshold, aggregates)
 
         # get new lambda value from config
-        #test_lambdas = [0.05, 0.051, 0.049, 0.04, 0.06, 0.03, 0.055, 0.045, 0.075]
-        new_lambda_, avg_MAPE = self.compute_lambda(
-            preprocessed_data, model_settings, lambda_, estimands=estimands
-        )
-        print(new_lambda_)
-        print(avg_MAPE)
-        model_settings = {"lambda_": new_lambda_}
+        new_lambda_, avg_MAPE = self.compute_lambda(preprocessed_data, model_settings, lambda_, features, estimands)
+        model_settings = {
+            "election_id": election_id,
+            "office": office,
+            "geographic_unit_type": geographic_unit_type,
+            "beta": beta,
+            "robust": robust,
+            "lambda_": new_lambda_,
+            "features": features,
+            "fixed_effects": fixed_effects,
+            "save_conformalization": save_conformalization,
+        }
 
         LOG.info(
             "Model parameters: \n geographic_unit_type: %s, prediction intervals: %s, percent reporting threshold: %s, features: %s, pi_method: %s, aggregates: %s, fixed effects: %s, model settings: %s",
