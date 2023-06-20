@@ -127,8 +127,8 @@ class ModelClient(object):
         data,
         model_settings,
         possible_lambda_values=[],
-        features: list[str] = [],
-        estimands: list[str] = [],
+        features=[],
+        estimands=[],
         K=3,
     ):
         if len(features) == 0 or len(estimands) == 0 or len(possible_lambda_values) == 0:
