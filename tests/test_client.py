@@ -17,7 +17,7 @@ fixed_effects = []
 pi_method = "gaussian"
 beta = 3
 robust = True
-lambda_ = 0
+lambda_ = [0.05, 0.051, 0.049, 0.04, 0.06, 0.03, 0.055, 0.045, 0.075, 0.0]
 handle_unreporting = "drop"
 
 

@@ -94,9 +94,9 @@ class ModelClient(object):
             raise ValueError("beta is not valid. Has to be either an integer or a float.")
         if not isinstance(robust, bool):
             raise ValueError("robust is not valid. Has to be a boolean.")
-        if not (isinstance(lambda_, float) or isinstance(lambda_, int)):
-            raise ValueError("lambda is not valid. It has to be numeric.")
-        if lambda_ < 0:
+        if not isinstance(lambda_, list):
+            raise ValueError("lambda is not valid. It has to be a list of numbers.")
+        if len(lambda_) < 0:
             raise ValueError("lambda is not valid. It has to be greater than zero.")
         if handle_unreporting not in {"drop", "zero"}:
             raise ValueError("handle_unreporting must be either `drop` or `zero`")
@@ -127,10 +127,13 @@ class ModelClient(object):
         data,
         model_settings,
         possible_lambda_values: list[float] = [0],
-        features: list[str] = ["gender_f", "median_household_income"],
-        estimands=["dem"],
+        features: list[str] = [],
+        estimands: list[str] = [],
         K=3,
     ):
+        if len(features) == 0 or len(estimands) == 0:
+            return 0, 0
+        
         average_MAPE_sum = 0
         counter = 0
         best_lambda = None
@@ -221,7 +224,7 @@ class ModelClient(object):
         pi_method = kwargs.get("pi_method", "nonparametric")
         beta = kwargs.get("beta", 1)
         robust = kwargs.get("robust", False)
-        lambda_ = kwargs.get("lambda_", 0)
+        lambda_ = kwargs.get("lambda_", [])
         save_output = kwargs.get("save_output", ["results"])
         save_results = "results" in save_output
         save_data = "data" in save_output
@@ -297,9 +300,9 @@ class ModelClient(object):
         unexpected_units = data.get_unexpected_units(percent_reporting_threshold, aggregates)
 
         # get new lambda value from config
-        test_lambdas = [0.05, 0.051, 0.049, 0.04, 0.06, 0.03, 0.055, 0.045, 0.075]
+        #test_lambdas = [0.05, 0.051, 0.049, 0.04, 0.06, 0.03, 0.055, 0.045, 0.075]
         new_lambda_, avg_MAPE = self.compute_lambda(
-            preprocessed_data, model_settings, test_lambdas, estimands=estimands
+            preprocessed_data, model_settings, lambda_, estimands=estimands
         )
         print(new_lambda_)
         print(avg_MAPE)
