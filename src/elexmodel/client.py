@@ -2,9 +2,6 @@ import logging
 
 import numpy as np
 import pandas as pd
-from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
-from sklearn.metrics import mean_absolute_percentage_error
-from sklearn.model_selection import KFold
 
 from elexmodel.handlers import s3
 from elexmodel.handlers.config import ConfigHandler
@@ -12,7 +9,6 @@ from elexmodel.handlers.data.CombinedData import CombinedDataHandler
 from elexmodel.handlers.data.ModelResults import ModelResultsHandler
 from elexmodel.handlers.data.PreprocessedData import PreprocessedDataHandler
 from elexmodel.logging import initialize_logging
-from elexmodel.models.BaseElectionModel import BaseElectionModel
 from elexmodel.models.GaussianElectionModel import GaussianElectionModel
 from elexmodel.models.NonparametricElectionModel import NonparametricElectionModel
 from elexmodel.utils.constants import AGGREGATE_ORDER, VALID_AGGREGATES_MAPPING
@@ -124,79 +120,6 @@ class ModelClient(object):
         """
         return self.all_conformalization_data_agg_dict
 
-    def compute_lambda(
-        self,
-        data,
-        model_settings,
-        possible_lambda_values=[],
-        features=[],
-        estimands=[],
-        K=3,
-    ):
-        if len(features) == 0 or len(estimands) == 0 or len(possible_lambda_values) == 0:
-            return 0, 0
-
-        average_MAPE_sum = 0
-        counter = 0
-        best_lambda = None
-        best_MAPE = float("inf")
-        estimand = estimands[0]
-
-        kfold = KFold(n_splits=K, shuffle=True, random_state=1)
-        # get the data section indexes that we will be training/testing on
-        for train_index, test_index in kfold.split(data):
-            size = len(train_index)
-
-            X_train = data.iloc[train_index].reset_index(drop=True)
-            df_X_train = pd.DataFrame(
-                {
-                    f"total_voters_{estimand}": X_train[f"baseline_{estimand}"],
-                    f"last_election_results_{estimand}": X_train[f"last_election_results_{estimand}"],
-                    f"results_{estimand}": X_train[f"results_{estimand}"],
-                    f"residuals_{estimand}": abs(X_train[f"results_{estimand}"] - X_train[f"baseline_{estimand}"]),
-                    "gender_f": X_train["gender_f"],
-                    "median_household_income": X_train["median_household_income"],
-                }
-            ).fillna(0)
-
-            X_test = data.iloc[test_index].reset_index(drop=True)
-            df_X_test = pd.DataFrame(
-                {
-                    f"total_voters_{estimand}": X_test[f"baseline_{estimand}"],
-                    f"last_election_results_{estimand}": X_test[f"last_election_results_{estimand}"],
-                    f"results_{estimand}": X_test[f"results_{estimand}"],
-                    f"residuals_{estimand}": abs(X_test[f"results_{estimand}"] - X_test[f"baseline_{estimand}"]),
-                    "gender_f": X_test["gender_f"],
-                    "median_household_income": X_test["median_household_income"],
-                }
-            ).fillna(0)
-
-            df_y_train = pd.DataFrame(df_X_train[f"results_{estimand}"])
-            df_y_test = pd.DataFrame(df_X_test[f"results_{estimand}"])
-
-            # loop through each lambda
-            for lam in possible_lambda_values:
-                # build model with custom lambda
-                model_settings = {"lambda_": lam, "features": features}
-                model = BaseElectionModel(model_settings=model_settings)
-                qr = QuantileRegressionSolver(solver="ECOS")
-                weights = pd.DataFrame({"weights": [1 for element in range(size)]}).weights
-
-                # fit model
-                model.fit_model(qr, df_X_train, df_y_train.squeeze(), 0.5, weights, True)
-                y_pred = model.get_unit_predictions(df_X_train, df_X_test, estimand=f"{estimand}")
-                MAPE = mean_absolute_percentage_error(df_y_test, y_pred)
-
-                # determine average and best
-                average_MAPE_sum += MAPE
-                counter += 1
-                if MAPE < best_MAPE:
-                    best_MAPE = MAPE
-                    best_lambda = lam
-
-        average_MAPE = average_MAPE_sum / counter
-        return best_lambda, average_MAPE
-
     def get_estimates(
         self,
         current_data,  # list of lists
@@ -226,7 +149,7 @@ class ModelClient(object):
         pi_method = kwargs.get("pi_method", "nonparametric")
         beta = kwargs.get("beta", 1)
         robust = kwargs.get("robust", False)
-        lambda_ = kwargs.get("lambda_", [])
+        lambda_ = kwargs.get("lambda_", [0])
         save_output = kwargs.get("save_output", ["results"])
         save_results = "results" in save_output
         save_data = "data" in save_output
@@ -240,7 +163,7 @@ class ModelClient(object):
             "geographic_unit_type": geographic_unit_type,
             "beta": beta,
             "robust": robust,
-            "lambda_": lambda_,
+            "lambda_": lambda_[0],
             "features": features,
             "fixed_effects": fixed_effects,
             "save_conformalization": save_conformalization,
@@ -300,20 +223,6 @@ class ModelClient(object):
             percent_reporting_threshold, features_to_normalize=features, add_intercept=True
         )
         unexpected_units = data.get_unexpected_units(percent_reporting_threshold, aggregates)
-
-        # get new lambda value from config
-        new_lambda_, avg_MAPE = self.compute_lambda(preprocessed_data, model_settings, lambda_, features, estimands)
-        model_settings = {
-            "election_id": election_id,
-            "office": office,
-            "geographic_unit_type": geographic_unit_type,
-            "beta": beta,
-            "robust": robust,
-            "lambda_": new_lambda_,
-            "features": features,
-            "fixed_effects": fixed_effects,
-            "save_conformalization": save_conformalization,
-        }
 
         LOG.info(
             "Model parameters: \n geographic_unit_type: %s, prediction intervals: %s, percent reporting threshold: %s, features: %s, pi_method: %s, aggregates: %s, fixed effects: %s, model settings: %s",
