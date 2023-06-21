@@ -107,7 +107,9 @@ class BootstrapElectionModel(BaseElectionModel):
         z_train_pred = ols_z.predict(x_train)
 
         residuals_y = ols_y.residuals(y_train, y_train_pred, loo=True, center=True)
+        print(ols_y.beta_hat)
         residuals_z = ols_z.residuals(z_train, z_train_pred, loo=True, center=True)
+        print(ols_z.beta_hat)
 
         taus_lower = np.arange(0.01, 0.5, 0.01)
         taus_upper = np.arange(0.50, 1, 0.01)
@@ -169,11 +171,13 @@ class BootstrapElectionModel(BaseElectionModel):
             unifs_z[np.isclose(unifs_z, 0)] = np.min(taus)            
 
             unifs_strata = np.concatenate([unifs_y, unifs_z], axis=1)
+            # unifs_strata = unifs_y
 
             unifs.append(unifs_strata)
         unifs = np.concatenate(unifs, axis=0)
 
         unifs_B = self.rng.choice(unifs, (n, self.B), replace=True)
+        # unifs_B = self.rng.choice(unifs.flatten(), (n, self.B), replace=True)
 
         residuals_y_B = np.zeros((n, self.B))
         residuals_z_B = np.zeros((n, self.B))
@@ -183,62 +187,32 @@ class BootstrapElectionModel(BaseElectionModel):
             unifs_strata = unifs_B[strata_indices]
             residuals_y_B[strata_indices] = stratum_ppfs_y[tuple(strata_dummies)](unifs_strata[:,:,0])
             residuals_z_B[strata_indices] = stratum_ppfs_z[tuple(strata_dummies)](unifs_strata[:,:,1])
-
+            # residuals_y_B[strata_indices] = stratum_ppfs_y[tuple(strata_dummies)](unifs_strata)
         y_B = y_train_pred + residuals_y_B
         z_B = z_train_pred + residuals_z_B
         ols_y_B = OLSRegression().fit(x_train, y_B, weights_train, normal_eqs=ols_y.normal_eqs)
         ols_z_B = OLSRegression().fit(x_train, z_B, weights_train, normal_eqs=ols_z.normal_eqs)
         
+        # y_test_pred_B = ols_y_B.predict(x_test)
         yz_test_pred_B = ols_y_B.predict(x_test) * ols_z_B.predict(x_test)
         
         y_test_pred = ols_y.predict(x_test)
         z_test_pred = ols_z.predict(x_test)
         yz_test_pred = y_test_pred * z_test_pred
 
-        test_unifs = self.rng.uniform(low=0, high=1, size=(n_test, self.B, 2))
         # sample uniforms for each outstanding state and outstanding stratum in state
-        groups_test = nonreporting_units[['postal_code', 'county_classification']].values.astype(str)
+        groups_test = nonreporting_units[['postal_code']].values.astype(str)
         unique_groups = np.unique(groups_test, axis=0)
         test_unifs_groups = self.rng.uniform(low=0, high=1, size=(len(unique_groups), self.B, 2))
+        # test_unifs_groups = self.rng.uniform(low=0, high=1, size=(len(unique_groups), self.B))
 
         # for each row in groups_test, fetch the index of the matching row in unique_groups
-        # matching_groups is the answer to ^this problem
-        # matching_groups.shape = (groups_test.shape[0], ) 
+        # matching_groups is the answer to ^this problem: matching_groups.shape = (groups_test.shape[0], ) 
         matching_groups = np.where((unique_groups == groups_test[:, None]).all(axis=-1))[1]
 
         # naive perfect correlation matching is below
         test_unifs = test_unifs_groups[matching_groups]  
-        '''
-        # inside each matching group sample perturbations to the uniform with replacement from a matching
-        # group in the training unifs 
-        groups_train = reporting_units[['postal_code', 'county_classification']].values.astype(str)
-        matched_test_groups, matched_train_indices = np.where((groups_train == unique_groups[:, None]).all(axis=-1))
-        # Create an argsort index
-        sort_index = np.argsort(matched_test_groups)
-        sorted_matched_test_groups = matched_test_groups[sort_index]
-        sorted_matched_train_indices = matched_train_indices[sort_index]
 
-        # Find split points
-        _, idx = np.unique(sorted_matched_test_groups, return_index=True)
-
-        # Use np.split to split array2 into subarrays whenever the value in array1 changes
-        matched_test_groups = np.unique(matched_test_groups)
-        groups_train_chunk_indices = np.split(sorted_matched_train_indices, idx[1:])
-
-
-        # now get all pairwise differences of uniforms within each chunk
-        for test_group, group_train_indices in zip(matched_test_groups, groups_train_chunk_indices):
-            if len(group_train_indices) < 5:
-                continue
-            unifs_group = unifs[group_train_indices] # shape: (k, 2)
-            unifs_group_norm = norm.ppf(unifs_group)
-            test_unif_deltas_norm = np.unique((unifs_group_norm[:, None, :] - unifs_group_norm[None, :, :]).reshape(-1, 2))
-
-            matching_test_indices = (matching_groups == test_group)
-            resampled_deltas_norm = self.rng.choice(test_unif_deltas_norm, size=(matching_test_indices.sum(), self.B, 2), replace=True)
-            perturbed_norm = norm.ppf(test_unifs[matching_test_indices]) + resampled_deltas_norm
-            test_unifs[matching_test_indices] = norm.cdf(perturbed_norm)
-        '''
         test_residuals_y = np.zeros((n_test, self.B))
         test_residuals_z = np.zeros((n_test, self.B))
 
@@ -248,17 +222,21 @@ class BootstrapElectionModel(BaseElectionModel):
             unifs_strata = test_unifs[strata_indices]
             test_residuals_y[strata_indices] = stratum_ppfs_y[tuple(strata_dummies)](unifs_strata[:,:,0])
             test_residuals_z[strata_indices] = stratum_ppfs_z[tuple(strata_dummies)](unifs_strata[:,:,1])
+            # test_residuals_y[strata_indices] = stratum_ppfs_y[tuple(strata_dummies)](unifs_strata)
 
         self.errors_B_1 = yz_test_pred_B * weights_test
+        # self.errors_B_1 = y_test_pred_B * weights_test
 
         errors_B_2 = test_residuals_z * y_test_pred
         errors_B_2 += test_residuals_y * z_test_pred
         errors_B_2 += test_residuals_y * test_residuals_z
         errors_B_2 += yz_test_pred
+        # errors_B_2 = y_test_pred + test_residuals_y # did we previously forget this?
 
         self.errors_B_2 = errors_B_2 * weights_test
 
         self.weighted_yz_test_pred = yz_test_pred * weights_test
+        # self.weighted_y_test_pred = y_test_pred * weights_test
 
         self.ran_bootstrap = True
 
@@ -266,7 +244,8 @@ class BootstrapElectionModel(BaseElectionModel):
         if not self.ran_bootstrap:
             self.compute_bootstrap_errors(reporting_units, nonreporting_units)
         return self.weighted_yz_test_pred
-    
+        # return self.weighted_y_test_pred
+
     def get_unit_prediction_intervals(self, reporting_units, non_reporting_units, alpha, estimand):
         errors_B = self.errors_B_1 - self.errors_B_2
 
@@ -276,6 +255,8 @@ class BootstrapElectionModel(BaseElectionModel):
         upper_q = np.ceil(upper_alpha * (self.B - 1)) / self.B
 
         interval_upper, interval_lower = (self.weighted_yz_test_pred - np.quantile(errors_B, q=[lower_q, upper_q], axis=-1).T).T
+        # interval_upper, interval_lower = (self.weighted_y_test_pred - np.quantile(errors_B, q=[lower_q, upper_q], axis=-1).T).T
+
         interval_upper = interval_upper.reshape(-1,1)
         interval_lower = interval_lower.reshape(-1,1)
 
@@ -301,6 +282,7 @@ class BootstrapElectionModel(BaseElectionModel):
         aggregate_indicator_unexpected = aggregate_indicator[(n + m):]
         margin_unexpected = unexpected_units['results_margin'].values.reshape(-1,1)
         aggregate_yz_unexpected = aggregate_indicator_unexpected.T @ margin_unexpected
+        # aggregate_y_unexpected = aggregate_indicator_unexpected.T @ margin_unexpected
 
         aggregate_indicator_train = aggregate_indicator_expected[:n]
         aggregate_indicator_test = aggregate_indicator_expected[n:]
@@ -310,12 +292,17 @@ class BootstrapElectionModel(BaseElectionModel):
 
         yz_train = y_train * z_train
         aggregate_yz_train = aggregate_indicator_train.T @ (weights_train * yz_train)
+        # aggregate_y_train = aggregate_indicator_train.T @ (weights_train * y_train)
 
         aggregate_yz_test_B = aggregate_yz_train + aggregate_indicator_test.T @ self.errors_B_1
         aggregate_yz_test_pred = aggregate_yz_train + aggregate_indicator_test.T @ self.errors_B_2
+        # aggregate_y_test_B = aggregate_y_train + aggregate_indicator_test.T @ self.errors_B_1
+        # aggregate_y_test_pred = aggregate_y_train + aggregate_indicator_test.T @ self.errors_B_2
 
         aggregate_error_B_1 = aggregate_yz_test_B
         aggregate_error_B_2 = aggregate_yz_test_pred
+        # aggregate_error_B_1 = aggregate_y_test_B
+        # aggregate_error_B_2 = aggregate_y_test_pred
 
         aggregate_error_B = aggregate_error_B_1 - aggregate_error_B_2
 
@@ -325,9 +312,11 @@ class BootstrapElectionModel(BaseElectionModel):
         upper_q = np.ceil(upper_alpha * (self.B - 1)) / self.B
 
         aggregate_yz_total = aggregate_yz_unexpected + aggregate_yz_train + aggregate_indicator_test.T @ self.weighted_yz_test_pred
+        # aggregate_y_total = aggregate_y_unexpected + aggregate_y_train + aggregate_indicator_test.T @ self.weighted_y_test_pred
         
         interval_upper, interval_lower = (
             aggregate_yz_total - # move into y space from residual space
+            # aggregate_y_total -
             np.quantile(
                 aggregate_error_B, 
                 q=[lower_q, upper_q],
