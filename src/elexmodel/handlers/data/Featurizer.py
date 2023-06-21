@@ -22,6 +22,7 @@ class Featurizer(object):
                     self.fixed_effect_params[fe] = params
 
         self.expanded_fixed_effects = []
+        self.expanded_fixed_effects_cols = []
         self.complete_features = None
         self.column_means = None
 
@@ -106,6 +107,8 @@ class Featurizer(object):
         # all features that the model will be fit on
         self.complete_features += self.features + self.expanded_fixed_effects
         new_fitting_data = new_fitting_data[self.complete_features]
+        
+        self.expanded_fixed_effects_cols = [new_fitting_data.columns.get_loc(c) for c in self.expanded_fixed_effects]
 
         return new_fitting_data
 
@@ -145,7 +148,3 @@ class Featurizer(object):
             new_heldout_data = new_heldout_data.join(missing_expanded_fixed_effects_df)
 
         return new_heldout_data[self.complete_features]
-
-    def get_all_strata(self, total_units):
-        strata = pd.get_dummies(total_units, columns=self.fixed_effect_cols, prefix=self.fixed_effect_cols, prefix_sep="_", dtype=np.int64)
-        return strata[[c for c in strata.columns if any(c.startswith(fixed_effect) for fixed_effect in self.fixed_effect_cols)]]
