@@ -31,7 +31,7 @@ class BaseElectionModel(object):
         self.seed = 4191  # set arbitrarily
         self.estimands = model_settings.get("estimands", [])
 
-    def fit_model(self, model, df_X, df_y, tau, weights, normalize_weights, testing = False):
+    def fit_model(self, model, df_X, df_y, tau, weights, normalize_weights, testing=False):
         """
         Fits the quantile regression for the model
         """
@@ -45,11 +45,13 @@ class BaseElectionModel(object):
         else:
             raise ValueError("Unsupported data type for weights")
 
-        if (not testing):
+        if not testing:
             # get optimal lambda value
-            new_lambda, avg_MAPE = self.compute_lambda(df_X, df_y, weights, self.lambda_, self.features, self.estimands, self.fixed_effects)
+            new_lambda, avg_MAPE = self.compute_lambda(
+                df_X, df_y, weights, self.lambda_, self.features, self.estimands, self.fixed_effects
+            )
             self.lambda_ = new_lambda
-        
+
         # normalizing weights speed up solution by a lot. However, if the relative size
         # of the smallest weight is too close to zero, it can lead to numerical instability
         # where the solver either throws a warning for inaccurate solution or breaks entirely
@@ -67,8 +69,8 @@ class BaseElectionModel(object):
         except (UserWarning, cvxpy.error.SolverError):
             LOG.warning("Warning: solution was inaccurate or solver broke. Re-running with normalize_weights=False.")
             model.fit(X, y, tau_value=tau, weights=weights, lambda_=self.lambda_[0], normalize_weights=False)
-                
-    def get_unit_predictions(self, reporting_units, nonreporting_units, estimand, testing = False):
+
+    def get_unit_predictions(self, reporting_units, nonreporting_units, estimand, testing=False):
         """
         Produces unit level predictions. Fits quantile regression to reporting data, applies
         it to nonreporting data. The features are specified in model_settings.
@@ -86,7 +88,9 @@ class BaseElectionModel(object):
         weights = reporting_units[f"last_election_results_{estimand}"]
         reporting_units_residuals = reporting_units[f"residuals_{estimand}"]
 
-        self.fit_model(self.qr, reporting_units_features, reporting_units_residuals, 0.5, weights, True, testing = testing)
+        self.fit_model(
+            self.qr, reporting_units_features, reporting_units_residuals, 0.5, weights, True, testing=testing
+        )
         self.features_to_coefficients = dict(zip(self.featurizer.complete_features, self.qr.coefficients))
 
         preds = self.qr.predict(nonreporting_units_features)
@@ -289,8 +293,8 @@ class BaseElectionModel(object):
         estimands=[],
         fixed_effects=[],
         K=3,
-        estimand_choice = 0,
-        features_choice = 0,
+        estimand_choice=0,
+        features_choice=0,
     ):
         if len(features) == 0 or len(estimands) == 0 or len(possible_lambda_values) == 0:
             return 0, 0
@@ -333,13 +337,12 @@ class BaseElectionModel(object):
             df_y_train = df_y.iloc[train_index].reset_index(drop=True)
             df_y_test = df_y.iloc[test_index].reset_index(drop=True)
 
-            if (type(df_y_train) != pd.core.series.Series):
+            if type(df_y_train) != pd.core.series.Series:
                 df_y_train = df_y_train.squeeze()
-            if (type(df_y_test) != pd.core.series.Series):
+            if type(df_y_test) != pd.core.series.Series:
                 df_y_test = df_y_test.squeeze()
 
             weights = np.ones(len(df_X_train))
-
 
             # loop through each lambda
             index = 0
@@ -348,7 +351,7 @@ class BaseElectionModel(object):
                 self.lambda_ = lam
                 # fit model
                 self.fit_model(self.qr, df_X_train, df_y_train, 0.5, weights, True, testing=True)
-                y_pred = self.get_unit_predictions(df_X_train, df_X_test, estimand=f"{estimand}", testing = True)
+                y_pred = self.get_unit_predictions(df_X_train, df_X_test, estimand=f"{estimand}", testing=True)
                 MAPE = mean_absolute_percentage_error(df_y_test, y_pred)
                 MAPE_arr[index] += MAPE
                 index += 1
