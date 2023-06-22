@@ -16,7 +16,6 @@ def test_fit_model():
     qr = QuantileRegressionSolver(solver="ECOS")
 
     df_X = pd.DataFrame({"a": [1, 1, 1, 1], "b": [1, 1, 1, 2]})
-
     df_y = pd.DataFrame({"y": [3, 8, 9, 15]}).y
     weights = pd.DataFrame({"weights": [1, 1, 1, 1]}).weights
     model.fit_model(qr, df_X, df_y, 0.5, weights, True)
@@ -300,3 +299,68 @@ def test_get_aggregate_predictions(va_governor_precinct_data):
         + df2.groupby("county_classification").sum().reset_index(drop=False)[f"pred_{estimand}"].values[0]
         == df4[f"pred_{estimand}"].values[0]
     )
+
+def test_lambda_model_integration():
+    """
+    Test the model w/ optimal lambda calculations by checking that there are no errors while running the integration/fitting
+    """
+    model_settings = {"lambda_": [0.01, 0.05], "features": ["a"], "estimands": ["b"]}
+    model = BaseElectionModel.BaseElectionModel(model_settings)
+
+    qr = QuantileRegressionSolver(solver="ECOS")
+
+    df_X = pd.DataFrame(
+        {
+            "residuals_a": [1, 2, 3, 4],
+            "total_voters_a": [4, 2, 9, 5],
+            "last_election_results_a": [5, 1, 4, 2],
+            "last_election_results_b": [5, 4, 1, 2],
+            "results_a": [0, 0, 0, 1],
+            "results_b": [1, 1, 0, 1],
+            "baseline_a": [9, 2, 4, 5],
+            "baseline_b": [9, 2, 4, 5],
+            "a": [2, 2, 3, 7],
+            "b": [2, 3, 4, 5],
+        }
+    )
+
+    df_y = pd.DataFrame({"y": [3, 8, 9, 15]}).y
+    weights = pd.DataFrame({"weights": [1,1,1,1]}).weights
+    model.fit_model(qr, df_X, df_y, 0.5, weights, True)
+
+
+def test_compute_lambda():
+    """
+    Test/view computing lambda
+    """
+    lambda_ = [0.01, 0.05]
+    features = ["a"]
+    estimands = ["b"]
+    fixed_effects = []
+    model_settings = {"lambda_": [0.01, 0.05], "features": ["a"], "estimands": ["b"]}
+    model = BaseElectionModel.BaseElectionModel(model_settings)
+
+    qr = QuantileRegressionSolver(solver="ECOS")
+
+    df_X = pd.DataFrame(
+        {
+            "residuals_a": [1, 2, 3, 4],
+            "total_voters_a": [4, 2, 9, 5],
+            "last_election_results_a": [5, 1, 4, 2],
+            "last_election_results_b": [5, 4, 1, 2],
+            "results_a": [0, 0, 0, 1],
+            "results_b": [1, 1, 0, 1],
+            "baseline_a": [9, 2, 4, 5],
+            "baseline_b": [9, 2, 4, 5],
+            "a": [2, 2, 3, 7],
+            "b": [2, 3, 4, 5],
+        }
+    )
+
+    df_y = pd.DataFrame({"y": [3, 8, 9, 15]}).y
+    weights = pd.DataFrame({"weights": [1,1,1,1]}).weights
+    new_lambda, avg_MAPE = model.compute_lambda(df_X, df_y, weights, lambda_, features, estimands, fixed_effects)
+    print(avg_MAPE)
+
+    assert(new_lambda == 0.05)
+    assert(avg_MAPE == 1.7425925925925925)
