@@ -107,9 +107,7 @@ class BootstrapElectionModel(BaseElectionModel):
         z_train_pred = ols_z.predict(x_train)
 
         residuals_y = ols_y.residuals(y_train, y_train_pred, loo=True, center=True)
-        print(ols_y.beta_hat)
         residuals_z = ols_z.residuals(z_train, z_train_pred, loo=True, center=True)
-        print(ols_z.beta_hat)
 
         taus_lower = np.arange(0.01, 0.5, 0.01)
         taus_upper = np.arange(0.50, 1, 0.01)
@@ -193,8 +191,9 @@ class BootstrapElectionModel(BaseElectionModel):
         ols_y_B = OLSRegression().fit(x_train, y_B, weights_train, normal_eqs=ols_y.normal_eqs)
         ols_z_B = OLSRegression().fit(x_train, z_B, weights_train, normal_eqs=ols_z.normal_eqs)
         
-        # y_test_pred_B = ols_y_B.predict(x_test)
-        yz_test_pred_B = ols_y_B.predict(x_test) * ols_z_B.predict(x_test)
+        y_test_pred_B = ols_y_B.predict(x_test)
+        z_test_pred_B = ols_z_B.predict(x_test)
+        yz_test_pred_B = y_test_pred_B * z_test_pred_B
         
         y_test_pred = ols_y.predict(x_test)
         z_test_pred = ols_z.predict(x_test)
@@ -235,7 +234,11 @@ class BootstrapElectionModel(BaseElectionModel):
 
         self.errors_B_2 = errors_B_2 * weights_test
 
+        self.errors_B_3 = z_test_pred_B * weights_test # denominator for percentage margin
+        self.errors_B_4 = (z_test_pred + test_residuals_z) * weights_test
+
         self.weighted_yz_test_pred = yz_test_pred * weights_test
+        self.weighted_z_test_pred = z_test_pred * weights_test
         # self.weighted_y_test_pred = y_test_pred * weights_test
 
         self.ran_bootstrap = True
@@ -245,6 +248,32 @@ class BootstrapElectionModel(BaseElectionModel):
             self.compute_bootstrap_errors(reporting_units, nonreporting_units)
         return self.weighted_yz_test_pred
         # return self.weighted_y_test_pred
+
+
+    def get_aggregate_predictions(self, reporting_units, nonreporting_units, unexpected_units, aggregate, estimand):
+        n = reporting_units.shape[0]
+        m = nonreporting_units.shape[0]
+
+        aggregate_indicator = pd.get_dummies(pd.concat([reporting_units, nonreporting_units, unexpected_units], axis=0)[aggregate]).values
+        aggregate_indicator_expected = aggregate_indicator[:(n + m)]
+
+        aggregate_indicator_unexpected = aggregate_indicator[(n + m):]
+        turnout_unexpected = (unexpected_units['results_dem'] + unexpected_units['results_gop']).values.reshape(-1, 1)
+        
+        aggregate_indicator_train = aggregate_indicator_expected[:n]
+        aggregate_indicator_test = aggregate_indicator_expected[n:]
+        weights_train = reporting_units['weights'].values.reshape(-1, 1)
+        z_train = reporting_units['turnout_factor'].values.reshape(-1, 1)
+
+        aggregate_z_train = aggregate_indicator_train.T @ (weights_train * z_train)
+        
+        aggregate_z_unexpected = aggregate_indicator_unexpected.T @ turnout_unexpected
+        aggregate_z_total = aggregate_z_unexpected + aggregate_z_train + aggregate_indicator_test.T @ self.weighted_z_test_pred
+
+        raw_margin_df = super().get_aggregate_predictions(reporting_units, nonreporting_units, unexpected_units, aggregate, estimand)
+        raw_margin_df['pred_margin'] /= (aggregate_z_total.flatten() + 1)
+        raw_margin_df['results_margin'] /= (aggregate_z_total.flatten() + 1) # avoid NaN
+        return raw_margin_df
 
     def get_unit_prediction_intervals(self, reporting_units, non_reporting_units, alpha, estimand):
         errors_B = self.errors_B_1 - self.errors_B_2
@@ -280,6 +309,8 @@ class BootstrapElectionModel(BaseElectionModel):
 
         aggregate_indicator_unexpected = aggregate_indicator[(n + m):]
         margin_unexpected = unexpected_units['results_margin'].values.reshape(-1,1)
+        turnout_unexpected = (unexpected_units['results_dem'] + unexpected_units['results_gop']).values.reshape(-1, 1)
+        aggregate_z_unexpected = aggregate_indicator_unexpected.T @ turnout_unexpected
         aggregate_yz_unexpected = aggregate_indicator_unexpected.T @ margin_unexpected
         # aggregate_y_unexpected = aggregate_indicator_unexpected.T @ margin_unexpected
 
@@ -290,31 +321,38 @@ class BootstrapElectionModel(BaseElectionModel):
         z_train = reporting_units['turnout_factor'].values.reshape(-1, 1)
 
         yz_train = y_train * z_train
+        aggregate_z_train = aggregate_indicator_train.T @ (weights_train * z_train)
         aggregate_yz_train = aggregate_indicator_train.T @ (weights_train * yz_train)
         # aggregate_y_train = aggregate_indicator_train.T @ (weights_train * y_train)
 
         aggregate_yz_test_B = aggregate_yz_train + aggregate_indicator_test.T @ self.errors_B_1
         aggregate_yz_test_pred = aggregate_yz_train + aggregate_indicator_test.T @ self.errors_B_2
+        aggregate_z_test_B = aggregate_z_train + aggregate_indicator_test.T @ self.errors_B_3
+        aggregate_z_test_pred = aggregate_z_train + aggregate_indicator_test.T @ self.errors_B_4
         # aggregate_y_test_B = aggregate_y_train + aggregate_indicator_test.T @ self.errors_B_1
         # aggregate_y_test_pred = aggregate_y_train + aggregate_indicator_test.T @ self.errors_B_2
 
         aggregate_error_B_1 = aggregate_yz_test_B
         aggregate_error_B_2 = aggregate_yz_test_pred
+        aggregate_error_B_3 = aggregate_z_test_B
+        aggregate_error_B_4 = aggregate_z_test_pred
         # aggregate_error_B_1 = aggregate_y_test_B
         # aggregate_error_B_2 = aggregate_y_test_pred
 
-        aggregate_error_B = aggregate_error_B_1 - aggregate_error_B_2
+        aggregate_error_B = (aggregate_error_B_1 / aggregate_error_B_3) - (aggregate_error_B_2 / aggregate_error_B_4)
 
         lower_alpha = (1 - alpha) / 2
         upper_alpha = 1 - lower_alpha
         lower_q = np.floor(lower_alpha * (self.B + 1)) / self.B
         upper_q = np.ceil(upper_alpha * (self.B - 1)) / self.B
 
+        aggregate_z_total = aggregate_z_unexpected + aggregate_z_train + aggregate_indicator_test.T @ self.weighted_z_test_pred
         aggregate_yz_total = aggregate_yz_unexpected + aggregate_yz_train + aggregate_indicator_test.T @ self.weighted_yz_test_pred
+        aggregate_perc_margin_total = aggregate_yz_total / aggregate_z_total
         # aggregate_y_total = aggregate_y_unexpected + aggregate_y_train + aggregate_indicator_test.T @ self.weighted_y_test_pred
         
         interval_upper, interval_lower = (
-            aggregate_yz_total - # move into y space from residual space
+            aggregate_perc_margin_total - # move into y space from residual space
             # aggregate_y_total -
             np.quantile(
                 aggregate_error_B, 
@@ -324,8 +362,7 @@ class BootstrapElectionModel(BaseElectionModel):
         ).T
         interval_upper = interval_upper.reshape(-1,1)
         interval_lower = interval_lower.reshape(-1,1)
-
-        return PredictionIntervals(interval_lower.round(decimals=0), interval_upper.round(decimals=0))
+        return PredictionIntervals(interval_lower, interval_upper) # removed round
 
     def get_all_conformalization_data_unit(self):
         return None, None
