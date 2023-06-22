@@ -68,7 +68,7 @@ class BaseElectionModel(object):
             )
         except (UserWarning, cvxpy.error.SolverError):
             LOG.warning("Warning: solution was inaccurate or solver broke. Re-running with normalize_weights=False.")
-            model.fit(X, y, tau_value=tau, weights=weights, lambda_=self.lambda_[0], normalize_weights=False)
+            model.fit(X, y, tau_value=tau, weights=weights, lambda_=self.lambda_, normalize_weights=False)
 
     def get_unit_predictions(self, reporting_units, nonreporting_units, estimand, testing=False):
         """
