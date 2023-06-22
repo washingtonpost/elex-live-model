@@ -270,8 +270,7 @@ class BootstrapElectionModel(BaseElectionModel):
         aggregate,
         alpha,
         conformalization_data,
-        estimand,
-        model_settings,
+        estimand
     ):
         n = reporting_units.shape[0]
         m = nonreporting_units.shape[0]
