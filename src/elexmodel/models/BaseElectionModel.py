@@ -282,7 +282,12 @@ class BaseElectionModel(object):
         estimand="",
         K=3,
     ):
-        if len(self.features) == 0 or len(possible_lambda_values) == 0 or estimand == "":
+        if (
+            len(self.features) == 0
+            or len(possible_lambda_values) == 0
+            or estimand == ""
+            or not (f"{estimand}" in reporting_units)
+        ):
             return 0, 0
 
         MAPE_arr = np.full_like(possible_lambda_values, 0)  # array of MAPE sums for each lambda
@@ -291,6 +296,7 @@ class BaseElectionModel(object):
         # get the data section indexes that we will be training/testing on
         divisor = 0
 
+        print(reporting_units)
         for train_index, test_index in kfold.split(reporting_units):
             divisor += 1
             train = reporting_units.iloc[train_index]
@@ -301,7 +307,7 @@ class BaseElectionModel(object):
                 # build model with custom lambda
                 self.lambda_ = lam
                 unit_predictions = self.get_unit_predictions(train, test, estimand)
-                MAPE = mean_absolute_percentage_error(unit_predictions.values, test[estimand].values)
+                MAPE = mean_absolute_percentage_error(test[estimand].values, unit_predictions.values)
                 MAPE_arr[index] += MAPE
                 index += 1
 
