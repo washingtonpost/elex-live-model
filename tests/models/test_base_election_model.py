@@ -321,7 +321,7 @@ def test_compute_lambda():
             "b": [2, 3, 4, 5],
         }
     )
-    
+
     new_lambda, avg_MAPE = model.compute_lambda(df_X, lambda_, "a")
 
     assert new_lambda == 0.01

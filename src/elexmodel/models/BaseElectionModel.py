@@ -62,7 +62,7 @@ class BaseElectionModel(object):
             LOG.warning("Warning: solution was inaccurate or solver broke. Re-running with normalize_weights=False.")
             model.fit(X, y, tau_value=tau, weights=weights, lambda_=lambda_, normalize_weights=False)
 
-    def get_unit_predictions(self, reporting_units, nonreporting_units, estimand, lambda_ = 0):
+    def get_unit_predictions(self, reporting_units, nonreporting_units, estimand, lambda_=0):
         """
         Produces unit level predictions. Fits quantile regression to reporting data, applies
         it to nonreporting data. The features are specified in model_settings.
@@ -278,7 +278,7 @@ class BaseElectionModel(object):
     def compute_lambda(
         self,
         reporting_units,
-        possible_lambda_values = [],
+        possible_lambda_values=[],
         estimand="",
         K=3,
     ):
