@@ -30,7 +30,7 @@ class BaseElectionModel(object):
         self.seed = 4191  # set arbitrarily
         self.estimands = model_settings.get("estimands", [])
 
-    def fit_model(self, model, df_X, df_y, tau, weights, normalize_weights, lambda_ = 0):
+    def fit_model(self, model, df_X, df_y, tau, weights, normalize_weights, lambda_=0):
         """
         Fits the quantile regression for the model
         """
@@ -69,7 +69,7 @@ class BaseElectionModel(object):
         """
         # compute the means of both reporting_units and nonreporting_units for centering (part of featurizing)
         # we want them both, since together they are the subunit population
-        self.featurizer.compute_means_for_centering(reporting_units, nonreporting_units)
+        self.featurizer.compute_means_for_centering(pd.DataFrame(reporting_units), pd.DataFrame(nonreporting_units))
         # reporting_units_features and nonreporting_units_features should have the same
         # features. Specifically also the same fixed effect columns.
         reporting_units_features = self.featurizer.featurize_fitting_data(
@@ -278,11 +278,11 @@ class BaseElectionModel(object):
     def compute_lambda(
         self,
         reporting_units,
-        possible_lambda_values=[],
+        possible_lambda_values = [],
         estimand="",
         K=3,
     ):
-        if len(self.features) == 0 or len(possible_lambda_values) == 0:
+        if len(self.features) == 0 or len(possible_lambda_values) == 0 or estimand == "":
             return 0, 0
 
         MAPE_arr = np.full_like(possible_lambda_values, 0)  # array of MAPE sums for each lambda
@@ -291,15 +291,17 @@ class BaseElectionModel(object):
         # get the data section indexes that we will be training/testing on
         divisor = 0
 
-        for train_index, test_index in kfold.split(reporting_units): #TODO: update this
+        for train_index, test_index in kfold.split(reporting_units):
             divisor += 1
+            train = reporting_units.iloc[train_index]
+            test = reporting_units.iloc[test_index]
             # loop through each lambda
             index = 0
             for lam in possible_lambda_values:
                 # build model with custom lambda
                 self.lambda_ = lam
-                unit_predictions = self.get_unit_predictions(train_index, train_index, estimand)
-                MAPE = mean_absolute_percentage_error(unit_predictions, test_index) #TODO: update this
+                unit_predictions = self.get_unit_predictions(train, test, estimand)
+                MAPE = mean_absolute_percentage_error(unit_predictions.values, test[estimand].values)
                 MAPE_arr[index] += MAPE
                 index += 1
 

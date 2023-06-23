@@ -163,7 +163,6 @@ class ModelClient(object):
             "geographic_unit_type": geographic_unit_type,
             "beta": beta,
             "robust": robust,
-            "lambda_": lambda_[0],
             "features": features,
             "fixed_effects": fixed_effects,
             "save_conformalization": save_conformalization,
