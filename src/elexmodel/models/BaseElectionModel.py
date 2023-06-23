@@ -24,14 +24,13 @@ class BaseElectionModel(object):
         self.qr = QuantileRegressionSolver(solver="ECOS")
         self.features = model_settings.get("features", [])
         self.fixed_effects = model_settings.get("fixed_effects", [])
-        self.lambda_ = model_settings.get("lambda_", [])
         self.features_to_coefficients = {}
         self.featurizer = Featurizer(self.features, self.fixed_effects)
         self.add_intercept = True
         self.seed = 4191  # set arbitrarily
         self.estimands = model_settings.get("estimands", [])
 
-    def fit_model(self, model, df_X, df_y, tau, weights, normalize_weights, testing=False):
+    def fit_model(self, model, df_X, df_y, tau, weights, normalize_weights, lambda_ = 0):
         """
         Fits the quantile regression for the model
         """
@@ -45,13 +44,6 @@ class BaseElectionModel(object):
         else:
             raise ValueError("Unsupported data type for weights")
 
-        if not testing:
-            # get optimal lambda value
-            new_lambda, avg_MAPE = self.compute_lambda(
-                df_X, df_y, weights, self.lambda_, self.features, self.estimands, self.fixed_effects
-            )
-            self.lambda_ = new_lambda
-
         # normalizing weights speed up solution by a lot. However, if the relative size
         # of the smallest weight is too close to zero, it can lead to numerical instability
         # where the solver either throws a warning for inaccurate solution or breaks entirely
@@ -62,15 +54,15 @@ class BaseElectionModel(object):
                 y,
                 tau_value=tau,
                 weights=weights,
-                lambda_=self.lambda_,
+                lambda_=lambda_,
                 fit_intercept=self.add_intercept,
                 normalize_weights=normalize_weights,
             )
         except (UserWarning, cvxpy.error.SolverError):
             LOG.warning("Warning: solution was inaccurate or solver broke. Re-running with normalize_weights=False.")
-            model.fit(X, y, tau_value=tau, weights=weights, lambda_=self.lambda_, normalize_weights=False)
+            model.fit(X, y, tau_value=tau, weights=weights, lambda_=lambda_, normalize_weights=False)
 
-    def get_unit_predictions(self, reporting_units, nonreporting_units, estimand, testing=False):
+    def get_unit_predictions(self, reporting_units, nonreporting_units, estimand, lambda_ = 0):
         """
         Produces unit level predictions. Fits quantile regression to reporting data, applies
         it to nonreporting data. The features are specified in model_settings.
@@ -89,7 +81,7 @@ class BaseElectionModel(object):
         reporting_units_residuals = reporting_units[f"residuals_{estimand}"]
 
         self.fit_model(
-            self.qr, reporting_units_features, reporting_units_residuals, 0.5, weights, True, testing=testing
+            self.qr, reporting_units_features, reporting_units_residuals, 0.5, weights, True, lambda_=lambda_
         )
         self.features_to_coefficients = dict(zip(self.featurizer.complete_features, self.qr.coefficients))
 
@@ -285,74 +277,29 @@ class BaseElectionModel(object):
 
     def compute_lambda(
         self,
-        df_X,
-        df_y,
-        weights,
+        reporting_units,
         possible_lambda_values=[],
-        features=[],
-        estimands=[],
-        fixed_effects=[],
+        estimand="",
         K=3,
-        estimand_choice=0,
-        features_choice=0,
     ):
-        if len(features) == 0 or len(estimands) == 0 or len(possible_lambda_values) == 0:
+        if len(self.features) == 0 or len(possible_lambda_values) == 0:
             return 0, 0
 
-        estimand = estimands[estimand_choice]
         MAPE_arr = np.full_like(possible_lambda_values, 0)  # array of MAPE sums for each lambda
         kfold = KFold(n_splits=K, shuffle=False)
 
         # get the data section indexes that we will be training/testing on
         divisor = 0
-        for train_index, test_index in kfold.split(df_X):
+
+        for train_index, test_index in kfold.split(reporting_units): #TODO: update this
             divisor += 1
-            X_train = df_X.iloc[train_index].reset_index(drop=True)
-            df_X_train = pd.DataFrame(
-                {
-                    f"total_voters_{estimand}": X_train[f"baseline_{estimand}"],
-                    f"last_election_results_{estimand}": X_train[f"last_election_results_{estimand}"],
-                    f"results_{estimand}": X_train[f"results_{estimand}"],
-                    f"residuals_{estimand}": abs(X_train[f"results_{estimand}"] - X_train[f"baseline_{estimand}"]),
-                    f"{features[0]}": X_train[f"{features[features_choice]}"],
-                }
-            ).fillna(0)
-
-            X_test = df_X.iloc[test_index].reset_index(drop=True)
-            df_X_test = pd.DataFrame(
-                {
-                    f"total_voters_{estimand}": X_test[f"baseline_{estimand}"],
-                    f"last_election_results_{estimand}": X_test[f"last_election_results_{estimand}"],
-                    f"results_{estimand}": X_test[f"results_{estimand}"],
-                    f"residuals_{estimand}": abs(X_test[f"results_{estimand}"] - X_test[f"baseline_{estimand}"]),
-                    f"{features[0]}": X_test[f"{features[features_choice]}"],
-                }
-            ).fillna(0)
-
-            if len(fixed_effects) != 0:
-                for label in fixed_effects.columns:
-                    df_X_train.append({f"{label}_{estimand}": X_train[f"{label}_{estimand}"]})
-                    df_X_test.append({f"{label}_{estimand}": X_test[f"{label}_{estimand}"]})
-
-            df_y_train = df_y.iloc[train_index].reset_index(drop=True)
-            df_y_test = df_y.iloc[test_index].reset_index(drop=True)
-
-            if type(df_y_train) != pd.core.series.Series:
-                df_y_train = df_y_train.squeeze()
-            if type(df_y_test) != pd.core.series.Series:
-                df_y_test = df_y_test.squeeze()
-
-            weights = np.ones(len(df_X_train))
-
             # loop through each lambda
             index = 0
             for lam in possible_lambda_values:
                 # build model with custom lambda
                 self.lambda_ = lam
-                # fit model
-                self.fit_model(self.qr, df_X_train, df_y_train, 0.5, weights, True, testing=True)
-                y_pred = self.get_unit_predictions(df_X_train, df_X_test, estimand=f"{estimand}", testing=True)
-                MAPE = mean_absolute_percentage_error(df_y_test, y_pred)
+                unit_predictions = self.get_unit_predictions(train_index, train_index, estimand)
+                MAPE = mean_absolute_percentage_error(unit_predictions, test_index) #TODO: update this
                 MAPE_arr[index] += MAPE
                 index += 1
 
