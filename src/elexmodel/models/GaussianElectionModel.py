@@ -106,7 +106,6 @@ class GaussianElectionModel(BaseElectionModel):
         alpha,
         conformalization_data,
         estimand,
-        model_settings,
     ):
         """
         Get aggregate prediction intervals. Adjust aggregate prediction intervals based on Gaussian models
@@ -128,7 +127,7 @@ class GaussianElectionModel(BaseElectionModel):
         )
 
         # fit gaussian model in aggregate case
-        gaussian_model = GaussianModel(model_settings).fit(
+        gaussian_model = GaussianModel(self.model_settings).fit(
             conformalization_data,
             reporting_units,
             nonreporting_units,
