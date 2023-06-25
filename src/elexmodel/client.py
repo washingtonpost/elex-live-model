@@ -11,7 +11,7 @@ from elexmodel.handlers.data.PreprocessedData import PreprocessedDataHandler
 from elexmodel.logging import initialize_logging
 from elexmodel.models.GaussianElectionModel import GaussianElectionModel
 from elexmodel.models.NonparametricElectionModel import NonparametricElectionModel
-from elexmodel.utils.constants import AGGREGATE_ORDER, VALID_AGGREGATES_MAPPING, DEFAULT_AGGREGATES
+from elexmodel.utils.constants import AGGREGATE_ORDER, DEFAULT_AGGREGATES, VALID_AGGREGATES_MAPPING
 from elexmodel.utils.file_utils import APP_ENV, S3_FILE_PATH, TARGET_BUCKET
 from elexmodel.utils.math_utils import compute_error, compute_frac_within_pi, compute_mean_pi_length
 
@@ -123,8 +123,6 @@ class ModelClient:
         values they pull out are generated in that function.
         """
         return self.all_conformalization_data_agg_dict
-
-
 
     def get_aggregate_list(self, office, aggregate):
         default_aggregate = DEFAULT_AGGREGATES[office]
