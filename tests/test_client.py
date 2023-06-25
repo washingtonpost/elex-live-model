@@ -292,6 +292,7 @@ def test_check_input_parameters_handle_unreporting(model_client, va_config):
             "bad_handle_unreporting",
         )
 
+
 def test_get_aggregate_list(model_client):
     assert model_client.get_aggregate_list("P", "county_fips") == ["postal_code", "county_fips"]
     assert model_client.get_aggregate_list("P", "postal_code") == ["postal_code"]
