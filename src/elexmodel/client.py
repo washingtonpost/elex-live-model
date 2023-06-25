@@ -11,7 +11,7 @@ from elexmodel.handlers.data.PreprocessedData import PreprocessedDataHandler
 from elexmodel.logging import initialize_logging
 from elexmodel.models.GaussianElectionModel import GaussianElectionModel
 from elexmodel.models.NonparametricElectionModel import NonparametricElectionModel
-from elexmodel.utils.constants import AGGREGATE_ORDER, VALID_AGGREGATES_MAPPING
+from elexmodel.utils.constants import AGGREGATE_ORDER, VALID_AGGREGATES_MAPPING, DEFAULT_AGGREGATES
 from elexmodel.utils.file_utils import APP_ENV, S3_FILE_PATH, TARGET_BUCKET
 from elexmodel.utils.math_utils import compute_error, compute_frac_within_pi, compute_mean_pi_length
 
@@ -124,20 +124,10 @@ class ModelClient:
         """
         return self.all_conformalization_data_agg_dict
 
-    def get_default_aggregates(self, office):
-        if office in {"P", "S", "G"}:
-            return ["postal_code", "unit"]
-        elif office in {"P_county", "S_county", "G_county", "P_precinct", "S_precinct", "G_precinct"}:
-            return ["postal_code", "unit"]
-        elif office in {"H", "Y", "Z"}:
-            return ["postal_code", "district", "unit"]
-        elif office in {"H_county", "Y_county", "Z_county", "H_precinct", "Y_precinct", "Z_precinct"}:
-            return ["postal_code", "district", "unit"]
-        else:
-            raise ValueError("Cannot get default aggregate because office id not recognized.")
+
 
     def get_aggregate_list(self, office, aggregate):
-        default_aggregate = self.get_default_aggregates(office)
+        default_aggregate = DEFAULT_AGGREGATES[office]
         base_aggregate = default_aggregate[:-1]  # remove unit
         raw_aggregate_list = base_aggregate + [aggregate]
         return sorted(list(set(raw_aggregate_list)), key=lambda x: AGGREGATE_ORDER.index(x))
@@ -166,8 +156,7 @@ class ModelClient:
             column_values = current_data[0]
             current_data = pd.DataFrame(current_data[1:], columns=column_values)
         features = kwargs.get("features", [])
-        default_aggregates = self.get_default_aggregates(office)
-        aggregates = kwargs.get("aggregates", default_aggregates)
+        aggregates = kwargs.get("aggregates", DEFAULT_AGGREGATES[office])
         fixed_effects = kwargs.get("fixed_effects", {})
         pi_method = kwargs.get("pi_method", "nonparametric")
         beta = kwargs.get("beta", 1)
