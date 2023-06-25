@@ -328,36 +328,6 @@ def test_check_input_parameters_handle_unreporting(model_client, va_config):
             "bad_handle_unreporting",
         )
 
-
-def test_get_default_aggregates_statewide(model_client):
-    assert model_client.get_default_aggregates("P") == ["postal_code", "unit"]
-    assert model_client.get_default_aggregates("S") == ["postal_code", "unit"]
-    assert model_client.get_default_aggregates("G") == ["postal_code", "unit"]
-    assert model_client.get_default_aggregates("P_county") == ["postal_code", "unit"]
-    assert model_client.get_default_aggregates("S_county") == ["postal_code", "unit"]
-    assert model_client.get_default_aggregates("G_county") == ["postal_code", "unit"]
-    assert model_client.get_default_aggregates("P_precinct") == ["postal_code", "unit"]
-    assert model_client.get_default_aggregates("S_precinct") == ["postal_code", "unit"]
-    assert model_client.get_default_aggregates("G_precinct") == ["postal_code", "unit"]
-
-
-def test_get_default_aggregates_districtwide(model_client):
-    assert model_client.get_default_aggregates("H") == ["postal_code", "district", "unit"]
-    assert model_client.get_default_aggregates("Z") == ["postal_code", "district", "unit"]
-    assert model_client.get_default_aggregates("Y") == ["postal_code", "district", "unit"]
-    assert model_client.get_default_aggregates("H_county") == ["postal_code", "district", "unit"]
-    assert model_client.get_default_aggregates("Z_county") == ["postal_code", "district", "unit"]
-    assert model_client.get_default_aggregates("Y_county") == ["postal_code", "district", "unit"]
-    assert model_client.get_default_aggregates("H_precinct") == ["postal_code", "district", "unit"]
-    assert model_client.get_default_aggregates("Z_precinct") == ["postal_code", "district", "unit"]
-    assert model_client.get_default_aggregates("Y_precinct") == ["postal_code", "district", "unit"]
-
-
-def test_get_default_aggregates_none(model_client):
-    with pytest.raises(ValueError):
-        model_client.get_default_aggregates("xyz")
-
-
 def test_get_aggregate_list(model_client):
     assert model_client.get_aggregate_list("P", "county_fips") == ["postal_code", "county_fips"]
     assert model_client.get_aggregate_list("P", "postal_code") == ["postal_code"]
