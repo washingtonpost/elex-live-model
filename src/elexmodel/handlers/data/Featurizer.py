@@ -96,8 +96,9 @@ class Featurizer(object):
             # drop_first is True for fitting_data (e.g. reporting_units) since we want to avoid the design matrix with
             # expanded fixed effects to be linearly dependent
             new_fitting_data = self._expand_fixed_effects(new_fitting_data, drop_first=True)
-            # we save the expanded fixed effects to be able to add fixed effects that are not in the heldout_data (nonreporting_units)
-            # as a zero column and to be able to specify the order of the expanded fixed effect when fitting the model
+            # we save the expanded fixed effects to be able to add fixed effects that are
+            # not in the heldout_data (nonreporting_units) as a zero column and to be able
+            # to specify the order of the expanded fixed effect when fitting the model
             self.expanded_fixed_effects = [
                 x
                 for x in new_fitting_data.columns
@@ -112,8 +113,10 @@ class Featurizer(object):
     def featurize_heldout_data(self, heldout_data):
         """
         Featurize the data that the model will be applied on.
-        In our case the heldout_data is either the nonreporting_units (when applying the model for the point predictions)
-        or conformalization_data/nonreporting_units (when applying the model for the prediction intervals)
+        In our case the heldout_data is either the nonreporting_units
+        (when applying the model for the point predictions)
+        or conformalization_data/nonreporting_units
+        (when applying the model for the prediction intervals)
         """
         new_heldout_data = heldout_data.copy()
 
@@ -126,11 +129,13 @@ class Featurizer(object):
         if len(self.fixed_effect_cols) > 0:
             missing_expanded_fixed_effects = []
             new_heldout_data = self._expand_fixed_effects(new_heldout_data, drop_first=False)
-            # if all units from one fixed effect are reporting they will not appear in the heldout_data (e.g. nonreporting_units) and won't
-            # get a column when we expand the fixed effects on that dataframe. Therefore we add those columns with zero
-            # fixed effects manually. As an example, if we are running a county model using state fixed effects, and
-            # all of Delaware's counties are reporting, then no Delaware county will be in heldout_data (nonreporting_units), as a result
-            # there will be no column for Delaware in the expanded fixed effects of heldout_data (nonreporting_units).
+            # if all units from one fixed effect are reporting they will not appear in the heldout_data
+            # (e.g. nonreporting_units) and won't get a column when we expand the fixed effects
+            # on that dataframe. Therefore we add those columns with zero fixed effects manually.
+            # As an example, if we are running a county model using state fixed effects, and
+            # all of Delaware's counties are reporting, then no Delaware county will be in
+            # heldout_data (nonreporting_units), as a result there will be no column for Delaware
+            # in the expanded fixed effects of heldout_data (nonreporting_units).
             for expanded_fixed_effect in self.expanded_fixed_effects:
                 if expanded_fixed_effect not in new_heldout_data.columns:
                     missing_expanded_fixed_effects.append(expanded_fixed_effect)

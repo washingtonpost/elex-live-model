@@ -25,7 +25,8 @@ class CombinedDataHandler(object):
         self.geographic_unit_type = geographic_unit_type
         data = preprocessed_data.merge(current_data, how="left", on=["postal_code", "geographic_unit_fips"])
         # if unreporting is 'drop' then drop units that are not reporting (ie. units where results are na)
-        # this is necessary if units will not be returning results in this election, but we didn't know that (ie. townships)
+        # this is necessary if units will not be returning results in this election,
+        # but we didn't know that (ie. townships)
         result_cols = [f"results_{estimand}" for estimand in estimands]
         if handle_unreporting == "drop":
             # Drop the whole row if an estimand is not reporting

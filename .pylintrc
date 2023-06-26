@@ -1,0 +1,2 @@
+[pylint]
+max-line-length=120

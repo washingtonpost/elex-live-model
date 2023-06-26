@@ -199,7 +199,8 @@ class GaussianModel:
                 # when the group is large enough we can compute the Gaussian model for conformalization
                 x = self._fit(conformalization_data, estimand, aggregate, alpha, beta)
 
-            # Write to s3 at the highest level of recursion before we exit GaussianModel and return to GaussianElectionModel
+            # Write to s3 at the highest level of recursion before we exit GaussianModel
+            # and return to GaussianElectionModel
             if top_level and aggregate and self.save_conformalization:
                 # Write conformalization data
                 gaussian_bounds = x.copy()
@@ -237,12 +238,14 @@ class GaussianModel:
         self, conformalization_data, election_id, office, geographic_unit_type, estimand, aggregate, alpha
     ):
         """
-        Write this data to S3 so we can examine if the upper and lower bounds look like they come from a Gaussian distribution.
+        Write this data to S3 so we can examine if the upper and lower bounds look like
+        they come from a Gaussian distribution.
         """
         s3_client = s3.S3CsvUtil(TARGET_BUCKET)
         # type(aggregate) == list
         aggregate_string = aggregate[-1]
-        path = f"{S3_FILE_PATH}/{election_id}/gaussian/{office}/{geographic_unit_type}/{estimand}-{aggregate_string}-{alpha}/conformalization_data"
+        path = f"{S3_FILE_PATH}/{election_id}/gaussian/{office}/{geographic_unit_type}\
+            /{estimand}-{aggregate_string}-{alpha}/conformalization_data"
         conformalization_data_csv = convert_df_to_csv(conformalization_data)
         s3_client.put(path, conformalization_data_csv)
 
@@ -255,6 +258,7 @@ class GaussianModel:
         s3_client = s3.S3CsvUtil(TARGET_BUCKET)
         # type(aggregate) == list
         aggregate_string = aggregate[-1]
-        path = f"{S3_FILE_PATH}/{election_id}/gaussian/{office}/{geographic_unit_type}/{estimand}-{aggregate_string}-{alpha}/bounds"
+        path = f"{S3_FILE_PATH}/{election_id}/gaussian/{office}/\
+            {geographic_unit_type}/{estimand}-{aggregate_string}-{alpha}/bounds"
         gaussian_fit_csv = convert_df_to_csv(gaussian_fit)
         s3_client.put(path, gaussian_fit_csv)
