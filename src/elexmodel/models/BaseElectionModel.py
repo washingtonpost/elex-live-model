@@ -5,7 +5,6 @@ from collections import namedtuple
 
 import cvxpy
 import numpy as np
-import pandas as pd
 from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
 from sklearn.metrics import mean_absolute_percentage_error
 from sklearn.model_selection import KFold
@@ -23,12 +22,11 @@ class BaseElectionModel(object):
     def __init__(self, model_settings={}):
         self.qr = QuantileRegressionSolver(solver="ECOS")
         self.features = model_settings.get("features", [])
-        self.fixed_effects = model_settings.get("fixed_effects", [])
+        self.fixed_effects = model_settings.get("fixed_effects", {})
         self.features_to_coefficients = {}
         self.featurizer = Featurizer(self.features, self.fixed_effects)
         self.add_intercept = True
         self.seed = 4191  # set arbitrarily
-        self.estimands = model_settings.get("estimands", [])
 
     def fit_model(self, model, df_X, df_y, tau, weights, normalize_weights, lambda_=0):
         """
@@ -36,13 +34,7 @@ class BaseElectionModel(object):
         """
         X = df_X.values
         y = df_y.values
-
-        if isinstance(weights, pd.DataFrame) or isinstance(weights, pd.Series):
-            weights = weights.values
-        elif isinstance(weights, np.ndarray):
-            pass  # No conversion needed for NumPy arrays
-        else:
-            raise ValueError("Unsupported data type for weights")
+        weights = weights.values
 
         # normalizing weights speed up solution by a lot. However, if the relative size
         # of the smallest weight is too close to zero, it can lead to numerical instability
@@ -69,7 +61,7 @@ class BaseElectionModel(object):
         """
         # compute the means of both reporting_units and nonreporting_units for centering (part of featurizing)
         # we want them both, since together they are the subunit population
-        self.featurizer.compute_means_for_centering(pd.DataFrame(reporting_units), pd.DataFrame(nonreporting_units))
+        self.featurizer.compute_means_for_centering(reporting_units, nonreporting_units)
         # reporting_units_features and nonreporting_units_features should have the same
         # features. Specifically also the same fixed effect columns.
         reporting_units_features = self.featurizer.featurize_fitting_data(
@@ -296,7 +288,6 @@ class BaseElectionModel(object):
         # get the data section indexes that we will be training/testing on
         divisor = 0
 
-        print(reporting_units)
         for train_index, test_index in kfold.split(reporting_units):
             divisor += 1
             train = reporting_units.iloc[train_index]
@@ -315,6 +306,6 @@ class BaseElectionModel(object):
         MAPE_arr_avg = [value / divisor for value in MAPE_arr]
         best_MAPE_index = MAPE_arr_avg.index(min(MAPE_arr_avg))
         best_lambda = possible_lambda_values[best_MAPE_index]
-        average_MAPE = np.mean(MAPE_arr_avg)
+        average_MAPE = MAPE_arr_avg[best_MAPE_index]
 
         return best_lambda, average_MAPE

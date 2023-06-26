@@ -305,7 +305,7 @@ def test_compute_lambda():
     """
     Test/view computing lambda
     """
-    lambda_ = [0.01, 0.05]
+    lambda_ = [0.01, 0.05, 0.99, 0.56]
     model_settings = {"features": ["b"]}
     model = BaseElectionModel.BaseElectionModel(model_settings)
     df_X = pd.DataFrame(
