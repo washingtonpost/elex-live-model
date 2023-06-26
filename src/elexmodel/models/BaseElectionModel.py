@@ -18,7 +18,7 @@ PredictionIntervals = namedtuple("PredictionIntervals", ["lower", "upper", "conf
 LOG = logging.getLogger(__name__)
 
 
-class BaseElectionModel(object):
+class BaseElectionModel:
     def __init__(self, model_settings={}):
         self.qr = QuantileRegressionSolver(solver="ECOS")
         self.features = model_settings.get("features", [])
@@ -199,7 +199,8 @@ class BaseElectionModel(object):
         Returns unadjusted bounds for nonreporting dat and conformalization data including bounds.
         """
         # split reporting data into training and conformalization data
-        # seed is set during initialization, to make sure we always get the same training/conformalization split for each alpha of one run
+        # seed is set during initialization, to make sure we always get the same
+        # training/conformalization split for each alpha of one run
         reporting_units_shuffled = reporting_units.sample(frac=1, random_state=self.seed).reset_index(drop=True)
 
         upper_bound = (1 + alpha) / 2

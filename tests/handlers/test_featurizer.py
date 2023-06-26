@@ -106,7 +106,8 @@ def test_column_names():
     )
 
     featurizer.compute_means_for_centering(df_fitting, df_heldout)
-    # since only a, b and c are "features" specified above we would expect "x" from df_fitting and "d" from df_heldout to be dropped
+    # since only a, b and c are "features" specified above we would expect
+    # "x" from df_fitting and "d" from df_heldout to be dropped
     # similarly we would expect the same from fe_b (since only fe_a is specified as a fixed effect)
     df_fitting_features = featurizer.featurize_fitting_data(df_fitting)
     df_heldout_features = featurizer.featurize_heldout_data(df_heldout)
@@ -127,9 +128,9 @@ def test_column_names():
     assert "a" in df_heldout_features.columns
     assert "b" in df_heldout_features.columns
     assert "c" in df_heldout_features.columns
-    assert (
-        "fe_a_a" not in df_heldout_features.columns
-    )  # drop_first is False for heldout, but "fe_a_a" is not in expanded_fixed_effects because dropped by fitting_data expansion
+    assert "fe_a_a" not in df_heldout_features.columns
+    # drop_first is False for heldout, but "fe_a_a" is not in
+    # expanded_fixed_effects because dropped by fitting_data expansion
     assert "fe_a_b" in df_heldout_features.columns
     assert "fe_a_c" in df_heldout_features.columns  # this column should have been addded manually
     assert "fe_a_d" not in df_heldout_features.columns  # not in expanded_fixed_effects since not fitting_datas
