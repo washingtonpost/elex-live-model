@@ -36,8 +36,7 @@ class S3Util(object):
 
     def get_file_path(self, file_type, path_info):
         if file_type == "preprocessed":
-            file_path = f'{S3_FILE_PATH}/{path_info["election_id"]}/data/\
-                {path_info["office"]}/data_{path_info["geographic_unit_type"]}.csv'
+            file_path = f'{S3_FILE_PATH}/{path_info["election_id"]}/data/{path_info["office"]}/data_{path_info["geographic_unit_type"]}.csv'
         elif file_type == "config":
             file_path = f'{S3_FILE_PATH}/{path_info["election_id"]}/config/{path_info["election_id"]}'
         return file_path
