@@ -28,7 +28,7 @@ class ModelNotEnoughSubunitsException(ModelClientException):
     pass
 
 
-class ModelClient(object):
+class ModelClient:
     """
     Client for generating vote estimates
     """
@@ -84,13 +84,14 @@ class ModelClient(object):
             raise ValueError(f"Fixed effect(s): {invalid_fixed_effects} not valid. Please check config")
         if pi_method not in {"gaussian", "nonparametric"}:
             raise ValueError(
-                f"Prediction interval method: {pi_method} is not valid. pi_method has to be either `gaussian` or `nonparametric`."
+                f"Prediction interval method: {pi_method} is not valid. \
+                    pi_method has to be either `gaussian` or `nonparametric`."
             )
         if not isinstance(beta, (int, float)):
             raise ValueError("beta is not valid. Has to be either an integer or a float.")
         if not isinstance(robust, bool):
             raise ValueError("robust is not valid. Has to be a boolean.")
-        if not (isinstance(lambda_, float) or isinstance(lambda_, int)):
+        if not isinstance(lambda_, (float, int)):
             raise ValueError("lambda is not valid. It has to be numeric.")
         if lambda_ < 0:
             raise ValueError("lambda is not valid. It has to be greater than zero.")
@@ -101,9 +102,10 @@ class ModelClient(object):
     def get_all_conformalization_data_unit(self):
         """
         This function collects the conformalization data from a model run. It produces a dictionary
-        with two types of data (in the gaussian case): the conformalization points that a distribution is
-        fit to, and the parameters of the resulting guassian distribution. In this unit-level function, the information for
-        one distribution is returned (all units combined). It returns None if get_estimates isn't called, as the
+        with two types of data (in the gaussian case): the conformalization points that a
+        distribution is fit to, and the parameters of the resulting guassian distribution.
+        In this unit-level function, the information for one distribution is returned
+        (all units combined). It returns None if get_estimates isn't called, as the
         values they pull out are generated in that function.
         """
         return self.all_conformalization_data_unit_dict
@@ -112,8 +114,9 @@ class ModelClient(object):
         """
         This function collects the conformalization data from a model run. It produces a dictionary
         with two types of data (in the gaussian case): the conformalization points that a distribution is
-        fit to, and the parameters of the resulting guassian distribution. In the agg case, distributions for each state (
-        in a multi-state model) are returned. This functions return None if get_estimates isn't called, as the
+        fit to, and the parameters of the resulting guassian distribution. In the agg case,
+        distributions for each state (in a multi-state model) are returned. This functions
+        return None if get_estimates isn't called, as the
         values they pull out are generated in that function.
         """
         return self.all_conformalization_data_agg_dict
@@ -223,7 +226,9 @@ class ModelClient(object):
         unexpected_units = data.get_unexpected_units(percent_reporting_threshold, aggregates)
 
         LOG.info(
-            "Model parameters: \n geographic_unit_type: %s, prediction intervals: %s, percent reporting threshold: %s, features: %s, pi_method: %s, aggregates: %s, fixed effects: %s, model settings: %s",
+            "Model parameters: \n geographic_unit_type: %s, prediction intervals: %s, \
+                percent reporting threshold: %s, features: %s, pi_method: %s, aggregates: %s, \
+                fixed effects: %s, model settings: %s",
             geographic_unit_type,
             prediction_intervals,
             percent_reporting_threshold,

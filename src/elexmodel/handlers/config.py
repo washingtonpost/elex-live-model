@@ -7,7 +7,7 @@ from elexmodel.utils.file_utils import create_directory, get_directory_path
 LOG = logging.getLogger(__name__)
 
 
-class ConfigHandler(object):
+class ConfigHandler:
     """
     Handler for model config
     """
@@ -39,7 +39,7 @@ class ConfigHandler(object):
 
         # Read local config file if available
         if Path(self.local_file_path).is_file():
-            with open(self.local_file_path, "r") as f:
+            with open(self.local_file_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
         # Else, get config from S3
         else:
@@ -103,5 +103,5 @@ class ConfigHandler(object):
     def save(self):
         if not Path(self.local_file_path).parent.exists():
             create_directory(str(Path(self.local_file_path).parent))
-        with open(self.local_file_path, "w") as f:
+        with open(self.local_file_path, "w", encoding="utf-8") as f:
             json.dump(self.config, f)

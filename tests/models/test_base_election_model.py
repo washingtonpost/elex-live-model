@@ -227,8 +227,8 @@ def test_get_aggregate_predictions_simple():
     """
     This is a basic test for our prediction aggregation. We sum the results of the reporting and reporting
     unexpected units with the predicitions from the nonreporting units. We also sum the results of the reporting
-    and reporting and unexpected units with the results from the nonreporting units (to get the current aggregate total).
-    All summing is done grouped by aggregate.git st
+    and reporting and unexpected units with the results from the nonreporting units
+    (to get the current aggregate total). All summing is done grouped by aggregate.git st
     """
     model_settings = {}
     model = BaseElectionModel.BaseElectionModel(model_settings)
