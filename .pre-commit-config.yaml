@@ -13,7 +13,7 @@ repos:
       - id: isort
         name: isort (python)
         args: ["--profile", "black", --line-length=120]
-
+      
   # black
   - repo: https://github.com/ambv/black
     rev: 23.3.0
