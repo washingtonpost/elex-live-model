@@ -8,7 +8,7 @@ from elexmodel.utils.file_utils import S3_FILE_PATH
 LOG = logging.getLogger(__name__)
 
 
-class S3Util(object):
+class S3Util:
     def __init__(self, bucket_name, client=None):
         self.bucket_name = bucket_name
         if not client:
@@ -36,7 +36,10 @@ class S3Util(object):
 
     def get_file_path(self, file_type, path_info):
         if file_type == "preprocessed":
-            file_path = f'{S3_FILE_PATH}/{path_info["election_id"]}/data/{path_info["office"]}/data_{path_info["geographic_unit_type"]}.csv'
+            file_path = (
+                f'{S3_FILE_PATH}/{path_info["election_id"]}/'
+                'data/{path_info["office"]}/data_{path_info["geographic_unit_type"]}.csv'
+            )
         elif file_type == "config":
             file_path = f'{S3_FILE_PATH}/{path_info["election_id"]}/config/{path_info["election_id"]}'
         return file_path

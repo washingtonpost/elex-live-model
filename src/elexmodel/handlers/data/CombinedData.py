@@ -2,7 +2,7 @@ from elexmodel.handlers import s3
 from elexmodel.utils.file_utils import S3_FILE_PATH, TARGET_BUCKET, convert_df_to_csv
 
 
-class CombinedDataHandler(object):
+class CombinedDataHandler:
     """
     Combined data handler. Combines preprocessed and live data
     """
@@ -89,8 +89,7 @@ class CombinedDataHandler(object):
         components = geographic_unit_fips.split("_")
         if "district" in self.geographic_unit_type:
             return components[1]
-        else:
-            return components[0]
+        return components[0]
 
     def _get_district_from_geographic_unit_fips(self, geographic_unit_fips):
         """

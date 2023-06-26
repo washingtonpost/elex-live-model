@@ -12,7 +12,7 @@ class MockLiveDataHandlerException(Exception):
     pass
 
 
-class MockLiveDataHandler(object):
+class MockLiveDataHandler:
     """
     Handles current data, which we would pull from Dynamo on an election night
     """
@@ -131,7 +131,7 @@ class MockLiveDataHandler(object):
         frac = round(percent / 100.0, 2)
         if _round == "up":
             return math.ceil(frac * self.data.shape[0])
-        elif _round == "down":
+        if _round == "down":
             return math.floor(frac * self.data.shape[0])
 
     def get_percent_fully_reported(self, percent, _round="up"):

@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 
-class Featurizer(object):
+class Featurizer:
     """
     Featurizer. Normalizes features, add intercept, expands fixed effects
     """
