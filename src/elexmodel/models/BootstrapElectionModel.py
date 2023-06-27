@@ -108,17 +108,19 @@ class BootstrapElectionModel(BaseElectionModel):
 
         residuals_y = ols_y.residuals(y_train, y_train_pred, loo=True, center=True)
         residuals_z = ols_z.residuals(z_train, z_train_pred, loo=True, center=True)
+        # TODO: compute epsilon_y, epsilon_z: state level random effect (average residual within each state)
+        # TODO: compute delta_y, delta_z: county level errors (residuals - epsilons)
 
         taus_lower = np.arange(0.01, 0.5, 0.01)
         taus_upper = np.arange(0.50, 1, 0.01)
         taus = np.concatenate([taus_lower, taus_upper])
 
-        # TODO: generalize this for the number of covariates
         x_strata_indices = [0] + self.featurizer.expanded_fixed_effects_cols
         x_strata = np.unique(x_all[:,x_strata_indices], axis=0).astype(int)
         x_train_strata = x_train[:,x_strata_indices]
         x_test_strata = x_test[:,x_strata_indices]
 
+        # TODO: separate ppfs/cdfs for epsilon and delta
         stratum_ppfs_y = {}
         stratum_ppfs_z = {}
 
@@ -131,8 +133,11 @@ class BootstrapElectionModel(BaseElectionModel):
         def cdf_creator(betas, taus):
             return lambda x: np.interp(x, betas, taus, right=1)
         
+        # TODO: fit QR models for epsilon_y, epsilon_z (covariates are state level demographics)
+
         for x_stratum in x_strata:
             x_train_aug = np.concatenate([x_train_strata, x_stratum.reshape(1, -1)], axis=0)
+            # TODO: turn residuals_y, residuals_z into delta_y, delta_z
             y_aug_lb = np.concatenate([residuals_y, [self.y_LB]])
             y_aug_ub = np.concatenate([residuals_y, [self.y_UB]])
             z_aug_lb = np.concatenate([residuals_z, [self.z_LB]])
@@ -153,9 +158,12 @@ class BootstrapElectionModel(BaseElectionModel):
             stratum_cdfs_y[tuple(x_stratum)] = cdf_creator(betas_y_stratum, taus)
             stratum_cdfs_z[tuple(x_stratum)] = cdf_creator(betas_y_stratum, taus)
 
+        # TODO: sample uniforms for epsilon
+
         unifs = []
         x_train_strata_unique = np.unique(x_train_strata, axis=0).astype(int)
         for strata_dummies in x_train_strata_unique:
+            # TODO: turn this into delta_y, delta_z
             residuals_y_strata = residuals_y[np.where((strata_dummies == x_train_strata).all(axis=1))[0]]
             residuals_z_strata = residuals_z[np.where((strata_dummies == x_train_strata).all(axis=1))[0]]
 
@@ -173,17 +181,22 @@ class BootstrapElectionModel(BaseElectionModel):
             unifs.append(unifs_strata)
         unifs = np.concatenate(unifs, axis=0)
 
+        # TODO: resample uniforms for states (ie. one per state) -> this is for the epsilons
         unifs_B = self.rng.choice(unifs, (n, self.B), replace=True)
 
+        # TODO: turn sampled epsilon uniforms into sampled epsilons
+
+        # TODO: turn this into delta_y, delta_z
         residuals_y_B = np.zeros((n, self.B))
         residuals_z_B = np.zeros((n, self.B))
-        
+
         for strata_dummies in x_train_strata_unique:
             strata_indices = np.where((strata_dummies == x_train_strata).all(axis=1))[0]
             unifs_strata = unifs_B[strata_indices]
             residuals_y_B[strata_indices] = stratum_ppfs_y[tuple(strata_dummies)](unifs_strata[:,:,0])
             residuals_z_B[strata_indices] = stratum_ppfs_z[tuple(strata_dummies)](unifs_strata[:,:,1])
 
+        # TODO: add epsilons and deltas here to get y_B, z_B
         y_B = y_train_pred + residuals_y_B
         z_B = z_train_pred + residuals_z_B
         ols_y_B = OLSRegression().fit(x_train, y_B, weights_train, normal_eqs=ols_y.normal_eqs)
@@ -196,6 +209,10 @@ class BootstrapElectionModel(BaseElectionModel):
         y_test_pred = ols_y.predict(x_test)
         z_test_pred = ols_z.predict(x_test)
         yz_test_pred = y_test_pred * z_test_pred
+
+        # TODO: for states where we have seen counties report we already have an estimate for epsilon_y, epsilon_z so we only 
+        # need to sample delta_y, delta_z
+        # for states where we have not seen any countiesreport we have to sample both epsilon_y, epsilon_z and delta_y, delta_z
 
         # sample uniforms for each outstanding state and outstanding stratum in state
         groups_test = nonreporting_units[['postal_code']].values.astype(str)
@@ -227,6 +244,7 @@ class BootstrapElectionModel(BaseElectionModel):
         # errors_B_2 += test_residuals_y * test_residuals_z
         # errors_B_2 += yz_test_pred
 
+        # TODO: add in epsilons and deltas instead of test_residuals
         errors_B_2 = (y_test_pred + test_residuals_y).clip(min=-1, max=1)
         errors_B_2 *= (z_test_pred + test_residuals_z).clip(min=0)
 
