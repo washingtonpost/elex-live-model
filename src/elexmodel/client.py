@@ -49,6 +49,7 @@ class ModelClient:
         fixed_effects,
         pi_method,
         beta,
+        winsorize,
         robust,
         lambda_,
         handle_unreporting,
@@ -89,6 +90,8 @@ class ModelClient:
             )
         if not isinstance(beta, (int, float)):
             raise ValueError("beta is not valid. Has to be either an integer or a float.")
+        if not isinstance(winsorize, int):
+            raise ValueError("winsorize is not valid. Has to be an integer.")
         if not isinstance(robust, bool):
             raise ValueError("robust is not valid. Has to be a boolean.")
         if not isinstance(lambda_, (float, int)):
@@ -149,6 +152,7 @@ class ModelClient:
         fixed_effects = kwargs.get("fixed_effects", {})
         pi_method = kwargs.get("pi_method", "nonparametric")
         beta = kwargs.get("beta", 1)
+        winsorize = kwargs.get("winsorize", 1)
         robust = kwargs.get("robust", False)
         lambda_ = kwargs.get("lambda_", 0)
         save_output = kwargs.get("save_output", ["results"])
@@ -163,6 +167,7 @@ class ModelClient:
             "office": office,
             "geographic_unit_type": geographic_unit_type,
             "beta": beta,
+            "winsorize": winsorize,
             "robust": robust,
             "lambda_": lambda_,
             "features": features,
@@ -184,6 +189,7 @@ class ModelClient:
             fixed_effects,
             pi_method,
             beta,
+            winsorize,
             robust,
             lambda_,
             handle_unreporting,

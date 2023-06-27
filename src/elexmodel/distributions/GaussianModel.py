@@ -70,7 +70,7 @@ class GaussianModel:
             .fillna({"n": 0})
         )
 
-    def _fit(self, conformalization_data, estimand, aggregate, alpha, beta):
+    def _fit(self, conformalization_data, estimand, aggregate, alpha, beta, winsorize):
         """
         Compute fit for Gaussian Model
         """
@@ -124,6 +124,7 @@ class GaussianModel:
         alpha=0.9,
         reweight=False,
         beta=1,
+        winsorize=1,
         top_level=True,
     ):
         """
@@ -157,6 +158,7 @@ class GaussianModel:
                 alpha=alpha,
                 reweight=reweight,
                 beta=beta,
+                winsorize=winsorize,
                 top_level=False,
             )
 
@@ -189,6 +191,7 @@ class GaussianModel:
                 alpha=alpha,
                 reweight=reweight,
                 beta=beta,
+                winsorize=winsorize,
                 top_level=False,
             )
 
@@ -196,7 +199,7 @@ class GaussianModel:
             x = pd.concat([gaussian_model_small_groups, gaussian_model_large_groups]).reset_index(drop=True)
         else:
             # when the group is large enough we can compute the Gaussian model for conformalization
-            x = self._fit(conformalization_data, estimand, aggregate, alpha, beta)
+            x = self._fit(conformalization_data, estimand, aggregate, alpha, beta, winsorize)
 
         # Write to s3 at the highest level of recursion before we exit GaussianModel
         # and return to GaussianElectionModel

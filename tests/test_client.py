@@ -16,6 +16,7 @@ aggregates = ["postal_code", "county_fips"]
 fixed_effects = []
 pi_method = "gaussian"
 beta = 3
+winsorize = 1
 robust = True
 lambda_ = 0
 handle_unreporting = "drop"
@@ -35,6 +36,7 @@ def test_check_input_parameters(model_client, va_governor_config):
         fixed_effects,
         pi_method,
         beta,
+        winsorize,
         robust,
         lambda_,
         handle_unreporting,
@@ -56,6 +58,7 @@ def test_check_input_parameters_office(model_client, va_governor_config):
             fixed_effects,
             pi_method,
             beta,
+            winsorize,
             robust,
             lambda_,
             handle_unreporting,
@@ -77,6 +80,7 @@ def test_check_input_parameters_pi_method(model_client, va_governor_config):
             fixed_effects,
             "bad_pi_method",
             beta,
+            winsorize,
             robust,
             lambda_,
             handle_unreporting,
@@ -98,6 +102,7 @@ def test_check_input_parameters_estimand(model_client, va_governor_config):
             fixed_effects,
             pi_method,
             beta,
+            winsorize,
             robust,
             lambda_,
             handle_unreporting,
@@ -119,6 +124,7 @@ def test_check_input_parameters_geographic_unit_type(model_client, va_governor_c
             fixed_effects,
             pi_method,
             beta,
+            winsorize,
             robust,
             lambda_,
             handle_unreporting,
@@ -140,6 +146,7 @@ def test_check_input_parameters_features(model_client, va_governor_config):
             fixed_effects,
             pi_method,
             beta,
+            winsorize,
             robust,
             lambda_,
             handle_unreporting,
@@ -161,6 +168,7 @@ def test_check_input_parameters_aggregates(model_client, va_governor_config):
             fixed_effects,
             pi_method,
             beta,
+            winsorize,
             robust,
             lambda_,
             handle_unreporting,
@@ -182,6 +190,7 @@ def test_check_input_parameters_fixed_effect_list(model_client, va_governor_conf
             ["bad_fixed_effect"],
             pi_method,
             beta,
+            winsorize,
             robust,
             lambda_,
             handle_unreporting,
@@ -203,6 +212,7 @@ def test_check_input_parameters_fixed_effect_dict(model_client, va_governor_conf
             {"bad_fixed_effect": ["a", "b"]},
             pi_method,
             beta,
+            winsorize,
             robust,
             lambda_,
             handle_unreporting,
@@ -224,6 +234,29 @@ def test_check_input_parameters_beta(model_client, va_governor_config):
             fixed_effects,
             pi_method,
             "bad_beta",
+            winsorize,
+            robust,
+            lambda_,
+            handle_unreporting,
+        )
+
+
+def test_check_input_parameters_winsorize(model_client, va_governor_config):
+    election_id = "2017-11-07_VA_G"
+    config_handler = ConfigHandler(election_id, config=va_governor_config)
+
+    with pytest.raises(ValueError):
+        model_client._check_input_parameters(
+            config_handler,
+            office,
+            estimands,
+            geographic_unit_type,
+            features,
+            aggregates,
+            fixed_effects,
+            pi_method,
+            beta,
+            "bad_winsorize",
             robust,
             lambda_,
             handle_unreporting,
@@ -245,6 +278,7 @@ def test_check_input_parameters_robust(model_client, va_governor_config):
             fixed_effects,
             pi_method,
             beta,
+            winsorize,
             "bad_robust",
             lambda_,
             handle_unreporting,
@@ -266,6 +300,7 @@ def test_check_input_parameters_lambda_(model_client, va_governor_config):
             fixed_effects,
             pi_method,
             beta,
+            winsorize,
             robust,
             -1,
             handle_unreporting,
@@ -287,6 +322,7 @@ def test_check_input_parameters_handle_unreporting(model_client, va_governor_con
             fixed_effects,
             pi_method,
             beta,
+            winsorize,
             robust,
             lambda_,
             "bad_handle_unreporting",

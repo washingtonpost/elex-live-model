@@ -130,6 +130,7 @@ def test_fit():
     weights = random_number_generator.randint(low=1, high=100, size=n)
     alpha = 0.9
     beta = 1
+    winsorize = 1
     estimand = "turnout"
     model_settings = {
         "election_id": "2017-11-07_VA_G",
@@ -143,7 +144,7 @@ def test_fit():
     df = pd.DataFrame({f"last_election_results_{estimand}": weights, "lower_bounds": lower, "upper_bounds": upper})
 
     # all in the same group
-    g = gaussian_model._fit(df, estimand, [], alpha, beta)
+    g = gaussian_model._fit(df, estimand, [], alpha, beta, winsorize)
 
     # assumes that weighted median and standard deviation bootstrap works
     # tests for that in test_utils
@@ -185,7 +186,7 @@ def test_fit():
     df = pd.concat([df_a, df_b])
 
     # fit model to multiple groups separately
-    g = gaussian_model._fit(df, estimand, ["group"], alpha, beta)
+    g = gaussian_model._fit(df, estimand, ["group"], alpha, beta, winsorize)
 
     assert math_utils.weighted_median(a, weights_a / weights_a.sum()) == pytest.approx(g.mu_lower_bound[0], TOL)
     assert math_utils.boot_sigma(a, conf=(3 + alpha) / 4) == pytest.approx(g.sigma_lower_bound[0], RELAX_TOL)
@@ -247,6 +248,7 @@ def test_large_and_small_fit():
 
     alpha = 0.9
     beta = 1
+    winsorize = 1
 
     reporting = pd.DataFrame({"group_1": ["general", "general"], "group_2": ["a", "b"]})
     nonreporting = pd.DataFrame({"group_1": ["general", "general"], "group_2": ["a", "b"]})
@@ -260,6 +262,7 @@ def test_large_and_small_fit():
         alpha=alpha,
         reweight=False,
         beta=beta,
+        winsorize=winsorize,
     )
 
     assert math_utils.weighted_median(general, general_weights / general_weights.sum()) == pytest.approx(

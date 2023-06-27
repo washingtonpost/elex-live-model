@@ -66,6 +66,9 @@ def weighted_median(x, weights):
 
 
 def robust_sample_std(x, axis):
+    """
+    Compute the robust sample standard deviation along the last axis by calling winsorize_std.
+    """
     return winsorize_std(x, axis=-1)
 
 
