@@ -7,7 +7,7 @@ from elexmodel.utils.constants import VALID_AGGREGATES_MAPPING
 from elexmodel.utils.file_utils import S3_FILE_PATH, TARGET_BUCKET, convert_df_to_csv
 
 
-class ModelResultsHandler(object):
+class ModelResultsHandler:
     """
     Handler for model results
     """

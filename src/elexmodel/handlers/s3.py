@@ -8,7 +8,7 @@ from elexmodel.utils.file_utils import S3_FILE_PATH
 LOG = logging.getLogger(__name__)
 
 
-class S3Util(object):
+class S3Util:
     def __init__(self, bucket_name, client=None):
         self.bucket_name = bucket_name
         if not client:
@@ -66,6 +66,7 @@ class S3CsvUtil(S3Util):
         """
         if not filename.endswith(".csv"):
             filename = f"{filename}.csv"
+        kwargs.setdefault("ContentType", "text/csv")
         super().put(filename, data, **kwargs)
 
     def get(self, filename, load=True, **kwargs):

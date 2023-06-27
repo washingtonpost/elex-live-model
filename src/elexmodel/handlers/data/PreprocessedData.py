@@ -9,7 +9,7 @@ from elexmodel.utils.file_utils import create_directory, get_directory_path
 LOG = logging.getLogger(__name__)
 
 
-class PreprocessedDataHandler(object):
+class PreprocessedDataHandler:
     """
     Handler for preprocessed data for model
     """
@@ -52,6 +52,7 @@ class PreprocessedDataHandler(object):
                 "geographic_unit_type": self.geographic_unit_type,
             }
             file_path = self.s3_client.get_file_path("preprocessed", path_info)
+
             csv_data = self.s3_client.get(file_path)
             # read data as a buffer
             preprocessed_data = StringIO(csv_data)
@@ -89,10 +90,8 @@ class PreprocessedDataHandler(object):
 
         for estimand, pointer in estimand_baselines.items():
             baseline_name = f"baseline_{pointer}"
-            preprocessed_data[f"last_election_results_{estimand}"] = preprocessed_data[baseline_name].copy()
-            # TODO: rename total voters column
             # Adding one to prevent zero divison
-            preprocessed_data[f"total_voters_{estimand}"] = preprocessed_data[f"last_election_results_{estimand}"] + 1
+            preprocessed_data[f"last_election_results_{estimand}"] = preprocessed_data[baseline_name].copy() + 1
 
         return preprocessed_data
 

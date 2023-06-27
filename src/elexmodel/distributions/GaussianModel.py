@@ -3,7 +3,6 @@ import pandas as pd
 
 from elexmodel.handlers import s3
 from elexmodel.utils import math_utils, pandas_utils
-from elexmodel.utils.constants import AGGREGATE_ORDER
 from elexmodel.utils.file_utils import S3_FILE_PATH, TARGET_BUCKET, convert_df_to_csv
 
 
@@ -93,14 +92,18 @@ class GaussianModel:
             .apply(
                 lambda x: pd.Series(
                     {
-                        "var_inflate": math_utils.compute_inflate(x[f"total_voters_{estimand}"]),
+                        "var_inflate": math_utils.compute_inflate(x[f"last_election_results_{estimand}"]),
                         "mu_lower_bound": math_utils.weighted_median(
                             x.lower_bounds.values,
-                            (x[f"total_voters_{estimand}"] / np.sum(x[f"total_voters_{estimand}"])).to_numpy(),
+                            (
+                                x[f"last_election_results_{estimand}"] / np.sum(x[f"last_election_results_{estimand}"])
+                            ).to_numpy(),
                         ),
                         "mu_upper_bound": math_utils.weighted_median(
                             x.upper_bounds.values,
-                            (x[f"total_voters_{estimand}"] / np.sum(x[f"total_voters_{estimand}"])).to_numpy(),
+                            (
+                                x[f"last_election_results_{estimand}"] / np.sum(x[f"last_election_results_{estimand}"])
+                            ).to_numpy(),
                         ),
                         "sigma_lower_bound": beta * math_utils.boot_sigma(x.lower_bounds.values, conf=(3 + alpha) / 4),
                         "sigma_upper_bound": beta * math_utils.boot_sigma(x.upper_bounds.values, conf=(3 + alpha) / 4),
@@ -136,114 +139,112 @@ class GaussianModel:
         if reweight:
             # TODO: implement reweighting
             raise NotImplementedError
+        counts = self._get_n_units_per_group(conformalization_data, nonreporting_units, aggregate)
+
+        # if one group has fewer than MODEL_THRESHOLD observations to fit with,
+        # remove one layer of aggregation and refit the parametric model
+        # e.g. instead of fitting a parametric model for each county in a state,
+        # produce a parametric model for the state
+        MODEL_THRESHOLD = min(10, n_conformalization_data)
+        if np.min(counts["n"]) < MODEL_THRESHOLD:
+            # model for small groups (ie. ones where count < MODEL_THRESHOLD)
+            gaussian_model_small_groups = self.fit(
+                conformalization_data,
+                reporting_units,
+                nonreporting_units,
+                estimand,
+                aggregate=aggregate[:-1],  # remove the last (smallest) aggregate
+                alpha=alpha,
+                reweight=reweight,
+                beta=beta,
+                top_level=False,
+            )
+
+            # still construct the per-group parametric model when possible
+            conformalization_data_for_large_groups = (
+                counts.query("n >= @MODEL_THRESHOLD")
+                .reset_index(drop=True)
+                .merge(conformalization_data, how="inner", on=aggregate)
+                # query("n < 0").reset_index(drop=True) # uncomment me to disable
+                .drop(columns=["n"])
+            )
+
+            # select reporting/nonreporting data that are in groups
+            # that are large enough only. semi_join does that
+            reporting_units_for_large_groups = pandas_utils.semi_join(
+                reporting_units, conformalization_data_for_large_groups, on=aggregate
+            )
+
+            nonreporting_units_for_large_groups = pandas_utils.semi_join(
+                nonreporting_units, conformalization_data_for_large_groups, on=aggregate
+            )
+
+            # fit gaussian model for groups that have enough units per group
+            gaussian_model_large_groups = self.fit(
+                conformalization_data_for_large_groups,
+                reporting_units_for_large_groups,
+                nonreporting_units_for_large_groups,
+                estimand,
+                aggregate=aggregate,  # remove the last (smallest) aggregate
+                alpha=alpha,
+                reweight=reweight,
+                beta=beta,
+                top_level=False,
+            )
+
+            # combine large and small models
+            x = pd.concat([gaussian_model_small_groups, gaussian_model_large_groups]).reset_index(drop=True)
         else:
-            counts = self._get_n_units_per_group(conformalization_data, nonreporting_units, aggregate)
+            # when the group is large enough we can compute the Gaussian model for conformalization
+            x = self._fit(conformalization_data, estimand, aggregate, alpha, beta)
 
-            # if one group has fewer than MODEL_THRESHOLD observations to fit with,
-            # remove one layer of aggregation and refit the parametric model
-            # e.g. instead of fitting a parametric model for each county in a state,
-            # produce a parametric model for the state
-            MODEL_THRESHOLD = min(10, n_conformalization_data)
-            if np.min(counts["n"]) < MODEL_THRESHOLD:
-                # model for small groups (ie. ones where count < MODEL_THRESHOLD)
-                gaussian_model_small_groups = self.fit(
-                    conformalization_data,
-                    reporting_units,
-                    nonreporting_units,
-                    estimand,
-                    aggregate=aggregate[:-1],  # remove the last (smallest) aggregate
-                    alpha=alpha,
-                    reweight=reweight,
-                    beta=beta,
-                    top_level=False,
-                )
+        # Write to s3 at the highest level of recursion before we exit GaussianModel
+        # and return to GaussianElectionModel
+        if top_level and aggregate and self.save_conformalization:
+            # Write conformalization data
+            gaussian_bounds = x.copy()
+            self._write_conformalization_data(
+                conformalization_data[
+                    ["geographic_unit_fips"]
+                    + aggregate
+                    + [
+                        f"last_election_results_{estimand}",
+                        "lower_bounds",
+                        "upper_bounds",
+                    ]
+                ],
+                self.election_id,
+                self.office,
+                self.geographic_unit_type,
+                estimand,
+                aggregate,
+                alpha,
+            )
+            # Write bounds
+            self._write_gaussian_bounds(
+                gaussian_bounds,
+                self.election_id,
+                self.office,
+                self.geographic_unit_type,
+                estimand,
+                aggregate,
+                alpha,
+            )
 
-                # still construct the per-group parametric model when possible
-                conformalization_data_for_large_groups = (
-                    counts.query("n >= @MODEL_THRESHOLD")
-                    .reset_index(drop=True)
-                    .merge(conformalization_data, how="inner", on=aggregate)
-                    # query("n < 0").reset_index(drop=True) # uncomment me to disable
-                    .drop(columns=["n"])
-                )
-
-                # select reporting/nonreporting data that are in groups
-                # that are large enough only. semi_join does that
-                reporting_units_for_large_groups = pandas_utils.semi_join(
-                    reporting_units, conformalization_data_for_large_groups, on=aggregate
-                )
-
-                nonreporting_units_for_large_groups = pandas_utils.semi_join(
-                    nonreporting_units, conformalization_data_for_large_groups, on=aggregate
-                )
-
-                # fit gaussian model for groups that have enough units per group
-                gaussian_model_large_groups = self.fit(
-                    conformalization_data_for_large_groups,
-                    reporting_units_for_large_groups,
-                    nonreporting_units_for_large_groups,
-                    estimand,
-                    aggregate=aggregate,  # remove the last (smallest) aggregate
-                    alpha=alpha,
-                    reweight=reweight,
-                    beta=beta,
-                    top_level=False,
-                )
-
-                # combine large and small models
-                x = pd.concat([gaussian_model_small_groups, gaussian_model_large_groups]).reset_index(drop=True)
-            else:
-                # when the group is large enough we can compute the Gaussian model for conformalization
-                x = self._fit(conformalization_data, estimand, aggregate, alpha, beta)
-
-            # Write to s3 at the highest level of recursion before we exit GaussianModel and return to GaussianElectionModel
-            if top_level and aggregate and self.save_conformalization:
-                # Write conformalization data
-                gaussian_bounds = x.copy()
-                self._write_conformalization_data(
-                    conformalization_data[
-                        ["geographic_unit_fips"]
-                        + aggregate
-                        + [
-                            f"total_voters_{estimand}",
-                            "lower_bounds",
-                            "upper_bounds",
-                        ]
-                    ],
-                    self.election_id,
-                    self.office,
-                    self.geographic_unit_type,
-                    estimand,
-                    aggregate,
-                    alpha,
-                )
-                # Write columns for preceding aggregates
-                for agg in AGGREGATE_ORDER[: AGGREGATE_ORDER.index(aggregate[-1])]:
-                    if agg in conformalization_data:
-                        gaussian_bounds[agg] = conformalization_data[agg]
-                # Write bounds
-                self._write_gaussian_bounds(
-                    gaussian_bounds,
-                    self.election_id,
-                    self.office,
-                    self.geographic_unit_type,
-                    estimand,
-                    aggregate,
-                    alpha,
-                )
-
-            return x
+        return x
 
     def _write_conformalization_data(
         self, conformalization_data, election_id, office, geographic_unit_type, estimand, aggregate, alpha
     ):
         """
-        Write this data to S3 so we can examine if the upper and lower bounds look like they come from a Gaussian distribution.
+        Write this data to S3 so we can examine if the upper and lower bounds look like
+        they come from a Gaussian distribution.
         """
         s3_client = s3.S3CsvUtil(TARGET_BUCKET)
         # type(aggregate) == list
         aggregate_string = aggregate[-1]
-        path = f"{S3_FILE_PATH}/{election_id}/gaussian/{office}/{geographic_unit_type}/{estimand}-{aggregate_string}-{alpha}/conformalization_data"
+        path = f"{S3_FILE_PATH}/{election_id}/gaussian/{office}/{geographic_unit_type}\
+            /{estimand}-{aggregate_string}-{alpha}/conformalization_data"
         conformalization_data_csv = convert_df_to_csv(conformalization_data)
         s3_client.put(path, conformalization_data_csv)
 
@@ -256,6 +257,7 @@ class GaussianModel:
         s3_client = s3.S3CsvUtil(TARGET_BUCKET)
         # type(aggregate) == list
         aggregate_string = aggregate[-1]
-        path = f"{S3_FILE_PATH}/{election_id}/gaussian/{office}/{geographic_unit_type}/{estimand}-{aggregate_string}-{alpha}/bounds"
+        path = f"{S3_FILE_PATH}/{election_id}/gaussian/{office}/\
+            {geographic_unit_type}/{estimand}-{aggregate_string}-{alpha}/bounds"
         gaussian_fit_csv = convert_df_to_csv(gaussian_fit)
         s3_client.put(path, gaussian_fit_csv)

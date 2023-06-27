@@ -25,69 +25,23 @@ def test_fit_model():
     assert all(np.abs(qr.coefficients - [1, 7]) <= TOL)
 
 
-def test_fit_model_substituting_coefficients():
-    """
-    Test substituting coefficients for duplicate and zero columns
-    """
-    model_settings = {}
+def test_get_unit_predictions():
+    model_settings = {"lambda_": 1, "features": ["b"]}
     model = BaseElectionModel.BaseElectionModel(model_settings)
-    qr = QuantileRegressionSolver(solver="ECOS")
+    df_X = pd.DataFrame(
+        {
+            "residuals_a": [1, 2, 3, 4],
+            "total_voters_a": [4, 2, 9, 5],
+            "last_election_results_a": [5, 1, 4, 2],
+            "results_a": [0, 0, 0, 1],
+            "b": [2, 3, 4, 5],
+        }
+    )
+    model.get_unit_predictions(df_X, df_X, estimand="a")
 
-    # test setting one coefficient to zero through duplication
-    df_X = pd.DataFrame({"a": [1, 1, 1, 1], "b": [1, 1, 1, 2], "c": [1, 1, 1, 2]})
-
-    df_y = pd.DataFrame({"y": [3, 8, 9, 15]}).y
-    weights = pd.DataFrame({"weights": [1, 1, 1, 1]}).weights
-    model.fit_model(qr, df_X, df_y, 0.5, weights, True)
-
-    assert all(np.abs(qr.predict(df_X) - [8, 8, 8, 15]) <= TOL)
-    # last coefficient has been set to zero because of duplicate
-    assert all(np.abs(qr.coefficients - [1, 7, 0]) <= TOL)
-
-    # test setting two coefficients to zero through duplication
-    df_X = pd.DataFrame({"a": [1, 1, 1, 1], "b": [1, 1, 1, 1], "c": [1, 1, 1, 2], "d": [1, 1, 1, 2]})
-
-    df_y = pd.DataFrame({"y": [3, 8, 9, 15]}).y
-    weights = pd.DataFrame({"weights": [1, 1, 1, 1]}).weights
-    model.fit_model(qr, df_X, df_y, 0.5, weights, True)
-
-    assert all(np.abs(qr.predict(df_X) - [8, 8, 8, 15]) <= TOL)
-    # second and last coefficients have been set to zero because duplicates
-    assert all(np.abs(qr.coefficients - [1, 0, 7, 0]) <= TOL)
-
-    # test setting one coefficient to zero through zero column
-    df_X = pd.DataFrame({"a": [1, 1, 1, 1], "b": [1, 1, 1, 2], "c": [0, 0, 0, 0]})
-
-    df_y = pd.DataFrame({"y": [3, 8, 9, 15]}).y
-    weights = pd.DataFrame({"weights": [1, 1, 1, 1]}).weights
-    model.fit_model(qr, df_X, df_y, 0.5, weights, True)
-
-    assert all(np.abs(qr.predict(df_X) - [8, 8, 8, 15]) <= TOL)
-    # last coefficient has been set to zero because it is a zero column
-    assert all(np.abs(qr.coefficients - [1, 7, 0]) <= TOL)
-
-    # test setting two coeffients to zero, one through duplication and one through zero column
-    df_X = pd.DataFrame({"a": [1, 1, 1, 1], "b": [1, 1, 1, 1], "c": [1, 1, 1, 2], "d": [0, 0, 0, 0]})
-
-    df_y = pd.DataFrame({"y": [3, 8, 9, 15]}).y
-    weights = pd.DataFrame({"weights": [1, 1, 1, 1]}).weights
-    model.fit_model(qr, df_X, df_y, 0.5, weights, True)
-
-    assert all(np.abs(qr.predict(df_X) - [8, 8, 8, 15]) <= TOL)
-    # second coefficient was set to zero because it was a duplicate column.
-    # last coefficient was set to zero because it was a zero column
-    assert all(np.abs(qr.coefficients - [1, 0, 7, 0]) <= TOL)
-
-    # test case where column is zero and duplicated
-    df_X = pd.DataFrame({"a": [1, 1, 1, 1], "b": [1, 1, 1, 2], "c": [0, 0, 0, 0], "d": [0, 0, 0, 0]})
-
-    df_y = pd.DataFrame({"y": [3, 8, 9, 15]}).y
-    weights = pd.DataFrame({"weights": [1, 1, 1, 1]}).weights
-    model.fit_model(qr, df_X, df_y, 0.5, weights, True)
-
-    assert all(np.abs(qr.predict(df_X) - [8, 8, 8, 15]) <= TOL)
-    # second to last and last coefficients were set to zero because they were both zero columns and duplicates
-    assert all(np.abs(qr.coefficients - [1, 7, 0, 0]) <= TOL)
+    "intercept" in model.features_to_coefficients
+    "b" in model.features_to_coefficients
+    model.features_to_coefficients["intercept"] > 0
 
 
 def test_aggregation_simple():
@@ -273,8 +227,8 @@ def test_get_aggregate_predictions_simple():
     """
     This is a basic test for our prediction aggregation. We sum the results of the reporting and reporting
     unexpected units with the predicitions from the nonreporting units. We also sum the results of the reporting
-    and reporting and unexpected units with the results from the nonreporting units (to get the current aggregate total).
-    All summing is done grouped by aggregate.git st
+    and reporting and unexpected units with the results from the nonreporting units
+    (to get the current aggregate total). All summing is done grouped by aggregate.git st
     """
     model_settings = {}
     model = BaseElectionModel.BaseElectionModel(model_settings)

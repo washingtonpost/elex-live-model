@@ -14,48 +14,9 @@ def test_load(va_governor_county_data):
     current_data = live_data_handler.data
 
     combined_data_handler = CombinedDataHandler(
-        va_governor_county_data, current_data, estimands, "county", fixed_effects=[], handle_unreporting="drop"
+        va_governor_county_data, current_data, estimands, "county", handle_unreporting="drop"
     )
-
     assert combined_data_handler.data.shape == (133, 29)
-
-
-def test_generate_fixed_effects(va_governor_county_data):
-    estimands = ["turnout"]
-    live_data_handler = MockLiveDataHandler(
-        "2017-11-07_VA_G", "G", "county", estimands=["turnout"], data=va_governor_county_data
-    )
-    current_data = live_data_handler.data
-
-    combined_data_handler = CombinedDataHandler(
-        va_governor_county_data,
-        current_data,
-        estimands,
-        "county",
-        fixed_effects=["county_classification"],
-        handle_unreporting="drop",
-    )
-
-    assert combined_data_handler.data.shape == (133, 34)  # 29 + 6 - 1 (subtracting dropped column)
-    assert "county_classification_nova" in combined_data_handler.data.columns
-    assert "county_classification" in combined_data_handler.fixed_effects
-    assert len(combined_data_handler.expanded_fixed_effects) == 5  # 6 - 1
-
-    combined_data_handler = CombinedDataHandler(
-        va_governor_county_data,
-        current_data,
-        estimands,
-        "county",
-        fixed_effects=["county_classification", "county_fips"],
-        handle_unreporting="drop",
-    )
-
-    assert combined_data_handler.data.shape == (133, 166)  # 29 + 6 + 133 - 2 (subtracting two dropped columns)= 166
-    assert "county_classification_nova" in combined_data_handler.data.columns
-    assert "county_fips_51790" in combined_data_handler.data.columns
-    assert "county_classification" in combined_data_handler.fixed_effects
-    assert "county_fips" in combined_data_handler.fixed_effects
-    assert len(combined_data_handler.expanded_fixed_effects) == 137  # 6 + 133 - 2
 
 
 def test_zero_unreporting_missing_single_estimand_value(va_governor_county_data):
@@ -158,40 +119,6 @@ def test_drop_unreporting_missing_single_estimand_value(va_governor_county_data)
     assert combined_data_handler.data["results_dem"].iloc[0] != 0  # didn't accidentally set other to zero
 
 
-def test_expanding_fixed_effects_basic():
-    df = pd.DataFrame({"c1": ["a", "b", "b", "c"], "c2": ["w", "x", "y", "z"], "c3": [2, 4, 1, 9]})
-    expanded = CombinedDataHandler._expand_fixed_effects(df, ["c1"])
-    pd.testing.assert_frame_equal(
-        expanded,
-        pd.DataFrame(
-            {
-                "c2": ["w", "x", "y", "z"],
-                "c3": [2, 4, 1, 9],
-                "c1_b": [0, 1, 1, 0],
-                "c1_c": [0, 0, 0, 1],
-                "c1": ["a", "b", "b", "c"],
-            }
-        ),
-    )
-
-    expanded = CombinedDataHandler._expand_fixed_effects(df, ["c1", "c2"])
-    pd.testing.assert_frame_equal(
-        expanded,
-        pd.DataFrame(
-            {
-                "c3": [2, 4, 1, 9],
-                "c1_b": [0, 1, 1, 0],
-                "c1_c": [0, 0, 0, 1],
-                "c2_x": [0, 1, 0, 0],
-                "c2_y": [0, 0, 1, 0],
-                "c2_z": [0, 0, 0, 1],
-                "c1": ["a", "b", "b", "c"],
-                "c2": ["w", "x", "y", "z"],
-            }
-        ),
-    )
-
-
 def test_get_reporting_data(va_governor_county_data):
     election_id = "2017-11-07_VA_G"
     office = "G"
@@ -213,8 +140,8 @@ def test_get_reporting_data(va_governor_county_data):
     )
     observed_data = combined_data_handler.get_reporting_units(100)
     assert observed_data.shape[0] == 20
-    assert observed_data.intercept.iloc[0] == 1
-    assert observed_data.intercept.sum() == 20
+    assert observed_data.reporting.iloc[0] == 1
+    assert observed_data.reporting.sum() == 20
 
 
 def test_get_unexpected_units_county_district(va_assembly_county_data):

@@ -10,6 +10,8 @@ class NonparametricElectionModel(BaseElectionModel):
     def __init__(self, model_settings={}):
         super().__init__(model_settings)
         self.robust = model_settings.get("robust", False)
+        self.conformalization_data_agg = None
+        self.conformalization_data_unit = None
 
     def _compute_conf_frac(self, n_reporting_units, alpha):
         """
@@ -30,7 +32,8 @@ class NonparametricElectionModel(BaseElectionModel):
         """
         # calc weights
         weights = (
-            conformalization_data[f"total_voters_{estimand}"] / conformalization_data[f"total_voters_{estimand}"].sum()
+            conformalization_data[f"last_election_results_{estimand}"]
+            / conformalization_data[f"last_election_results_{estimand}"].sum()
         )
         # sort scores and weights by scores
         population_correction = pd.DataFrame({"scores": scores, "weights": weights}).sort_values("scores")
@@ -52,7 +55,7 @@ class NonparametricElectionModel(BaseElectionModel):
         prediction_intervals = self.get_unit_prediction_interval_bounds(
             reporting_units, nonreporting_units, conf_frac, alpha, estimand
         )
-
+        self.conformalization_data_unit = prediction_intervals.conformalization
         # compute conformity scores (e_j). This is how well the the lower/upper model cover the conformalization data.
         scores = np.maximum(
             prediction_intervals.conformalization.lower_bounds, prediction_intervals.conformalization.upper_bounds
@@ -84,8 +87,8 @@ class NonparametricElectionModel(BaseElectionModel):
         self.nonreporting_upper_bounds = upper
 
         # un-normalize residuals
-        lower *= nonreporting_units[f"total_voters_{estimand}"]
-        upper *= nonreporting_units[f"total_voters_{estimand}"]
+        lower *= nonreporting_units[f"last_election_results_{estimand}"]
+        upper *= nonreporting_units[f"last_election_results_{estimand}"]
 
         # move from residual to vote space
         # max with nonreporting results so that bounds are at least as large as the # of votes seen
@@ -100,6 +103,13 @@ class NonparametricElectionModel(BaseElectionModel):
             lower.round(decimals=0), upper.round(decimals=0), prediction_intervals.conformalization
         )
 
+    # At the unit level, conformalization data is adjustment from estimated % change from baseline
+    def get_all_conformalization_data_unit(self):
+        return None, self.conformalization_data_unit
+
+    def get_all_conformalization_data_agg(self):
+        return None, self.conformalization_data_agg
+
     def get_aggregate_prediction_intervals(
         self,
         reporting_units,
@@ -109,7 +119,6 @@ class NonparametricElectionModel(BaseElectionModel):
         alpha,
         conformalization_data,
         estimand,
-        model_settings,
     ):
         """
         Get aggregate prediction intervals. In the non-parametric case prediction intervals just sum.
@@ -146,4 +155,5 @@ class NonparametricElectionModel(BaseElectionModel):
             .reset_index(drop=True)
         )
 
+        self.conformalization_data_agg = conformalization_data
         return PredictionIntervals(aggregate_data.lower.round(decimals=0), aggregate_data.upper.round(decimals=0))

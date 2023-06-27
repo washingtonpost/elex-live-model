@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.0.10 (06/07/2023)
+- fix: fixing a fixed effect bug [#35](https://github.com/washingtonpost/elex-live-model/pull/35)
+- chore: updated boto3 version [#36](https://github.com/washingtonpost/elex-live-model/pull/36)
+- feat: move fixed effect creation from CombinedDataHandler to Featurizer [#38](https://github.com/washingtonpost/elex-live-model/pull/38)
+- refactor: removing residual column for nonreporting units [#39](https://github.com/washingtonpost/elex-live-model/pull/39)
+- refactor: remove total voters column [#40](https://github.com/washingtonpost/elex-live-model/pull/40)
+- feat: add regularization to model [#42](https://github.com/washingtonpost/elex-live-model/pull/42)
+- feat: allow selection of fixed effects [#43](https://github.com/washingtonpost/elex-live-model/pull/43)
+- fix: update checking fixed effect input [#44](https://github.com/washingtonpost/elex-live-model/pull/44)
+- fix: rename regularization parameter [#46](https://github.com/washingtonpost/elex-live-model/pull/46)
+- fix: stop unit tests from writing to s3 [#48](https://github.com/washingtonpost/elex-live-model/pull/48)
+
+### 1.0.9 (03/06/2022)
+- feat: allow model to return conformalization data [#32](https://github.com/washingtonpost/elex-live-model/pull/32)
+
+### 1.0.8 (01/11/2022)
+- fix: fix overwriting non-reporting lower/upper bounds in multiple prediction interval case [#23](https://github.com/washingtonpost/elex-live-model/pull/23)
+- fix: fix bug when computing fixed effects [#27](https://github.com/washingtonpost/elex-live-model/pull/27)
+- fix: fix overwritting columns when saving conformalization set/bounds to s3 [#28](https://github.com/washingtonpost/elex-live-model/pull/28)
+
 ### 1.0.7 (10/28/2022)
 - fix: fix mape when uncontested historical baseline [#18](https://github.com/washingtonpost/elex-live-model/pull/18)
 - fix: small relative weights for ecos solver [#19](https://github.com/washingtonpost/elex-live-model/pull/18)

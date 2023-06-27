@@ -54,8 +54,7 @@ def weighted_median(x, weights):
     if weights_cumulative[0] > 0.5:
         LOG.warning("Warning: smallest x-value is greater than or equal to half the weight")
         return x_sorted[0]
-    else:
-        median_index = np.where(weights_cumulative <= 0.5)[0][-1]
+    median_index = np.where(weights_cumulative <= 0.5)[0][-1]
 
     # if there is one element where weights are exactly 0.5, median is average
     # otherwise weighted median is the next largest element
@@ -63,8 +62,7 @@ def weighted_median(x, weights):
         lower = x_sorted[median_index]
         upper = x_sorted[median_index + 1]
         return (lower + upper) / 2
-    else:
-        return x_sorted[median_index + 1]
+    return x_sorted[median_index + 1]
 
 
 def robust_sample_std(x, axis):
@@ -87,7 +85,7 @@ def compute_error(true, pred, type_="mae"):
     """
     if type_ == "mae":
         return np.mean(np.abs(true - pred)).round(decimals=0)
-    elif type_ == "mape":
+    if type_ == "mape":
         mask = true != 0
         mape = np.mean((np.abs(true - pred) / true)[mask])
         # if all true values are zero, then race was uncontested and mape doesn't make sense to compute
