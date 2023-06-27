@@ -25,7 +25,7 @@ def sample_std(x, axis):
 
 def winsorize_std(x, axis):
     """
-    Compute the winsorized standard deviation along the last axis. Limits 
+    Compute the winsorized standard deviation along the last axis. Limits
     are used to trim 1% of the extreme values on both ends of the data.
     """
     x_win = winsorize(x, limits=(0.01, 0.01), axis=-1).data
@@ -68,7 +68,6 @@ def weighted_median(x, weights):
 
 
 def robust_sample_std(x, axis):
-
     return winsorize_std(x, axis=-1)
 
 

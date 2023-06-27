@@ -226,7 +226,6 @@ class GaussianElectionModel(BaseElectionModel):
                 assert remaining_models.shape[0] <= 1
                 remaining_bounds_w_models = remaining_bounds.merge(remaining_models, how="cross")
             else:
-
                 remaining_bounds_w_models = remaining_bounds.merge(remaining_models, how="inner", on=next_aggregate)
             # APPEND NEWLY MODELED BOUNDS TO modeled_bounds
             modeled_bounds = pd.concat([modeled_bounds, remaining_bounds_w_models])

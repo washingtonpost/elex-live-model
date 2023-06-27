@@ -1,21 +1,21 @@
 files: \.py$
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.0.1
+    rev: v4.4.0
     hooks:
       - id: end-of-file-fixer
       - id: trailing-whitespace
 
   - repo: https://github.com/pycqa/isort
-    rev: 5.10.1
+    rev: 5.12.0
     hooks:
       - id: isort
         name: isort (python)
         args: ["--profile", "black", --line-length=120]
-
+  
   # black
   - repo: https://github.com/ambv/black
-    rev: 22.3.0
+    rev: 23.3.0
     hooks:
       - id: black
         args: # arguments to configure black

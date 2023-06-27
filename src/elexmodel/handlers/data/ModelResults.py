@@ -20,7 +20,6 @@ class ModelResultsHandler(object):
         nonreporting_units,
         unexpected_units,
     ):
-
         self.prediction_interval_alphas = prediction_interval_alphas
         self.include_unit_data = "unit" in aggregates
         self.aggregates = [agg for agg in aggregates if agg != "unit"]
