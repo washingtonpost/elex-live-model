@@ -11,7 +11,7 @@ VALID_AGGREGATES_MAPPING = {
 AGGREGATE_ORDER = ["postal_code", "district", "county_classification", "county_fips"]
 
 default_aggregates_elems = {
-    #"P": ["postal_code", "unit"],
+    "P": ["postal_code", "unit"],
     "S": ["postal_code", "unit"],
     "G": ["postal_code", "unit"],
     "P_county": ["postal_code", "unit"],
@@ -19,7 +19,7 @@ default_aggregates_elems = {
     "G_county": ["postal_code", "unit"],
     "P_precinct": ["postal_code", "unit"],
     "S_precinct": ["postal_code", "unit"],
-    "G_Precinct": ["postal_code", "unit"],
+    "G_precinct": ["postal_code", "unit"],
     "H": ["postal_code", "district", "unit"],
     "Y": ["postal_code", "district", "unit"],
     "Z": ["postal_code", "district", "unit"],
