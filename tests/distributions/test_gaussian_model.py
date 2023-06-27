@@ -28,6 +28,7 @@ def test_empty_gaussian_model_simple():
         "sigma_lower_bound",
         "sigma_upper_bound",
         "var_inflate",
+        "winsorize",
     ]
 
 
@@ -51,6 +52,7 @@ def test_empty_gaussian_model(va_governor_precinct_data):
         "sigma_lower_bound",
         "sigma_upper_bound",
         "var_inflate",
+        "winsorize",
     ]
 
 

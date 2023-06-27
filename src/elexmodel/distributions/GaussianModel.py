@@ -30,6 +30,7 @@ class GaussianModel:
                 sigma_lower_bound=None,
                 sigma_upper_bound=None,
                 var_inflate=None,
+                winsorize=None,
             )
             .astype(
                 dtype={
@@ -38,6 +39,7 @@ class GaussianModel:
                     "sigma_lower_bound": float,
                     "sigma_upper_bound": float,
                     "var_inflate": float,
+                    "winsorize": float,
                 }
             )
         )
@@ -107,6 +109,7 @@ class GaussianModel:
                         ),
                         "sigma_lower_bound": beta * math_utils.boot_sigma(x.lower_bounds.values, conf=(3 + alpha) / 4),
                         "sigma_upper_bound": beta * math_utils.boot_sigma(x.upper_bounds.values, conf=(3 + alpha) / 4),
+                        # "winsorize": math_utils.winsorize_std(x[f"last_election_results_{estimand}"]),
                     }
                 )
             )

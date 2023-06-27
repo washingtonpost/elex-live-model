@@ -39,6 +39,8 @@ class S3Util:
             file_path = f'{S3_FILE_PATH}/{path_info["election_id"]}/data/{path_info["office"]}/data_{path_info["geographic_unit_type"]}.csv'
         elif file_type == "config":
             file_path = f'{S3_FILE_PATH}/{path_info["election_id"]}/config/{path_info["election_id"]}'
+        print(S3_FILE_PATH)
+        print(file_path)
         return file_path
 
 

@@ -23,7 +23,7 @@ def sample_std(x, axis):
     return np.std(x, ddof=1, axis=-1)
 
 
-def winsorize_std(x, axis):
+def winsorize_std(x):
     """
     Compute the winsorized standard deviation along the last axis. Limits
     are used to trim 1% of the extreme values on both ends of the data.
