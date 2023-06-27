@@ -3,6 +3,7 @@ import math
 
 import numpy as np
 from scipy.stats import bootstrap
+from scipy.stats.mstats import winsorize
 
 LOG = logging.getLogger()
 
@@ -20,6 +21,15 @@ def sample_std(x, axis):
     """
     # ddof=1 to get unbiased sample estimate.
     return np.std(x, ddof=1, axis=-1)
+
+
+def winsorize_std(x, axis):
+    """
+    Compute the winsorized standard deviation along the last axis. Limits
+    are used to trim 1% of the extreme values on both ends of the data.
+    """
+    x_win = winsorize(x, limits=(0.01, 0.01), axis=-1).data
+    return np.std(x_win, ddof=1, axis=-1)
 
 
 def weighted_median(x, weights):
@@ -53,6 +63,10 @@ def weighted_median(x, weights):
         upper = x_sorted[median_index + 1]
         return (lower + upper) / 2
     return x_sorted[median_index + 1]
+
+
+def robust_sample_std(x, axis):
+    return winsorize_std(x, axis=-1)
 
 
 def boot_sigma(data, conf, num_iterations=10000):
