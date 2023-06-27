@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 VALID_AGGREGATES_MAPPING = {
     "postal_code": "state_data",
     "county_fips": "county_data",
@@ -8,8 +10,8 @@ VALID_AGGREGATES_MAPPING = {
 
 AGGREGATE_ORDER = ["postal_code", "district", "county_classification", "county_fips"]
 
-DEFAULT_AGGREGATES = {
-    "P": ["postal_code", "unit"],
+default_aggregates_elems = {
+    #"P": ["postal_code", "unit"],
     "S": ["postal_code", "unit"],
     "G": ["postal_code", "unit"],
     "P_county": ["postal_code", "unit"],
@@ -28,3 +30,4 @@ DEFAULT_AGGREGATES = {
     "Y_precinct-district": ["postal_code", "district", "unit"],
     "Z_precinct-district": ["postal_code", "district", "unit"],
 }
+DEFAULT_AGGREGATES = defaultdict(list, **default_aggregates_elems)

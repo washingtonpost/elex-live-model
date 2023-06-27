@@ -306,6 +306,7 @@ class ModelClient:
 
             for aggregate in results_handler.aggregates:
                 aggregate_list = self.get_aggregate_list(office, aggregate)
+                import pdb; pdb.set_trace()
                 estimates_df = model.get_aggregate_predictions(
                     results_handler.reporting_units,
                     results_handler.nonreporting_units,
