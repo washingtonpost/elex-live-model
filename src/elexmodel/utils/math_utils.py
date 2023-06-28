@@ -23,7 +23,7 @@ def sample_std(x, axis):
     return np.std(x, ddof=1, axis=-1)
 
 
-def winsorize_std(x):
+def winsorize_std(x, axis):
     """
     Compute the winsorized standard deviation along the last axis. Limits
     are used to trim 1% of the extreme values on both ends of the data.
@@ -72,11 +72,16 @@ def robust_sample_std(x, axis):
     return winsorize_std(x, axis=-1)
 
 
-def boot_sigma(data, conf, num_iterations=10000):
+def boot_sigma(data, conf, num_iterations=10000, winsorize=winsorize):
     """
     Bootstrap standard deviation.
     """
     # we use upper bound of confidence interval for more robustness
+
+    if winsorize:
+        return bootstrap(
+            data.reshape(1, -1), robust_sample_std, confidence_level=conf, method="basic", n_resamples=num_iterations
+        ).confidence_interval.high
     return bootstrap(
         data.reshape(1, -1), sample_std, confidence_level=conf, method="basic", n_resamples=num_iterations
     ).confidence_interval.high

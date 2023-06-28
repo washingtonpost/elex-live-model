@@ -107,9 +107,10 @@ class GaussianModel:
                                 x[f"last_election_results_{estimand}"] / np.sum(x[f"last_election_results_{estimand}"])
                             ).to_numpy(),
                         ),
-                        "sigma_lower_bound": beta * math_utils.boot_sigma(x.lower_bounds.values, conf=(3 + alpha) / 4),
-                        "sigma_upper_bound": beta * math_utils.boot_sigma(x.upper_bounds.values, conf=(3 + alpha) / 4),
-                        # "winsorize": math_utils.winsorize_std(x[f"last_election_results_{estimand}"]),
+                        "sigma_lower_bound": beta
+                        * math_utils.boot_sigma(x.lower_bounds.values, conf=(3 + alpha) / 4, winsorize=winsorize),
+                        "sigma_upper_bound": beta
+                        * math_utils.boot_sigma(x.upper_bounds.values, conf=(3 + alpha) / 4, winsorize=winsorize),
                     }
                 )
             )
@@ -127,7 +128,7 @@ class GaussianModel:
         alpha=0.9,
         reweight=False,
         beta=1,
-        winsorize=1,
+        winsorize=False,
         top_level=True,
     ):
         """

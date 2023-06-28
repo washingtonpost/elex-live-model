@@ -11,7 +11,7 @@ class GaussianElectionModel(BaseElectionModel):
         super().__init__(model_settings)
         self.model_settings = model_settings
         self.beta = model_settings.get("beta", 1)
-        self.winsorize = model_settings.get("winsorize", 1)
+        self.winsorize = model_settings.get("winsorize", False)
         self.alpha_to_nonreporting_lower_bounds = {}
         self.alpha_to_nonreporting_upper_bounds = {}
         self.modeled_bounds_agg = None
