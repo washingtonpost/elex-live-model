@@ -132,6 +132,95 @@ def test_fit():
     weights = random_number_generator.randint(low=1, high=100, size=n)
     alpha = 0.9
     beta = 1
+    winsorize = False
+    estimand = "turnout"
+    model_settings = {
+        "election_id": "2017-11-07_VA_G",
+        "office": "G",
+        "geographic_unit_type": "county",
+        "save_conformalization": False,
+    }
+
+    gaussian_model = GaussianModel(model_settings)
+
+    df = pd.DataFrame({f"last_election_results_{estimand}": weights, "lower_bounds": lower, "upper_bounds": upper})
+
+    # all in the same group
+    g = gaussian_model._fit(df, estimand, [], alpha, beta, winsorize)
+
+    # assumes that weighted median and standard deviation bootstrap works
+    # tests for that in test_utils
+    assert math_utils.weighted_median(lower, weights / weights.sum()) == pytest.approx(g.mu_lower_bound[0], TOL)
+    assert math_utils.boot_sigma(lower, conf=(3 + alpha) / 4, winsorize=winsorize) == pytest.approx(
+        g.sigma_lower_bound[0], RELAX_TOL
+    )
+    assert math_utils.weighted_median(upper, weights / weights.sum()) == pytest.approx(g.mu_upper_bound[0], TOL)
+    assert math_utils.boot_sigma(upper, conf=(3 + alpha) / 4, winsorize=winsorize) == pytest.approx(
+        g.sigma_upper_bound[0], RELAX_TOL
+    )
+
+    # generate test data for two different groups
+    mean_a = 5
+    mean_b = 7
+    sd_a = 2
+    sd_b = 0.5
+    n = 100
+    a = random_number_generator.normal(loc=mean_a, scale=sd_a, size=n)
+    b = random_number_generator.normal(loc=mean_b, scale=sd_b, size=n)
+    weights_a = random_number_generator.randint(low=1, high=100, size=n)
+    weights_b = random_number_generator.randint(low=1, high=100, size=n)
+    df_a = pd.DataFrame(
+        {
+            "postal_code": "VA",
+            "geographic_unit_fips": 1,
+            "lower_bounds": a,
+            "upper_bounds": a,
+            f"last_election_results_{estimand}": weights_a,
+        }
+    )
+    df_a["group"] = "a"
+    df_b = pd.DataFrame(
+        {
+            "postal_code": "VA",
+            "geographic_unit_fips": 2,
+            "lower_bounds": b,
+            "upper_bounds": b,
+            f"last_election_results_{estimand}": weights_b,
+        }
+    )
+    df_b["group"] = "b"
+    df = pd.concat([df_a, df_b])
+
+    # fit model to multiple groups separately
+    g = gaussian_model._fit(df, estimand, ["group"], alpha, beta, winsorize)
+
+    assert math_utils.weighted_median(a, weights_a / weights_a.sum()) == pytest.approx(g.mu_lower_bound[0], TOL)
+    assert math_utils.boot_sigma(a, conf=(3 + alpha) / 4, winsorize=winsorize) == pytest.approx(
+        g.sigma_lower_bound[0], RELAX_TOL
+    )
+    assert math_utils.weighted_median(b, weights_b / weights_b.sum()) == pytest.approx(g.mu_lower_bound[1], TOL)
+    assert math_utils.boot_sigma(b, conf=(3 + alpha) / 4, winsorize=winsorize) == pytest.approx(
+        g.sigma_lower_bound[1], RELAX_TOL
+    )
+
+
+def test_fit_winsorized():
+    """
+    We test the basic model fit function
+    """
+    random_number_generator = np.random.RandomState(42)
+
+    # generate test data
+    mean_lower = 5
+    mean_upper = 7
+    sd_lower = 2
+    sd_upper = 0.5
+    n = 100
+    lower = random_number_generator.normal(loc=mean_lower, scale=sd_lower, size=n)
+    upper = random_number_generator.normal(loc=mean_upper, scale=sd_upper, size=n)
+    weights = random_number_generator.randint(low=1, high=100, size=n)
+    alpha = 0.9
+    beta = 1
     winsorize = True
     estimand = "turnout"
     model_settings = {
