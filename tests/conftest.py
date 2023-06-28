@@ -25,10 +25,10 @@ def setup_logging():
 def get_fixture():
     def _get_fixture(filename, load=True, pandas=False):
         filepath = os.path.join(FIXTURE_DIR, filename)
-        fileobj = open(filepath)
+        fileobj = open(filepath, encoding="utf-8")
         if load:
             return json.load(fileobj)
-        elif pandas:
+        if pandas:
             return pd.read_csv(
                 filepath,
                 dtype={"geographic_unit_fips": str, "geographic_unit_type": str, "county_fips": str, "district": str},

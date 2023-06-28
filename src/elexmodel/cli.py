@@ -3,13 +3,13 @@ import json
 import click
 from dotenv import find_dotenv, load_dotenv
 
-load_dotenv(find_dotenv())
-
 from elexmodel.client import HistoricalModelClient, ModelClient  # noqa: E402
 from elexmodel.handlers import s3  # noqa: E402
 from elexmodel.handlers.data.LiveData import MockLiveDataHandler  # noqa: E402
 from elexmodel.utils.constants import VALID_AGGREGATES_MAPPING  # noqa: E402
 from elexmodel.utils.file_utils import TARGET_BUCKET  # noqa: E402
+
+load_dotenv(find_dotenv())
 
 
 @click.command()

@@ -8,7 +8,7 @@ from elexmodel.utils.file_utils import S3_FILE_PATH
 LOG = logging.getLogger(__name__)
 
 
-class S3Util(object):
+class S3Util:
     def __init__(self, bucket_name, client=None):
         self.bucket_name = bucket_name
         if not client:
