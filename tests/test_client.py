@@ -493,6 +493,67 @@ def test_get_estimates_fully_reporting(model_client, va_governor_county_data, va
     assert result["state_data"]["upper_0.9_turnout"][0] == 2614065.0
 
 
+def test_get_estimates_fully_reporting_lambda(model_client, va_governor_county_data, va_config):
+    election_id = "2017-11-07_VA_G"
+    office_id = "G"
+    geographic_unit_type = "county"
+    estimands = ["turnout"]
+    prediction_intervals = [0.9]
+    percent_reporting_threshold = 100
+
+    data_handler = MockLiveDataHandler(
+        election_id, office_id, geographic_unit_type, estimands, data=va_governor_county_data
+    )
+
+    data_handler.shuffle()
+    data = data_handler.get_percent_fully_reported(100)
+
+    preprocessed_data = va_governor_county_data.copy()
+    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
+
+    result = model_client.get_estimates(
+        data,
+        election_id,
+        office_id,
+        estimands,
+        prediction_intervals,
+        percent_reporting_threshold,
+        geographic_unit_type,
+        raw_config=va_config,
+        preprocessed_data=preprocessed_data,
+        lambda_=[0.1, 0.05, 0.56, 0.99],
+        save_output=[],
+    )
+
+    assert result["state_data"].shape == (1, 6)
+    assert result["unit_data"].shape == (133, 7)
+
+    assert list(result["state_data"].columns.values) == [
+        "postal_code",
+        "pred_turnout",
+        "results_turnout",
+        "reporting",
+        "lower_0.9_turnout",
+        "upper_0.9_turnout",
+    ]
+    assert list(result["unit_data"].columns.values) == [
+        "postal_code",
+        "geographic_unit_fips",
+        "pred_turnout",
+        "reporting",
+        "lower_0.9_turnout",
+        "upper_0.9_turnout",
+        "results_turnout",
+    ]
+
+    assert result["state_data"]["postal_code"][0] == "VA"
+    assert result["state_data"]["pred_turnout"][0] == 2614065.0
+    assert result["state_data"]["results_turnout"][0] == 2614065.0
+    assert result["state_data"]["reporting"][0] == 133.0
+    assert result["state_data"]["lower_0.9_turnout"][0] == 2614065.0
+    assert result["state_data"]["upper_0.9_turnout"][0] == 2614065.0
+
+
 def test_not_including_unit_data(model_client, va_assembly_precinct_data, va_config):
     election_id = "2017-11-07_VA_G"
     office_id = "Y"

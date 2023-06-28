@@ -313,8 +313,8 @@ def test_compute_lambda():
             "residuals_a": [1, 2, 3, 4],
             "total_voters_a": [4, 2, 9, 5],
             "last_election_results_a": [5, 1, 4, 2],
-            "results_a": [0, 0, 0, 1],
-            "results_b": [1, 1, 0, 1],
+            "results_a": [5, 2, 8, 0],
+            "results_b": [0, 6, 2, 1],
             "baseline_a": [9, 2, 4, 5],
             "baseline_b": [9, 2, 4, 5],
             "a": [2, 2, 3, 7],
@@ -324,5 +324,5 @@ def test_compute_lambda():
 
     new_lambda, avg_MAPE = model.compute_lambda(df_X, lambda_, "a")
 
-    assert new_lambda == 0.56
-    assert avg_MAPE == 0.0
+    assert new_lambda == 0.01
+    assert avg_MAPE == 0.625

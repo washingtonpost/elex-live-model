@@ -274,28 +274,26 @@ class BaseElectionModel:
         estimand="",
         K=3,
     ):
-        if len(possible_lambda_values) == 0 or not (f"{estimand}" in reporting_units):
+        if len(possible_lambda_values) == 0:
             return 0, 0
 
         MAPE_arr = np.zeros_like(possible_lambda_values)  # array of MAPE sums for each lambda
 
-        # get the data section indexes that we will be training/testing on
-        divisor = 0
-
-        for index, (train_index, test_index) in enumerate(math_utils.get_kfold_splits(reporting_units, K)):
-            divisor += 1
-            train = reporting_units.iloc[train_index]
-            test = reporting_units.iloc[test_index]
-            # loop through each lambda
-            for lam in possible_lambda_values:
+        # loop through each lambda
+        for loc, lam in enumerate(possible_lambda_values):
+            self.lambda_ = lam
+            for train_index, test_index in math_utils.get_kfold_splits(reporting_units, K):
                 # build model with custom lambda
-                self.lambda_ = lam
+                train = reporting_units.iloc[train_index]
+                test = reporting_units.iloc[test_index]
                 unit_predictions = self.get_unit_predictions(train, test, estimand)
-                MAPE = math_utils.compute_error(test[estimand].values, unit_predictions.values, type_="mape")
-                MAPE_arr[index] += MAPE
+                MAPE = math_utils.compute_error(
+                    test[f"results_{estimand}"].values, unit_predictions.values, type_="mape"
+                )
+                MAPE_arr[loc] += MAPE
 
         # determine average and best
-        MAPE_arr_avg = MAPE_arr / divisor
+        MAPE_arr_avg = MAPE_arr / len(possible_lambda_values)
         best_MAPE_index = np.argmin(MAPE_arr_avg)
         best_lambda = possible_lambda_values[best_MAPE_index]
         average_MAPE = MAPE_arr_avg[best_MAPE_index]
