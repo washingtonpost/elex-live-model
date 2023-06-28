@@ -293,10 +293,9 @@ def test_check_input_parameters_handle_unreporting(model_client, va_config):
         )
 
 
-
-def test_check_input_parameters_lambda_empty(model_client, va_governor_config):
+def test_check_input_parameters_lambda_empty(model_client, va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     assert model_client._check_input_parameters(
         config_handler,
@@ -314,9 +313,9 @@ def test_check_input_parameters_lambda_empty(model_client, va_governor_config):
     )
 
 
-def test_check_input_parameters_lambda_bad_values(model_client, va_governor_config):
+def test_check_input_parameters_lambda_bad_values(model_client, va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
@@ -335,9 +334,9 @@ def test_check_input_parameters_lambda_bad_values(model_client, va_governor_conf
         )
 
 
-def test_check_input_parameters_lambda_bad_type(model_client, va_governor_config):
+def test_check_input_parameters_lambda_bad_type(model_client, va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
@@ -355,6 +354,7 @@ def test_check_input_parameters_lambda_bad_type(model_client, va_governor_config
             handle_unreporting,
         )
 
+
 def test_get_aggregate_list(model_client):
     assert model_client.get_aggregate_list("P", "county_fips") == ["postal_code", "county_fips"]
     assert model_client.get_aggregate_list("P", "postal_code") == ["postal_code"]
@@ -363,7 +363,6 @@ def test_get_aggregate_list(model_client):
     assert model_client.get_aggregate_list("H", "county_fips") == ["postal_code", "district", "county_fips"]
     assert model_client.get_aggregate_list("H", "postal_code") == ["postal_code", "district"]
     assert model_client.get_aggregate_list("H", "district") == ["postal_code", "district"]
-
 
 
 def test_compute_evaluation(historical_model_client):
