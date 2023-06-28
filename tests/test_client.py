@@ -241,9 +241,9 @@ def test_check_input_parameters_beta(model_client, va_governor_config):
         )
 
 
-def test_check_input_parameters_winsorize(model_client, va_governor_config):
+def test_check_input_parameters_winsorize(model_client, va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
