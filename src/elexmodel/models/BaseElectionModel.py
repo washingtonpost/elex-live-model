@@ -291,6 +291,7 @@ class BaseElectionModel:
                     test[f"results_{estimand}"].values, unit_predictions.values, type_="mape"
                 )
                 MAPE_arr[loc] += MAPE
+                print(MAPE_arr)
 
         # determine average and best
         MAPE_arr_avg = MAPE_arr / len(possible_lambda_values)
@@ -298,4 +299,5 @@ class BaseElectionModel:
         best_lambda = possible_lambda_values[best_MAPE_index]
         average_MAPE = MAPE_arr_avg[best_MAPE_index]
 
+        print(best_lambda)
         return best_lambda, average_MAPE

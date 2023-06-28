@@ -301,7 +301,7 @@ def test_get_aggregate_predictions(va_governor_precinct_data):
     )
 
 
-def test_compute_lambda():
+def test_compute_lambda_under_one():
     """
     Test/view computing lambda
     """
@@ -326,3 +326,30 @@ def test_compute_lambda():
 
     assert new_lambda == 0.01
     assert avg_MAPE == 0.625
+
+
+def test_compute_lambda_over_one():
+    """
+    Test/view computing lambda
+    """
+    lambda_ = [4, 7, 21, 3, 0, 1, 0.5]
+    model_settings = {"features": ["b"]}
+    model = BaseElectionModel.BaseElectionModel(model_settings)
+    df_X = pd.DataFrame(
+        {
+            "residuals_a": [1, 2, 3, 4],
+            "total_voters_a": [4, 2, 9, 5],
+            "last_election_results_a": [5, 1, 4, 2],
+            "results_a": [5, 2, 8, 0],
+            "results_b": [0, 6, 2, 1],
+            "baseline_a": [9, 2, 4, 5],
+            "baseline_b": [9, 2, 4, 5],
+            "a": [2, 2, 3, 7],
+            "b": [2, 3, 4, 5],
+        }
+    )
+
+    new_lambda, avg_MAPE = model.compute_lambda(df_X, lambda_, "a")
+
+    assert new_lambda == 4
+    assert avg_MAPE == 0.35714285714285715
