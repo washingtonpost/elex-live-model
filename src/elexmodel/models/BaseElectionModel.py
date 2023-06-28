@@ -6,7 +6,6 @@ from collections import namedtuple
 import cvxpy
 import numpy as np
 from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
-from sklearn.model_selection import KFold
 
 from elexmodel.handlers.data.Featurizer import Featurizer
 from elexmodel.utils import math_utils
@@ -279,12 +278,11 @@ class BaseElectionModel:
             return 0, 0
 
         MAPE_arr = np.zeros_like(possible_lambda_values)  # array of MAPE sums for each lambda
-        kfold = KFold(n_splits=K, shuffle=False)
 
         # get the data section indexes that we will be training/testing on
         divisor = 0
 
-        for index, (train_index, test_index) in enumerate(kfold.split(reporting_units)):
+        for index, (train_index, test_index) in enumerate(math_utils.get_kfold_splits(reporting_units, K)):
             divisor += 1
             train = reporting_units.iloc[train_index]
             test = reporting_units.iloc[test_index]

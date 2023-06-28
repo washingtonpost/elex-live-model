@@ -93,3 +93,20 @@ def compute_mean_pi_length(lower, upper, pred):
     """
     # we add 1 since pred can be literally zero
     return np.mean((upper - lower) / (pred + 1)).round(decimals=2)
+
+
+def get_kfold_splits(data, n_splits):
+    splits = []
+    num_samples = len(data)
+    fold_size = num_samples // n_splits
+    remaining_samples = num_samples % n_splits
+    current_index = 0
+
+    for i in range(n_splits):
+        fold_length = fold_size + i if i < remaining_samples else fold_size
+        test_index = range(current_index, current_index + fold_length)
+        train_index = list(set(range(num_samples)) - set(test_index))
+        splits.append((train_index, test_index))
+        current_index += fold_length
+
+    return splits

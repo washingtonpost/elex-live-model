@@ -6,5 +6,4 @@ pre-commit
 wheel
 twine
 boto
-scikit-learn
 -r requirements-test.txt
