@@ -6,10 +6,10 @@ from collections import namedtuple
 import cvxpy
 import numpy as np
 from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
-from sklearn.metrics import mean_absolute_percentage_error
 from sklearn.model_selection import KFold
 
 from elexmodel.handlers.data.Featurizer import Featurizer
+from elexmodel.utils import math_utils
 
 warnings.filterwarnings("error", category=UserWarning, module="cvxpy")
 
@@ -275,37 +275,30 @@ class BaseElectionModel:
         estimand="",
         K=3,
     ):
-        if (
-            len(self.features) == 0
-            or len(possible_lambda_values) == 0
-            or estimand == ""
-            or not (f"{estimand}" in reporting_units)
-        ):
+        if len(possible_lambda_values) == 0 or not (f"{estimand}" in reporting_units):
             return 0, 0
 
-        MAPE_arr = np.full_like(possible_lambda_values, 0)  # array of MAPE sums for each lambda
+        MAPE_arr = np.zeros_like(possible_lambda_values)  # array of MAPE sums for each lambda
         kfold = KFold(n_splits=K, shuffle=False)
 
         # get the data section indexes that we will be training/testing on
         divisor = 0
 
-        for train_index, test_index in kfold.split(reporting_units):
+        for index, (train_index, test_index) in enumerate(kfold.split(reporting_units)):
             divisor += 1
             train = reporting_units.iloc[train_index]
             test = reporting_units.iloc[test_index]
             # loop through each lambda
-            index = 0
             for lam in possible_lambda_values:
                 # build model with custom lambda
                 self.lambda_ = lam
                 unit_predictions = self.get_unit_predictions(train, test, estimand)
-                MAPE = mean_absolute_percentage_error(test[estimand].values, unit_predictions.values)
+                MAPE = math_utils.compute_error(test[estimand].values, unit_predictions.values, type_="mape")
                 MAPE_arr[index] += MAPE
-                index += 1
 
         # determine average and best
-        MAPE_arr_avg = [value / divisor for value in MAPE_arr]
-        best_MAPE_index = MAPE_arr_avg.index(min(MAPE_arr_avg))
+        MAPE_arr_avg = MAPE_arr / divisor
+        best_MAPE_index = np.argmin(MAPE_arr_avg)
         best_lambda = possible_lambda_values[best_MAPE_index]
         average_MAPE = MAPE_arr_avg[best_MAPE_index]
 
