@@ -351,5 +351,5 @@ def test_compute_lambda_over_one():
 
     new_lambda, avg_MAPE = model.compute_lambda(df_X, lambda_, "a")
 
-    assert new_lambda == 4
+    assert new_lambda == 0
     assert avg_MAPE == 0.35714285714285715

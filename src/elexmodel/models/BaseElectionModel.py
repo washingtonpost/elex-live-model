@@ -286,12 +286,11 @@ class BaseElectionModel:
                 # build model with custom lambda
                 train = reporting_units.iloc[train_index]
                 test = reporting_units.iloc[test_index]
-                unit_predictions = self.get_unit_predictions(train, test, estimand)
+                unit_predictions = self.get_unit_predictions(train, test, estimand, lam)
                 MAPE = math_utils.compute_error(
                     test[f"results_{estimand}"].values, unit_predictions.values, type_="mape"
                 )
                 MAPE_arr[loc] += MAPE
-                print(MAPE_arr)
 
         # determine average and best
         MAPE_arr_avg = MAPE_arr / len(possible_lambda_values)
@@ -299,5 +298,4 @@ class BaseElectionModel:
         best_lambda = possible_lambda_values[best_MAPE_index]
         average_MAPE = MAPE_arr_avg[best_MAPE_index]
 
-        print(best_lambda)
         return best_lambda, average_MAPE
