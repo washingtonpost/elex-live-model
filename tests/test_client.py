@@ -21,9 +21,9 @@ lambda_ = 0
 handle_unreporting = "drop"
 
 
-def test_check_input_parameters(model_client, va_governor_config):
+def test_check_input_parameters(model_client, va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     assert model_client._check_input_parameters(
         config_handler,
@@ -41,9 +41,9 @@ def test_check_input_parameters(model_client, va_governor_config):
     )
 
 
-def test_check_input_parameters_office(model_client, va_governor_config):
+def test_check_input_parameters_office(model_client, va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
@@ -62,9 +62,9 @@ def test_check_input_parameters_office(model_client, va_governor_config):
         )
 
 
-def test_check_input_parameters_pi_method(model_client, va_governor_config):
+def test_check_input_parameters_pi_method(model_client, va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
@@ -83,9 +83,9 @@ def test_check_input_parameters_pi_method(model_client, va_governor_config):
         )
 
 
-def test_check_input_parameters_estimand(model_client, va_governor_config):
+def test_check_input_parameters_estimand(model_client, va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
@@ -104,9 +104,9 @@ def test_check_input_parameters_estimand(model_client, va_governor_config):
         )
 
 
-def test_check_input_parameters_geographic_unit_type(model_client, va_governor_config):
+def test_check_input_parameters_geographic_unit_type(model_client, va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
@@ -125,9 +125,9 @@ def test_check_input_parameters_geographic_unit_type(model_client, va_governor_c
         )
 
 
-def test_check_input_parameters_features(model_client, va_governor_config):
+def test_check_input_parameters_features(model_client, va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
@@ -146,9 +146,9 @@ def test_check_input_parameters_features(model_client, va_governor_config):
         )
 
 
-def test_check_input_parameters_aggregates(model_client, va_governor_config):
+def test_check_input_parameters_aggregates(model_client, va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
@@ -167,9 +167,9 @@ def test_check_input_parameters_aggregates(model_client, va_governor_config):
         )
 
 
-def test_check_input_parameters_fixed_effect_list(model_client, va_governor_config):
+def test_check_input_parameters_fixed_effect_list(model_client, va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
@@ -188,9 +188,9 @@ def test_check_input_parameters_fixed_effect_list(model_client, va_governor_conf
         )
 
 
-def test_check_input_parameters_fixed_effect_dict(model_client, va_governor_config):
+def test_check_input_parameters_fixed_effect_dict(model_client, va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
@@ -209,9 +209,9 @@ def test_check_input_parameters_fixed_effect_dict(model_client, va_governor_conf
         )
 
 
-def test_check_input_parameters_beta(model_client, va_governor_config):
+def test_check_input_parameters_beta(model_client, va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
@@ -230,9 +230,9 @@ def test_check_input_parameters_beta(model_client, va_governor_config):
         )
 
 
-def test_check_input_parameters_robust(model_client, va_governor_config):
+def test_check_input_parameters_robust(model_client, va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
@@ -251,9 +251,9 @@ def test_check_input_parameters_robust(model_client, va_governor_config):
         )
 
 
-def test_check_input_parameters_lambda_(model_client, va_governor_config):
+def test_check_input_parameters_lambda_(model_client, va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
@@ -272,9 +272,9 @@ def test_check_input_parameters_lambda_(model_client, va_governor_config):
         )
 
 
-def test_check_input_parameters_handle_unreporting(model_client, va_governor_config):
+def test_check_input_parameters_handle_unreporting(model_client, va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
@@ -291,6 +291,16 @@ def test_check_input_parameters_handle_unreporting(model_client, va_governor_con
             lambda_,
             "bad_handle_unreporting",
         )
+
+
+def test_get_aggregate_list(model_client):
+    assert model_client.get_aggregate_list("P", "county_fips") == ["postal_code", "county_fips"]
+    assert model_client.get_aggregate_list("P", "postal_code") == ["postal_code"]
+    assert model_client.get_aggregate_list("P", "district") == ["postal_code", "district"]
+
+    assert model_client.get_aggregate_list("H", "county_fips") == ["postal_code", "district", "county_fips"]
+    assert model_client.get_aggregate_list("H", "postal_code") == ["postal_code", "district"]
+    assert model_client.get_aggregate_list("H", "district") == ["postal_code", "district"]
 
 
 def test_compute_evaluation(historical_model_client):
@@ -361,7 +371,7 @@ def test_compute_evaluation(historical_model_client):
     assert eval_[True][f"mean_pi_length_0.7_{estimand}"] == math_utils.compute_mean_pi_length(lower, upper, raw_results)
 
 
-def test_get_estimates_fully_reporting(model_client, va_governor_county_data, va_governor_config):
+def test_get_estimates_fully_reporting(model_client, va_governor_county_data, va_config):
     election_id = "2017-11-07_VA_G"
     office_id = "G"
     geographic_unit_type = "county"
@@ -387,7 +397,7 @@ def test_get_estimates_fully_reporting(model_client, va_governor_county_data, va
         prediction_intervals,
         percent_reporting_threshold,
         geographic_unit_type,
-        raw_config=va_governor_config,
+        raw_config=va_config,
         preprocessed_data=preprocessed_data,
         save_output=[],
     )
@@ -421,23 +431,22 @@ def test_get_estimates_fully_reporting(model_client, va_governor_county_data, va
     assert result["state_data"]["upper_0.9_turnout"][0] == 2614065.0
 
 
-def test_not_including_unit_data(model_client, va_governor_county_data, va_governor_config):
+def test_not_including_unit_data(model_client, va_assembly_precinct_data, va_config):
     election_id = "2017-11-07_VA_G"
     office_id = "Y"
     geographic_unit_type = "precinct-district"
     estimands = ["turnout"]
     prediction_intervals = [0.9]
     percent_reporting_threshold = 100
-    aggregates = ["postal_code"]
+    aggregates = ["postal_code", "district"]
 
     data_handler = MockLiveDataHandler(
-        election_id, office_id, geographic_unit_type, estimands, data=va_governor_county_data
+        election_id, office_id, geographic_unit_type, estimands, data=va_assembly_precinct_data
     )
-
     data_handler.shuffle()
     data = data_handler.get_percent_fully_reported(100)
 
-    preprocessed_data = va_governor_county_data.copy()
+    preprocessed_data = va_assembly_precinct_data.copy()
     preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
 
     result = model_client.get_estimates(
@@ -449,14 +458,14 @@ def test_not_including_unit_data(model_client, va_governor_county_data, va_gover
         percent_reporting_threshold,
         geographic_unit_type,
         aggregates=aggregates,
-        raw_config=va_governor_config,
+        raw_config=va_config,
         preprocessed_data=preprocessed_data,
         save_output=[],
     )
     assert "unit_data" not in result.keys()
 
 
-def test_unexpected_units_no_new_units(model_client, va_governor_precinct_data, va_governor_config):
+def test_unexpected_units_no_new_units(model_client, va_governor_precinct_data, va_config):
     # verifies that adding unexpected units doesn't add any extra units when not expected to
     election_id = "2017-11-07_VA_G"
     office_id = "G"
@@ -485,7 +494,7 @@ def test_unexpected_units_no_new_units(model_client, va_governor_precinct_data, 
         percent_reporting_threshold,
         geographic_unit_type,
         aggregates=aggregates,
-        raw_config=va_governor_config,
+        raw_config=va_config,
         preprocessed_data=preprocessed_data,
         save_output=[],
     )
@@ -493,7 +502,7 @@ def test_unexpected_units_no_new_units(model_client, va_governor_precinct_data, 
     assert result["county_data"].shape[0] == va_counties_count
 
 
-def test_unexpected_units_new_units(model_client, va_governor_county_data, va_governor_config):
+def test_unexpected_units_new_units(model_client, va_governor_county_data, va_config):
     # verifies that adding unexpected units DOES add any extra units when expected to
     election_id = "2017-11-07_VA_G"
     office_id = "G"
@@ -528,7 +537,7 @@ def test_unexpected_units_new_units(model_client, va_governor_county_data, va_go
         percent_reporting_threshold,
         geographic_unit_type,
         aggregates=aggregates,
-        raw_config=va_governor_config,
+        raw_config=va_config,
         preprocessed_data=preprocessed_data,
         save_output=[],
     )
@@ -536,7 +545,7 @@ def test_unexpected_units_new_units(model_client, va_governor_county_data, va_go
     assert result["county_data"].shape[0] == va_counties_count + unexpected_units
 
 
-def test_get_estimates_some_reporting(model_client, va_governor_county_data, va_governor_config):
+def test_get_estimates_some_reporting(model_client, va_governor_county_data, va_config):
     election_id = "2017-11-07_VA_G"
     office_id = "G"
     geographic_unit_type = "county"
@@ -562,7 +571,7 @@ def test_get_estimates_some_reporting(model_client, va_governor_county_data, va_
         prediction_intervals,
         percent_reporting_threshold,
         geographic_unit_type,
-        raw_config=va_governor_config,
+        raw_config=va_config,
         preprocessed_data=preprocessed_data,
         save_output=[],
     )
@@ -595,7 +604,7 @@ def test_get_estimates_some_reporting(model_client, va_governor_county_data, va_
     assert result["state_data"]["upper_0.9_turnout"][0] == 2683348.0
 
 
-def test_get_estimates_no_subunits_reporting(model_client, va_governor_county_data, va_governor_config):
+def test_get_estimates_no_subunits_reporting(model_client, va_governor_county_data, va_config):
     election_id = "2017-11-07_VA_G"
     office_id = "G"
     geographic_unit_type = "county"
@@ -622,13 +631,13 @@ def test_get_estimates_no_subunits_reporting(model_client, va_governor_county_da
             prediction_intervals,
             percent_reporting_threshold,
             geographic_unit_type,
-            raw_config=va_governor_config,
+            raw_config=va_config,
             preprocessed_data=preprocessed_data,
             save_output=[],
         )
 
 
-def test_get_estimates_not_enough_subunits_reporting(model_client, va_governor_county_data, va_governor_config):
+def test_get_estimates_not_enough_subunits_reporting(model_client, va_governor_county_data, va_config):
     election_id = "2017-11-07_VA_G"
     office_id = "G"
     geographic_unit_type = "county"
@@ -655,13 +664,13 @@ def test_get_estimates_not_enough_subunits_reporting(model_client, va_governor_c
             prediction_intervals,
             percent_reporting_threshold,
             geographic_unit_type,
-            raw_config=va_governor_config,
+            raw_config=va_config,
             preprocessed_data=preprocessed_data,
             save_output=[],
         )
 
 
-def test_conformalization_data(model_client, va_governor_county_data, va_governor_config):
+def test_conformalization_data(model_client, va_governor_county_data, va_config):
     election_id = "2017-11-07_VA_G"
     office_id = "G"
     geographic_unit_type = "county"
@@ -687,7 +696,7 @@ def test_conformalization_data(model_client, va_governor_county_data, va_governo
         prediction_intervals,
         percent_reporting_threshold,
         geographic_unit_type,
-        raw_config=va_governor_config,
+        raw_config=va_config,
         preprocessed_data=preprocessed_data,
         pi_method="gaussian",
         save_output=[],
@@ -715,7 +724,7 @@ def test_conformalization_data(model_client, va_governor_county_data, va_governo
         prediction_intervals,
         percent_reporting_threshold,
         geographic_unit_type,
-        raw_config=va_governor_config,
+        raw_config=va_config,
         preprocessed_data=preprocessed_data,
         pi_method="nonparametric",
         save_output=[],

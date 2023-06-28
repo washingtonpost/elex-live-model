@@ -11,7 +11,7 @@ from elexmodel.handlers.data.PreprocessedData import PreprocessedDataHandler
 from elexmodel.logging import initialize_logging
 from elexmodel.models.GaussianElectionModel import GaussianElectionModel
 from elexmodel.models.NonparametricElectionModel import NonparametricElectionModel
-from elexmodel.utils.constants import AGGREGATE_ORDER, VALID_AGGREGATES_MAPPING
+from elexmodel.utils.constants import AGGREGATE_ORDER, DEFAULT_AGGREGATES, VALID_AGGREGATES_MAPPING
 from elexmodel.utils.file_utils import APP_ENV, S3_FILE_PATH, TARGET_BUCKET
 from elexmodel.utils.math_utils import compute_error, compute_frac_within_pi, compute_mean_pi_length
 
@@ -121,6 +121,12 @@ class ModelClient:
         """
         return self.all_conformalization_data_agg_dict
 
+    def get_aggregate_list(self, office, aggregate):
+        default_aggregate = DEFAULT_AGGREGATES[office]
+        base_aggregate = default_aggregate[:-1]  # remove unit
+        raw_aggregate_list = base_aggregate + [aggregate]
+        return sorted(list(set(raw_aggregate_list)), key=lambda x: AGGREGATE_ORDER.index(x))
+
     def get_estimates(
         self,
         current_data,  # list of lists
@@ -145,7 +151,7 @@ class ModelClient:
             column_values = current_data[0]
             current_data = pd.DataFrame(current_data[1:], columns=column_values)
         features = kwargs.get("features", [])
-        aggregates = kwargs.get("aggregates", ["postal_code", "unit"])
+        aggregates = kwargs.get("aggregates", DEFAULT_AGGREGATES[office])
         fixed_effects = kwargs.get("fixed_effects", {})
         pi_method = kwargs.get("pi_method", "nonparametric")
         beta = kwargs.get("beta", 1)
@@ -293,7 +299,7 @@ class ModelClient:
             results_handler.add_unit_intervals(estimand, alpha_to_unit_prediction_intervals)
 
             for aggregate in results_handler.aggregates:
-                aggregate_list = sorted(list(set(["postal_code", aggregate])), key=lambda x: AGGREGATE_ORDER.index(x))
+                aggregate_list = self.get_aggregate_list(office, aggregate)
                 estimates_df = model.get_aggregate_predictions(
                     results_handler.reporting_units,
                     results_handler.nonreporting_units,
