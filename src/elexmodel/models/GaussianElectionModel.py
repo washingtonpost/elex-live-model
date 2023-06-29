@@ -10,8 +10,6 @@ class GaussianElectionModel(BaseElectionModel):
     def __init__(self, model_settings={}):
         super().__init__(model_settings)
         self.model_settings = model_settings
-        self.beta = model_settings.get("beta", 1)
-        self.winsorize = model_settings.get("winsorize", False)
         self.alpha_to_nonreporting_lower_bounds = {}
         self.alpha_to_nonreporting_upper_bounds = {}
         self.modeled_bounds_agg = None
@@ -47,8 +45,6 @@ class GaussianElectionModel(BaseElectionModel):
             estimand,
             aggregate=[],
             alpha=alpha,
-            beta=self.beta,
-            winsorize=self.winsorize,
         )
         self.gaussian_bounds_unit = gaussian_model
         self.conformalization_data_unit = prediction_intervals.conformalization
@@ -137,8 +133,6 @@ class GaussianElectionModel(BaseElectionModel):
             aggregate=aggregate,
             alpha=alpha,
             reweight=False,
-            beta=self.beta,
-            winsorize=self.winsorize,
             top_level=True,
         )
 

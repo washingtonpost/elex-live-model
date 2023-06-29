@@ -131,14 +131,14 @@ def test_fit():
     upper = random_number_generator.normal(loc=mean_upper, scale=sd_upper, size=n)
     weights = random_number_generator.randint(low=1, high=100, size=n)
     alpha = 0.9
-    beta = 1
-    winsorize = False
     estimand = "turnout"
     model_settings = {
         "election_id": "2017-11-07_VA_G",
         "office": "G",
         "geographic_unit_type": "county",
         "save_conformalization": False,
+        "beta": 1,
+        "winsorize": True,
     }
 
     gaussian_model = GaussianModel(model_settings)
@@ -146,16 +146,16 @@ def test_fit():
     df = pd.DataFrame({f"last_election_results_{estimand}": weights, "lower_bounds": lower, "upper_bounds": upper})
 
     # all in the same group
-    g = gaussian_model._fit(df, estimand, [], alpha, beta, winsorize)
+    g = gaussian_model._fit(df, estimand, [], alpha)
 
     # assumes that weighted median and standard deviation bootstrap works
     # tests for that in test_utils
     assert math_utils.weighted_median(lower, weights / weights.sum()) == pytest.approx(g.mu_lower_bound[0], TOL)
-    assert math_utils.boot_sigma(lower, conf=(3 + alpha) / 4, winsorize=winsorize) == pytest.approx(
+    assert math_utils.boot_sigma(lower, conf=(3 + alpha) / 4, winsorize=model_settings["winsorize"]) == pytest.approx(
         g.sigma_lower_bound[0], RELAX_TOL
     )
     assert math_utils.weighted_median(upper, weights / weights.sum()) == pytest.approx(g.mu_upper_bound[0], TOL)
-    assert math_utils.boot_sigma(upper, conf=(3 + alpha) / 4, winsorize=winsorize) == pytest.approx(
+    assert math_utils.boot_sigma(upper, conf=(3 + alpha) / 4, winsorize=model_settings["winsorize"]) == pytest.approx(
         g.sigma_upper_bound[0], RELAX_TOL
     )
 
@@ -192,14 +192,14 @@ def test_fit():
     df = pd.concat([df_a, df_b])
 
     # fit model to multiple groups separately
-    g = gaussian_model._fit(df, estimand, ["group"], alpha, beta, winsorize)
+    g = gaussian_model._fit(df, estimand, ["group"], alpha)
 
     assert math_utils.weighted_median(a, weights_a / weights_a.sum()) == pytest.approx(g.mu_lower_bound[0], TOL)
-    assert math_utils.boot_sigma(a, conf=(3 + alpha) / 4, winsorize=winsorize) == pytest.approx(
+    assert math_utils.boot_sigma(a, conf=(3 + alpha) / 4, winsorize=model_settings["winsorize"]) == pytest.approx(
         g.sigma_lower_bound[0], RELAX_TOL
     )
     assert math_utils.weighted_median(b, weights_b / weights_b.sum()) == pytest.approx(g.mu_lower_bound[1], TOL)
-    assert math_utils.boot_sigma(b, conf=(3 + alpha) / 4, winsorize=winsorize) == pytest.approx(
+    assert math_utils.boot_sigma(b, conf=(3 + alpha) / 4, winsorize=model_settings["winsorize"]) == pytest.approx(
         g.sigma_lower_bound[1], RELAX_TOL
     )
 
@@ -220,14 +220,14 @@ def test_fit_winsorized():
     upper = random_number_generator.normal(loc=mean_upper, scale=sd_upper, size=n)
     weights = random_number_generator.randint(low=1, high=100, size=n)
     alpha = 0.9
-    beta = 1
-    winsorize = True
     estimand = "turnout"
     model_settings = {
         "election_id": "2017-11-07_VA_G",
         "office": "G",
         "geographic_unit_type": "county",
         "save_conformalization": False,
+        "beta": 1,
+        "winsorize": True,
     }
 
     gaussian_model = GaussianModel(model_settings)
@@ -235,16 +235,16 @@ def test_fit_winsorized():
     df = pd.DataFrame({f"last_election_results_{estimand}": weights, "lower_bounds": lower, "upper_bounds": upper})
 
     # all in the same group
-    g = gaussian_model._fit(df, estimand, [], alpha, beta, winsorize)
+    g = gaussian_model._fit(df, estimand, [], alpha)
 
     # assumes that weighted median and standard deviation bootstrap works
     # tests for that in test_utils
     assert math_utils.weighted_median(lower, weights / weights.sum()) == pytest.approx(g.mu_lower_bound[0], TOL)
-    assert math_utils.boot_sigma(lower, conf=(3 + alpha) / 4, winsorize=winsorize) == pytest.approx(
+    assert math_utils.boot_sigma(lower, conf=(3 + alpha) / 4, winsorize=model_settings["winsorize"]) == pytest.approx(
         g.sigma_lower_bound[0], RELAX_TOL
     )
     assert math_utils.weighted_median(upper, weights / weights.sum()) == pytest.approx(g.mu_upper_bound[0], TOL)
-    assert math_utils.boot_sigma(upper, conf=(3 + alpha) / 4, winsorize=winsorize) == pytest.approx(
+    assert math_utils.boot_sigma(upper, conf=(3 + alpha) / 4, winsorize=model_settings["winsorize"]) == pytest.approx(
         g.sigma_upper_bound[0], RELAX_TOL
     )
 
@@ -281,14 +281,14 @@ def test_fit_winsorized():
     df = pd.concat([df_a, df_b])
 
     # fit model to multiple groups separately
-    g = gaussian_model._fit(df, estimand, ["group"], alpha, beta, winsorize)
+    g = gaussian_model._fit(df, estimand, ["group"], alpha)
 
     assert math_utils.weighted_median(a, weights_a / weights_a.sum()) == pytest.approx(g.mu_lower_bound[0], TOL)
-    assert math_utils.boot_sigma(a, conf=(3 + alpha) / 4, winsorize=winsorize) == pytest.approx(
+    assert math_utils.boot_sigma(a, conf=(3 + alpha) / 4, winsorize=model_settings["winsorize"]) == pytest.approx(
         g.sigma_lower_bound[0], RELAX_TOL
     )
     assert math_utils.weighted_median(b, weights_b / weights_b.sum()) == pytest.approx(g.mu_lower_bound[1], TOL)
-    assert math_utils.boot_sigma(b, conf=(3 + alpha) / 4, winsorize=winsorize) == pytest.approx(
+    assert math_utils.boot_sigma(b, conf=(3 + alpha) / 4, winsorize=model_settings["winsorize"]) == pytest.approx(
         g.sigma_lower_bound[1], RELAX_TOL
     )
 
@@ -305,6 +305,8 @@ def test_large_and_small_fit():
         "office": "G",
         "geographic_unit_type": "county",
         "save_conformalization": False,
+        "beta": 1,
+        "winsorize": True,
     }
 
     gaussian_model = GaussianModel(model_settings)
@@ -346,8 +348,6 @@ def test_large_and_small_fit():
     general_weights = df[f"last_election_results_{estimand}"].values
 
     alpha = 0.9
-    beta = 1
-    winsorize = True
 
     reporting = pd.DataFrame({"group_1": ["general", "general"], "group_2": ["a", "b"]})
     nonreporting = pd.DataFrame({"group_1": ["general", "general"], "group_2": ["a", "b"]})
@@ -360,18 +360,16 @@ def test_large_and_small_fit():
         aggregate=["group_1", "group_2"],
         alpha=alpha,
         reweight=False,
-        beta=beta,
-        winsorize=winsorize,
     )
 
     assert math_utils.weighted_median(general, general_weights / general_weights.sum()) == pytest.approx(
         g.mu_lower_bound.values[0], TOL
     )
-    assert math_utils.boot_sigma(general, conf=(3 + alpha) / 4, winsorize=winsorize) == pytest.approx(
+    assert math_utils.boot_sigma(general, conf=(3 + alpha) / 4, winsorize=model_settings["winsorize"]) == pytest.approx(
         g.sigma_lower_bound.values[0], RELAX_TOL
     )
     assert math_utils.weighted_median(b, weights_b / weights_b.sum()) == pytest.approx(g.mu_lower_bound.values[1], TOL)
-    assert math_utils.boot_sigma(b, conf=(3 + alpha) / 4, winsorize=winsorize) == pytest.approx(
+    assert math_utils.boot_sigma(b, conf=(3 + alpha) / 4, winsorize=model_settings["winsorize"]) == pytest.approx(
         g.sigma_lower_bound.values[1], RELAX_TOL
     )
     assert g.group_1.values[0] == "general"

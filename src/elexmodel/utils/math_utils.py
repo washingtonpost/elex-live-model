@@ -72,7 +72,7 @@ def robust_sample_std(x, axis):
     return winsorize_std(x, axis=-1)
 
 
-def boot_sigma(data, conf, num_iterations=10000, winsorize=winsorize):
+def boot_sigma(data, conf, num_iterations=10000, winsorize=False):
     """
     Bootstrap standard deviation.
     """

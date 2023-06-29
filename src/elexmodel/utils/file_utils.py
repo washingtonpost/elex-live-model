@@ -3,10 +3,6 @@ import os
 import pathlib
 from io import StringIO
 
-from dotenv import find_dotenv, load_dotenv
-
-load_dotenv(find_dotenv())
-
 LOG = logging.getLogger(__name__)
 
 APP_ENV = os.getenv("APP_ENV")
