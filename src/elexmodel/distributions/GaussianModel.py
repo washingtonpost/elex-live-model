@@ -31,7 +31,6 @@ class GaussianModel:
                 sigma_lower_bound=None,
                 sigma_upper_bound=None,
                 var_inflate=None,
-                winsorize=None,
             )
             .astype(
                 dtype={
@@ -40,7 +39,6 @@ class GaussianModel:
                     "sigma_lower_bound": float,
                     "sigma_upper_bound": float,
                     "var_inflate": float,
-                    "winsorize": float,
                 }
             )
         )
