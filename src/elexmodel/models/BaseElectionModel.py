@@ -275,9 +275,9 @@ class BaseElectionModel:
         K=3,
     ):
         if len(possible_lambda_values) == 0:
-            return 0, 0
+            return 0, None
         if len(possible_lambda_values) == 1:
-            return possible_lambda_values[0], 0
+            return possible_lambda_values[0], None
 
         MAPE_arr = np.zeros_like(possible_lambda_values)  # array of MAPE sums for each lambda
 

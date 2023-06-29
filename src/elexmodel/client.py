@@ -95,8 +95,6 @@ class ModelClient:
             raise ValueError("lambda is not valid. It has to be a list.")
         if len(lambda_) > 0 and not all(isinstance(e, (int, float)) for e in lambda_):
             raise ValueError("lambda is not valid. It has to be a list of numbers.")
-        if len(lambda_) < 0:
-            raise ValueError("lambda is not valid. It has to be greater than zero.")
         if handle_unreporting not in {"drop", "zero"}:
             raise ValueError("handle_unreporting must be either `drop` or `zero`")
         return True

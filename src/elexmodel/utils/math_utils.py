@@ -102,7 +102,7 @@ def get_kfold_splits(data, n_splits=2):
     """
 
     if n_splits <= 0:
-        raise ZeroDivisionError("n_splits cannot be equal to zero")
+        raise ValueError("n_splits cannot be equal to zero")
 
     if n_splits == 1:
         raise ValueError(
@@ -117,7 +117,7 @@ def get_kfold_splits(data, n_splits=2):
 
     for i in range(n_splits):
         fold_length = fold_size + i if i < remaining_samples else fold_size
-        test_index = range(current_index, current_index + fold_length)
+        test_index = list(range(current_index, current_index + fold_length))
         train_index = list(set(range(num_samples)) - set(test_index))
         splits.append((train_index, test_index))
         current_index += fold_length

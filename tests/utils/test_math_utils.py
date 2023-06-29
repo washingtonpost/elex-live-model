@@ -152,7 +152,7 @@ def test_kfold_splits_no_split():
     array = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     n_splits = 0
 
-    with pytest.raises(ZeroDivisionError):
+    with pytest.raises(ValueError):
         math_utils.get_kfold_splits(array, n_splits)
 
 
@@ -194,8 +194,19 @@ def test_kfold_splits_3D():
     assert len(splits[0][0]) == 3
 
 
-def test_scikit_example():
+def test_np_example():
     X = np.array([[1, 2], [3, 4], [1, 2], [3, 4]])
+    n_splits = 2
+
+    splits = math_utils.get_kfold_splits(X, n_splits)
+
+    assert len(splits) == 2
+    assert len(splits[0]) == 2
+    assert len(splits[0][0]) == 2
+
+
+def test_df_example():
+    X = pd.DataFrame([[1, 2], [3, 4], [1, 2], [3, 4]])
     n_splits = 2
 
     splits = math_utils.get_kfold_splits(X, n_splits)
