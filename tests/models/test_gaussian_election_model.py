@@ -1,5 +1,6 @@
 from elexmodel.models import GaussianElectionModel
 
+
 def test_compute_conf_frac():
     model = GaussianElectionModel.GaussianElectionModel()
     conf_frac = model._compute_conf_frac()
