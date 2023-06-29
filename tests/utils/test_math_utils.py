@@ -136,3 +136,70 @@ def test_compute_mean_pi_length():
     length = random_number_generator.lognormal(mean=1, sigma=5, size=100)
     upper = lower + length
     assert math_utils.compute_mean_pi_length(lower, upper, 0) == np.mean(length).round(decimals=2)
+
+
+def test_kfold_splits_empty():
+    array = []
+    n_splits = 5
+
+    splits = math_utils.get_kfold_splits(array, n_splits)
+
+    assert len(splits) == 5
+    assert len(splits[0][0]) == 0
+
+
+def test_kfold_splits_no_split():
+    array = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    n_splits = 0
+
+    with pytest.raises(ZeroDivisionError):
+        math_utils.get_kfold_splits(array, n_splits)
+
+
+def test_kfold_splits_one_split():
+    array = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    n_splits = 1
+
+    with pytest.raises(ValueError):
+        math_utils.get_kfold_splits(array, n_splits)
+
+
+def test_kfold_splits_1D():
+    array = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    n_splits = 5
+
+    splits = math_utils.get_kfold_splits(array, n_splits)
+
+    assert len(splits) == 5
+    assert len(splits[0][0]) == 8
+
+
+def test_kfold_splits_five():
+    array = [1, 2, 3, 4, 5]
+    n_splits = 5
+
+    splits = math_utils.get_kfold_splits(array, n_splits)
+
+    assert len(splits) == 5
+    assert len(splits[0][0]) == 4
+
+
+def test_kfold_splits_3D():
+    array = [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]
+    n_splits = 10
+
+    splits = math_utils.get_kfold_splits(array, n_splits)
+
+    assert len(splits) == 10
+    assert len(splits[0][0]) == 3
+
+
+def test_scikit_example():
+    X = np.array([[1, 2], [3, 4], [1, 2], [3, 4]])
+    n_splits = 2
+
+    splits = math_utils.get_kfold_splits(X, n_splits)
+
+    assert len(splits) == 2
+    assert len(splits[0]) == 2
+    assert len(splits[0][0]) == 2

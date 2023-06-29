@@ -276,12 +276,13 @@ class BaseElectionModel:
     ):
         if len(possible_lambda_values) == 0:
             return 0, 0
+        if len(possible_lambda_values) == 1:
+            return possible_lambda_values[0], 0
 
         MAPE_arr = np.zeros_like(possible_lambda_values)  # array of MAPE sums for each lambda
 
         # loop through each lambda
         for loc, lam in enumerate(possible_lambda_values):
-            self.lambda_ = lam
             for train_index, test_index in math_utils.get_kfold_splits(reporting_units, K):
                 # build model with custom lambda
                 train = reporting_units.iloc[train_index]
