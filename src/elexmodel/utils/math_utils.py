@@ -77,13 +77,13 @@ def boot_sigma(data, conf, num_iterations=10000, winsorize=False):
     Bootstrap standard deviation.
     """
     # we use upper bound of confidence interval for more robustness
-
     if winsorize:
-        return bootstrap(
-            data.reshape(1, -1), robust_sample_std, confidence_level=conf, method="basic", n_resamples=num_iterations
-        ).confidence_interval.high
+        std_func = robust_sample_std
+    else:
+        std_func = sample_std
+
     return bootstrap(
-        data.reshape(1, -1), sample_std, confidence_level=conf, method="basic", n_resamples=num_iterations
+        data.reshape(1, -1), std_func, confidence_level=conf, method="basic", n_resamples=num_iterations
     ).confidence_interval.high
 
 
