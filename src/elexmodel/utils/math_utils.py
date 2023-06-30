@@ -1,6 +1,6 @@
+import decimal
 import logging
 import math
-import decimal
 
 import numpy as np
 from scipy.stats import bootstrap

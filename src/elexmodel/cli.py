@@ -11,6 +11,7 @@ from elexmodel.handlers.data.LiveData import MockLiveDataHandler  # noqa: E402
 from elexmodel.utils.constants import VALID_AGGREGATES_MAPPING  # noqa: E402
 from elexmodel.utils.file_utils import TARGET_BUCKET  # noqa: E402
 
+
 @click.command()
 @click.argument("election_id")
 @click.option("--estimands", "estimands", default=["turnout"], multiple=True)
