@@ -1,3 +1,4 @@
+import decimal
 import logging
 import math
 
@@ -80,11 +81,19 @@ def compute_error(true, pred, type_="mae"):
         return mape.round(decimals=2)
 
 
+def normal_round(x, n):
+    """
+    rounds postive values up rather than down, alternative to banker's rounding which is used in python .round
+    """
+    decimal.getcontext().rounding = decimal.ROUND_HALF_UP
+    return float(decimal.Decimal(x).quantize(decimal.Decimal("0." + "0" * n)))
+
+
 def compute_frac_within_pi(lower, upper, results):
     """
     computes coverage of prediction intervals.
     """
-    return np.mean((upper >= results) & (lower <= results)).round(decimals=2)
+    return normal_round(np.mean((upper >= results) & (lower <= results)), 2)
 
 
 def compute_mean_pi_length(lower, upper, pred):
@@ -92,7 +101,7 @@ def compute_mean_pi_length(lower, upper, pred):
     Computes average relative length of prediction interval
     """
     # we add 1 since pred can be literally zero
-    return np.mean((upper - lower) / (pred + 1)).round(decimals=2)
+    return normal_round(np.mean((upper - lower) / (pred + 1)), 2)
 
 
 def get_kfold_splits(data, n_splits=2):
