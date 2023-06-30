@@ -2,6 +2,7 @@ import logging
 import math
 
 import numpy as np
+import pandas as pd
 from scipy.stats import bootstrap
 
 LOG = logging.getLogger()
@@ -101,6 +102,9 @@ def get_kfold_splits(data, n_splits=2):
     returns a list of paired train and test indexes
     """
 
+    if isinstance(data, pd.DataFrame) and data.empty:
+        raise ValueError("data cannot be empty")
+
     if n_splits <= 0:
         raise ValueError("n_splits cannot be equal to zero")
 
@@ -118,7 +122,7 @@ def get_kfold_splits(data, n_splits=2):
     for i in range(n_splits):
         fold_length = fold_size + i if i < remaining_samples else fold_size
         test_index = list(range(current_index, current_index + fold_length))
-        train_index = list(set(range(num_samples)) - set(test_index))
+        train_index = list(set(range(num_samples + 1)) - set(test_index))
         splits.append((train_index, test_index))
         current_index += fold_length
 

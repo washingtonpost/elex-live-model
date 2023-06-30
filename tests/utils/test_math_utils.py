@@ -139,13 +139,11 @@ def test_compute_mean_pi_length():
 
 
 def test_kfold_splits_empty():
-    array = []
+    array = pd.DataFrame([])
     n_splits = 5
 
-    splits = math_utils.get_kfold_splits(array, n_splits)
-
-    assert len(splits) == 5
-    assert len(splits[0][0]) == 0
+    with pytest.raises(ValueError):
+        math_utils.get_kfold_splits(array, n_splits)
 
 
 def test_kfold_splits_no_split():
@@ -171,7 +169,7 @@ def test_kfold_splits_1D():
     splits = math_utils.get_kfold_splits(array, n_splits)
 
     assert len(splits) == 5
-    assert len(splits[0][0]) == 8
+    assert len(splits[0][0]) == 9
 
 
 def test_kfold_splits_five():
@@ -181,7 +179,7 @@ def test_kfold_splits_five():
     splits = math_utils.get_kfold_splits(array, n_splits)
 
     assert len(splits) == 5
-    assert len(splits[0][0]) == 4
+    assert len(splits[0][0]) == 5
 
 
 def test_kfold_splits_3D():
@@ -191,7 +189,7 @@ def test_kfold_splits_3D():
     splits = math_utils.get_kfold_splits(array, n_splits)
 
     assert len(splits) == 10
-    assert len(splits[0][0]) == 3
+    assert len(splits[0][0]) == 4
 
 
 def test_np_example():
@@ -202,7 +200,7 @@ def test_np_example():
 
     assert len(splits) == 2
     assert len(splits[0]) == 2
-    assert len(splits[0][0]) == 2
+    assert len(splits[0][0]) == 3
 
 
 def test_df_example():
@@ -213,4 +211,4 @@ def test_df_example():
 
     assert len(splits) == 2
     assert len(splits[0]) == 2
-    assert len(splits[0][0]) == 2
+    assert len(splits[0][0]) == 3

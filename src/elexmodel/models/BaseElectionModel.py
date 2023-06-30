@@ -285,8 +285,10 @@ class BaseElectionModel:
         for loc, lam in enumerate(possible_lambda_values):
             for train_index, test_index in math_utils.get_kfold_splits(reporting_units, K):
                 # build model with custom lambda
-                train = reporting_units.iloc[train_index]
-                test = reporting_units.iloc[test_index]
+                train_index_bounded = [idx for idx in train_index if idx < len(reporting_units)]
+                test_index_bounded = [idy for idy in test_index if idy < len(reporting_units)]
+                train = reporting_units.iloc[train_index_bounded]
+                test = reporting_units.iloc[test_index_bounded]
                 unit_predictions = self.get_unit_predictions(train, test, estimand, lam)
                 MAPE = math_utils.compute_error(
                     test[f"results_{estimand}"].values, unit_predictions.values, type_="mape"
