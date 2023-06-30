@@ -781,7 +781,7 @@ def test_conformalization_data(model_client, va_governor_county_data, va_config)
     assert isinstance(conform_agg[0.9]["turnout"][1], pd.DataFrame)
 
 
-def test_winsorize_intervals(model_client, va_governor_county_data, va_governor_config):
+def test_winsorize_intervals(model_client, va_governor_county_data, va_config):
     election_id = "2017-11-07_VA_G"
     office_id = "G"
     geographic_unit_type = "county"
@@ -807,7 +807,7 @@ def test_winsorize_intervals(model_client, va_governor_county_data, va_governor_
         prediction_intervals,
         percent_reporting_threshold,
         geographic_unit_type,
-        raw_config=va_governor_config,
+        raw_config=va_config,
         preprocessed_data=preprocessed_data,
         pi_method="gaussian",
         winsorize=True,
@@ -822,7 +822,7 @@ def test_winsorize_intervals(model_client, va_governor_county_data, va_governor_
         prediction_intervals,
         percent_reporting_threshold,
         geographic_unit_type,
-        raw_config=va_governor_config,
+        raw_config=va_config,
         preprocessed_data=preprocessed_data,
         pi_method="gaussian",
         winsorize=False,
