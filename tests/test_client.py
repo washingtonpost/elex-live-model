@@ -770,3 +770,63 @@ def test_conformalization_data(model_client, va_governor_county_data, va_governo
     assert isinstance(conform_unit[0.9]["turnout"][1], pd.DataFrame)
     assert conform_agg[0.9]["turnout"][0] is None
     assert isinstance(conform_agg[0.9]["turnout"][1], pd.DataFrame)
+
+
+def test_winsorize_intervals(model_client, va_governor_county_data, va_governor_config):
+    election_id = "2017-11-07_VA_G"
+    office_id = "G"
+    geographic_unit_type = "county"
+    estimands = ["turnout"]
+    prediction_intervals = [0.9]
+    percent_reporting_threshold = 100
+
+    data_handler = MockLiveDataHandler(
+        election_id, office_id, geographic_unit_type, estimands, data=va_governor_county_data
+    )
+
+    data_handler.shuffle()
+    data = data_handler.get_percent_fully_reported(70)
+
+    preprocessed_data = va_governor_county_data.copy()
+    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
+
+    winsorize_results = model_client.get_estimates(
+        data,
+        election_id,
+        office_id,
+        estimands,
+        prediction_intervals,
+        percent_reporting_threshold,
+        geographic_unit_type,
+        raw_config=va_governor_config,
+        preprocessed_data=preprocessed_data,
+        pi_method="gaussian",
+        winsorize=True,
+        save_output=[],
+    )
+
+    non_winsorize_results = model_client.get_estimates(
+        data,
+        election_id,
+        office_id,
+        estimands,
+        prediction_intervals,
+        percent_reporting_threshold,
+        geographic_unit_type,
+        raw_config=va_governor_config,
+        preprocessed_data=preprocessed_data,
+        pi_method="gaussian",
+        winsorize=False,
+        save_output=[],
+    )
+    winsorize_results = winsorize_results.get("state_data")
+    non_winsorize_results = non_winsorize_results.get("state_data")
+
+    assert (
+        winsorize_results.loc[:, "lower_0.9_turnout"].values[0]
+        >= non_winsorize_results.loc[:, "lower_0.9_turnout"].values[0]
+    )
+    assert (
+        winsorize_results.loc[:, "upper_0.9_turnout"].values[0]
+        <= non_winsorize_results.loc[:, "upper_0.9_turnout"].values[0]
+    )

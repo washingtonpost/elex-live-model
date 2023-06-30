@@ -136,7 +136,7 @@ def test_fit():
         "geographic_unit_type": "county",
         "save_conformalization": False,
         "beta": 1,
-        "winsorize": True,
+        "winsorize": False,
     }
 
     gaussian_model = GaussianModel(model_settings)
