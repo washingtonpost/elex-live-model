@@ -144,7 +144,7 @@ def get_kfold_splits(data, n_splits=2):
     for i in range(n_splits):
         fold_length = fold_size + i if i < remaining_samples else fold_size
         test_index = list(range(current_index, current_index + fold_length))
-        train_index = list(set(range(num_samples + 1)) - set(test_index))
+        train_index = list(set(range(num_samples)) - set(test_index))
         splits.append((train_index, test_index))
         current_index += fold_length
 

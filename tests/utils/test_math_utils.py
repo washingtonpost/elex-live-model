@@ -169,7 +169,7 @@ def test_kfold_splits_1D():
     splits = math_utils.get_kfold_splits(array, n_splits)
 
     assert len(splits) == 5
-    assert len(splits[0][0]) == 9
+    assert len(splits[0][0]) == 8
 
 
 def test_kfold_splits_five():
@@ -179,7 +179,7 @@ def test_kfold_splits_five():
     splits = math_utils.get_kfold_splits(array, n_splits)
 
     assert len(splits) == 5
-    assert len(splits[0][0]) == 5
+    assert len(splits[0][0]) == 4
 
 
 def test_kfold_splits_3D():
@@ -189,7 +189,7 @@ def test_kfold_splits_3D():
     splits = math_utils.get_kfold_splits(array, n_splits)
 
     assert len(splits) == 10
-    assert len(splits[0][0]) == 4
+    assert len(splits[0][0]) == 3
 
 
 def test_np_example():
@@ -200,7 +200,7 @@ def test_np_example():
 
     assert len(splits) == 2
     assert len(splits[0]) == 2
-    assert len(splits[0][0]) == 3
+    assert len(splits[0][0]) == 2
 
 
 def test_df_example():
@@ -211,28 +211,29 @@ def test_df_example():
 
     assert len(splits) == 2
     assert len(splits[0]) == 2
-    assert len(splits[0][0]) == 3
+    assert len(splits[0][0]) == 2
 
 
 def test_kfold_splits_bounds():
-    array = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    array = [1, 2, 3, 4, 5, 6, 7, 8, 9]
     n_splits = 4
 
     splits = math_utils.get_kfold_splits(array, n_splits)
 
     assert len(splits) == 4
-    assert len(splits[0][0]) == 9
+    assert len(splits[0][0]) == 7
 
-    X = pd.DataFrame([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    X = pd.DataFrame([1, 2, 3, 4, 5, 6, 7, 8, 9])
 
-    train_index = splits[0][0]  # [2, 3, 4, 5, 6, 7, 8, 9, 10]
+    train_index = splits[0][0]  # [2, 3, 4, 5, 6, 7, 8]
     test_index = splits[0][1]  # [0, 1]
 
-    train_index_bounded = [idx for idx in train_index if idx < len(X)]
-    test_index_bounded = [idy for idy in test_index if idy < len(X)]
-    train = X.iloc[train_index_bounded]
-    test = X.iloc[test_index_bounded]
+    assert train_index == [2, 3, 4, 5, 6, 7, 8]
+    assert test_index == [0, 1]
+
+    train = X.iloc[train_index]  # [3, 4, 5, 6, 7, 8, 9]
+    test = X.iloc[test_index]  # [1, 2]
 
     # assert that we have not lost values to subsetting
-    assert len(train_index_bounded) == len(train)  # 8=8
-    assert len(test_index_bounded) == len(test)  # 2=2
+    assert len(train_index) == len(train)  # 8=8
+    assert len(test_index) == len(test)  # 2=2
