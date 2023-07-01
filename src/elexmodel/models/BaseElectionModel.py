@@ -267,7 +267,7 @@ class BaseElectionModel:
         """
         return self.features_to_coefficients
 
-    def compute_lambda(
+    def find_optimal_lambda(
         self,
         reporting_units,
         possible_lambda_values=[],

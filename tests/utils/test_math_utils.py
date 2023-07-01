@@ -212,3 +212,27 @@ def test_df_example():
     assert len(splits) == 2
     assert len(splits[0]) == 2
     assert len(splits[0][0]) == 3
+
+
+def test_kfold_splits_bounds():
+    array = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    n_splits = 4
+
+    splits = math_utils.get_kfold_splits(array, n_splits)
+
+    assert len(splits) == 4
+    assert len(splits[0][0]) == 9
+
+    X = pd.DataFrame([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+
+    train_index = splits[0][0]  # [2, 3, 4, 5, 6, 7, 8, 9, 10]
+    test_index = splits[0][1]  # [0, 1]
+
+    train_index_bounded = [idx for idx in train_index if idx < len(X)]
+    test_index_bounded = [idy for idy in test_index if idy < len(X)]
+    train = X.iloc[train_index_bounded]
+    test = X.iloc[test_index_bounded]
+
+    # assert that we have not lost values to subsetting
+    assert len(train_index_bounded) == len(train)  # 8=8
+    assert len(test_index_bounded) == len(test)  # 2=2

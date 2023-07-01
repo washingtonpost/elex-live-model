@@ -291,7 +291,7 @@ class ModelClient:
         self.all_conformalization_data_unit_dict = {alpha: {} for alpha in prediction_intervals}
         self.all_conformalization_data_agg_dict = {alpha: {} for alpha in prediction_intervals}
         for estimand in estimands:
-            new_lambda, avg_MAPE = model.compute_lambda(reporting_units, lambda_, estimand)
+            new_lambda, avg_MAPE = model.find_optimal_lambda(reporting_units, lambda_, estimand)
             unit_predictions = model.get_unit_predictions(reporting_units, nonreporting_units, estimand, new_lambda)
             results_handler.add_unit_predictions(estimand, unit_predictions)
             # gets prediciton intervals for each alpha
