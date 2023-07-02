@@ -92,6 +92,9 @@ class BootstrapElectionModel(BaseElectionModel):
     def _estimate_conditional_distribution(self): 
         pass
 
+    # TODO: 
+    #  robust-ify OLS (e.g. regularization, quantile -> one bad AP county does not break everything)
+    #  account for partial reporting in UB/LB
     def compute_bootstrap_errors(self, reporting_units, nonreporting_units, unexpected_units):
         n_train = reporting_units.shape[0]
         n_test = nonreporting_units.shape[0]
@@ -122,7 +125,6 @@ class BootstrapElectionModel(BaseElectionModel):
         aggregate_indicator_train = aggregate_indicator_expected[:n_train]
         aggregate_indicator_test = aggregate_indicator_expected[n_train:]
 
-        # TODO: use james-stein
         epsilon_y_hat = np.nan_to_num((aggregate_indicator_train.T @ residuals_y) / aggregate_indicator_train.sum(axis=0).reshape(-1, 1))
         epsilon_z_hat = np.nan_to_num((aggregate_indicator_train.T @ residuals_z) / aggregate_indicator_train.sum(axis=0).reshape(-1, 1))
         epsilon_hat = np.concatenate([epsilon_y_hat, epsilon_z_hat], axis=1)
@@ -196,13 +198,35 @@ class BootstrapElectionModel(BaseElectionModel):
             unifs.append(unifs_strata)
         unifs = np.concatenate(unifs, axis=0)
 
-        epsilon_B = self.rng.choice(epsilon_hat, (len(epsilon_hat), self.B), replace=True)
-        epsilon_y_B = epsilon_B[:,:,0]
-        epsilon_z_B = epsilon_B[:,:,1]
+        iqr_y_strata = {}
+        iqr_z_strata = {}
+        for x_stratum in x_strata:
+            x_stratum_delta_y_ppf = stratum_ppfs_delta_y[tuple(x_stratum)]
+            iqr_y = x_stratum_delta_y_ppf(.75) - x_stratum_delta_y_ppf(.25)
+            iqr_y_strata[tuple(x_stratum)] = iqr_y
+
+            x_stratum_delta_z_ppf = stratum_ppfs_delta_z[tuple(x_stratum)]
+            iqr_z = x_stratum_delta_z_ppf(.75) - x_stratum_delta_z_ppf(.25)
+            iqr_z_strata[tuple(x_stratum)] = iqr_z
+
+        var_epsilon_y = np.zeros((aggregate_indicator_train.shape[1], ))
+        var_epsilon_z = np.zeros((aggregate_indicator_train.shape[1], ))
+
+        for strata_dummies in x_train_strata_unique:
+            strata_indices = np.where((strata_dummies == x_train_strata).all(axis=1))[0]
+            var_epsilon_y += (aggregate_indicator_train[strata_indices] * (iqr_y_strata[tuple(strata_dummies)] ** 2)).sum(axis=0)
+            var_epsilon_z += (aggregate_indicator_train[strata_indices] * (iqr_z_strata[tuple(strata_dummies)] ** 2)).sum(axis=0)
+
+        var_epsilon_y /= aggregate_indicator_train.sum(axis=0)
+        var_epsilon_z /= aggregate_indicator_train.sum(axis=0)
+        var_epsilon_y = np.nan_to_num(var_epsilon_y)
+        var_epsilon_z = np.nan_to_num(var_epsilon_z)
+
+        epsilon_y_B = self.rng.multivariate_normal(mean=epsilon_hat[:,0], cov=np.diag(var_epsilon_y), size=self.B).T
+        epsilon_z_B = self.rng.multivariate_normal(mean=epsilon_hat[:,1], cov=np.diag(var_epsilon_z), size=self.B).T
 
         unifs_B = self.rng.choice(unifs, (n_train, self.B), replace=True)
 
-        # TODO: turn this into delta_y, delta_z
         delta_y_B = np.zeros((n_train, self.B))
         delta_z_B = np.zeros((n_train, self.B))
 
@@ -265,9 +289,9 @@ class BootstrapElectionModel(BaseElectionModel):
         states_in_nonreporting_units = np.where(np.any(aggregate_indicator_test > 0, axis=0))[0]
         states_that_need_random_effect = np.intersect1d(states_not_in_reporting_units, states_in_nonreporting_units)
         
-        test_epsilon = self.rng.multivariate_normal([0, 0], cov_mat_epsilon, size=len(states_that_need_random_effect))
-        test_epsilon_y = test_epsilon[:,0].reshape(-1, 1)
-        test_epsilon_z = test_epsilon[:,1].reshape(-1, 1)
+        test_epsilon = self.rng.multivariate_normal([0, 0], cov_mat_epsilon, size=(len(states_that_need_random_effect), self.B))
+        test_epsilon_y = test_epsilon[:,:,0]
+        test_epsilon_z = test_epsilon[:,:,1]
  
         test_residuals_y += aggregate_indicator_test[:,states_that_need_random_effect] @ test_epsilon_y
         test_residuals_z += aggregate_indicator_test[:,states_that_need_random_effect] @ test_epsilon_z
@@ -277,15 +301,14 @@ class BootstrapElectionModel(BaseElectionModel):
         errors_B_2 = (y_test_pred + test_residuals_y).clip(min=-1, max=1)
         errors_B_2 *= (z_test_pred + test_residuals_z).clip(min=0)
 
-        self.errors_B_2 = errors_B_2 * weights_test # clipping since this is results margin
+        self.errors_B_2 = errors_B_2 * weights_test 
 
         self.errors_B_3 = z_test_pred_B.clip(min=0) * weights_test # denominator for percentage margin
         self.errors_B_4 = (z_test_pred + test_residuals_z).clip(min=0) * weights_test # clipping since this is the results turnout
 
         self.weighted_yz_test_pred = yz_test_pred * weights_test
         self.weighted_z_test_pred = z_test_pred * weights_test
-        if n_train > 700:
-            import pdb; pdb.set_trace()
+
         self.ran_bootstrap = True
 
     def get_unit_predictions(self,  reporting_units, nonreporting_units, estimand, **kwargs):
