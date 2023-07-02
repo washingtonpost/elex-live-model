@@ -12,7 +12,7 @@ class MockLiveDataHandlerException(Exception):
     pass
 
 
-class MockLiveDataHandler(object):
+class MockLiveDataHandler:
     """
     Handles current data, which we would pull from Dynamo on an election night
     """
@@ -113,9 +113,9 @@ class MockLiveDataHandler(object):
 
     def shuffle(self, seed=None, upweight={}, enforce=[]):
         """
-        Function that allows for random shuffling of geographic units with upweights for certain types of counties
-        this makes those geographic units more likely to be picked. Also allows a specific ordering by enforcing which geographic units
-        come first.
+        Function that allows for random shuffling of geographic units with upweights for certain
+        types of counties this makes those geographic units more likely to be picked.
+        Also allows a specific ordering by enforcing which geographic units come first.
         seed: int
         upweight: dict of dicts, from category to upweight by to geographic unit identifier to weight
             e.g. {"postal_code": {"AL": 3, "FL": 5}, "county_classification": {"urban": 1000, "rural": 0.3}}
@@ -143,7 +143,7 @@ class MockLiveDataHandler(object):
         frac = round(percent / 100.0, 2)
         if _round == "up":
             return math.ceil(frac * self.data.shape[0])
-        elif _round == "down":
+        if _round == "down":
             return math.floor(frac * self.data.shape[0])
 
     def get_percent_fully_reported(self, percent, _round="up"):

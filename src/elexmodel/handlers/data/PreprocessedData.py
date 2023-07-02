@@ -9,7 +9,7 @@ from elexmodel.utils.file_utils import create_directory, get_directory_path
 LOG = logging.getLogger(__name__)
 
 
-class PreprocessedDataHandler(object):
+class PreprocessedDataHandler:
     """
     Handler for preprocessed data for model
     """

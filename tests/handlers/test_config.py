@@ -3,33 +3,33 @@ import os
 from elexmodel.handlers.config import ConfigHandler
 
 
-def test_init(va_governor_config):
+def test_init(va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     assert election_id in config_handler.config.keys()
 
 
-def test_get_office_subconfig(va_governor_config):
+def test_get_office_subconfig(va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     office = "G"
     office_subconfig = config_handler._get_office_subconfig(office)
     assert len(office_subconfig) > 0
 
 
-def test_get_offices(va_governor_config):
+def test_get_offices(va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     offices = config_handler.get_offices()
     assert ["Y", "G"] == offices
 
 
-def test_get_baseline_pointer_general(va_governor_config):
+def test_get_baseline_pointer_general(va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     office = "G"
     baseline_pointer = config_handler.get_baseline_pointer(office)
@@ -50,9 +50,9 @@ def test_get_baseline_pointer_primary(tx_primary_governor_config):
     } == baseline_pointer
 
 
-def test_get_estimand_baselines_general(va_governor_config):
+def test_get_estimand_baselines_general(va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     office = "G"
     estimands = ["turnout", "dem"]
@@ -70,9 +70,9 @@ def test_get_estimand_baselines_primary(tx_primary_governor_config):
     assert estimand_baselines == {"abbott_41404": "abbott_41404", "turnout": "turnout"}
 
 
-def test_get_estimands_general(va_governor_config):
+def test_get_estimands_general(va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     office = "G"
     estimands = config_handler.get_estimands(office)
@@ -88,18 +88,18 @@ def test_get_estimands_primary(tx_primary_governor_config):
     assert ["abbott_41404", "krueger_66077", "kilgore_57793", "turnout"] == estimands
 
 
-def test_get_states(va_governor_config):
+def test_get_states(va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     office = "G"
     states = config_handler.get_states(office)
     assert ["VA"] == states
 
 
-def test_get_geographic_unit_types(va_governor_config):
+def test_get_geographic_unit_types(va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     office = "G"
     states = config_handler.get_geographic_unit_types(office)
@@ -111,9 +111,9 @@ def test_get_geographic_unit_types(va_governor_config):
     assert ["precinct-district", "county-district"] == states
 
 
-def test_get_features(va_governor_config):
+def test_get_features(va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     office = "G"
     features = config_handler.get_features(office)
@@ -123,9 +123,9 @@ def test_get_features(va_governor_config):
     assert features[-1] == "percent_bachelor_or_higher"
 
 
-def test_get_aggregates(va_governor_config):
+def test_get_aggregates(va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     office = "G"
     aggregates = config_handler.get_aggregates(office)
@@ -137,9 +137,9 @@ def test_get_aggregates(va_governor_config):
     assert ["postal_code", "county_classification", "county_fips", "district", "unit"] == aggregates
 
 
-def test_get_fixed_effects(va_governor_config):
+def test_get_fixed_effects(va_config):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
 
     office = "G"
     fixed_effects = config_handler.get_fixed_effects(office)
@@ -150,9 +150,9 @@ def test_get_fixed_effects(va_governor_config):
     assert ["postal_code", "county_fips", "county_classification", "district"] == fixed_effects
 
 
-def test_save(va_governor_config, test_path):
+def test_save(va_config, test_path):
     election_id = "2017-11-07_VA_G"
-    config_handler = ConfigHandler(election_id, config=va_governor_config)
+    config_handler = ConfigHandler(election_id, config=va_config)
     local_file_path = f"{test_path}/test_dir/config.json"
     if os.path.exists(local_file_path):
         os.remove(local_file_path)

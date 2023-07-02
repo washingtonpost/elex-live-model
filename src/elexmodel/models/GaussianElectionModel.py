@@ -10,7 +10,6 @@ class GaussianElectionModel(BaseElectionModel):
     def __init__(self, model_settings={}):
         super().__init__(model_settings)
         self.model_settings = model_settings
-        self.beta = model_settings.get("beta", 1)
         self.alpha_to_nonreporting_lower_bounds = {}
         self.alpha_to_nonreporting_upper_bounds = {}
         self.modeled_bounds_agg = None
@@ -46,7 +45,6 @@ class GaussianElectionModel(BaseElectionModel):
             estimand,
             aggregate=[],
             alpha=alpha,
-            beta=self.beta,
         )
         self.gaussian_bounds_unit = gaussian_model
         self.conformalization_data_unit = prediction_intervals.conformalization
@@ -135,7 +133,6 @@ class GaussianElectionModel(BaseElectionModel):
             aggregate=aggregate,
             alpha=alpha,
             reweight=False,
-            beta=self.beta,
             top_level=True,
         )
 
@@ -239,7 +236,6 @@ class GaussianElectionModel(BaseElectionModel):
                 assert remaining_models.shape[0] <= 1
                 remaining_bounds_w_models = remaining_bounds.merge(remaining_models, how="cross")
             else:
-
                 remaining_bounds_w_models = remaining_bounds.merge(remaining_models, how="inner", on=next_aggregate)
             # APPEND NEWLY MODELED BOUNDS TO modeled_bounds
             modeled_bounds = pd.concat([modeled_bounds, remaining_bounds_w_models])
@@ -267,8 +263,8 @@ class GaussianElectionModel(BaseElectionModel):
             aggregate + ["lb", "ub"]
         ]
 
-        # un-residualize bounds by adding last election results
-        # elementwise maximum with votes from nonreporting units to avoid adding negative vote count in nonreporting units
+        # un-residualize bounds by adding last election results elementwise maximum with
+        # votes from nonreporting units to avoid adding negative vote count in nonreporting units.
         # Note, gaussian interval aggregation can result in  a lower bound that is less than the votes
         # already returned in non-reporting units. If that is the case we correct by assigning the number of votes
         # already returned in nonreporting units.

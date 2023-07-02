@@ -12,7 +12,7 @@ from elexmodel.logging import initialize_logging
 from elexmodel.models.GaussianElectionModel import GaussianElectionModel
 from elexmodel.models.BootstrapElectionModel import BootstrapElectionModel
 from elexmodel.models.NonparametricElectionModel import NonparametricElectionModel
-from elexmodel.utils.constants import AGGREGATE_ORDER, VALID_AGGREGATES_MAPPING
+from elexmodel.utils.constants import AGGREGATE_ORDER, DEFAULT_AGGREGATES, VALID_AGGREGATES_MAPPING
 from elexmodel.utils.file_utils import APP_ENV, S3_FILE_PATH, TARGET_BUCKET
 from elexmodel.utils.math_utils import compute_error, compute_frac_within_pi, compute_mean_pi_length
 
@@ -29,7 +29,7 @@ class ModelNotEnoughSubunitsException(ModelClientException):
     pass
 
 
-class ModelClient(object):
+class ModelClient:
     """
     Client for generating vote estimates
     """
@@ -50,6 +50,7 @@ class ModelClient(object):
         fixed_effects,
         pi_method,
         beta,
+        winsorize,
         robust,
         lambda_,
         handle_unreporting,
@@ -85,13 +86,16 @@ class ModelClient(object):
             raise ValueError(f"Fixed effect(s): {invalid_fixed_effects} not valid. Please check config")
         if pi_method not in {"gaussian", "nonparametric"}:
             raise ValueError(
-                f"Prediction interval method: {pi_method} is not valid. pi_method has to be either `gaussian` or `nonparametric`."
+                f"Prediction interval method: {pi_method} is not valid. \
+                    pi_method has to be either `gaussian` or `nonparametric`."
             )
         if not isinstance(beta, (int, float)):
             raise ValueError("beta is not valid. Has to be either an integer or a float.")
+        if not isinstance(winsorize, bool):
+            raise ValueError("winsorize is not valid. Has to be an boolean.")
         if not isinstance(robust, bool):
             raise ValueError("robust is not valid. Has to be a boolean.")
-        if not (isinstance(lambda_, float) or isinstance(lambda_, int)):
+        if not isinstance(lambda_, (float, int)):
             raise ValueError("lambda is not valid. It has to be numeric.")
         if lambda_ < 0:
             raise ValueError("lambda is not valid. It has to be greater than zero.")
@@ -102,9 +106,10 @@ class ModelClient(object):
     def get_all_conformalization_data_unit(self):
         """
         This function collects the conformalization data from a model run. It produces a dictionary
-        with two types of data (in the gaussian case): the conformalization points that a distribution is
-        fit to, and the parameters of the resulting guassian distribution. In this unit-level function, the information for
-        one distribution is returned (all units combined). It returns None if get_estimates isn't called, as the
+        with two types of data (in the gaussian case): the conformalization points that a
+        distribution is fit to, and the parameters of the resulting guassian distribution.
+        In this unit-level function, the information for one distribution is returned
+        (all units combined). It returns None if get_estimates isn't called, as the
         values they pull out are generated in that function.
         """
         return self.all_conformalization_data_unit_dict
@@ -113,11 +118,18 @@ class ModelClient(object):
         """
         This function collects the conformalization data from a model run. It produces a dictionary
         with two types of data (in the gaussian case): the conformalization points that a distribution is
-        fit to, and the parameters of the resulting guassian distribution. In the agg case, distributions for each state (
-        in a multi-state model) are returned. This functions return None if get_estimates isn't called, as the
+        fit to, and the parameters of the resulting guassian distribution. In the agg case,
+        distributions for each state (in a multi-state model) are returned. This functions
+        return None if get_estimates isn't called, as the
         values they pull out are generated in that function.
         """
         return self.all_conformalization_data_agg_dict
+
+    def get_aggregate_list(self, office, aggregate):
+        default_aggregate = DEFAULT_AGGREGATES[office]
+        base_aggregate = default_aggregate[:-1]  # remove unit
+        raw_aggregate_list = base_aggregate + [aggregate]
+        return sorted(list(set(raw_aggregate_list)), key=lambda x: AGGREGATE_ORDER.index(x))
 
     def get_estimates(
         self,
@@ -143,10 +155,11 @@ class ModelClient(object):
             column_values = current_data[0]
             current_data = pd.DataFrame(current_data[1:], columns=column_values)
         features = kwargs.get("features", [])
-        aggregates = kwargs.get("aggregates", ["postal_code", "unit"])
+        aggregates = kwargs.get("aggregates", DEFAULT_AGGREGATES[office])
         fixed_effects = kwargs.get("fixed_effects", {})
         pi_method = kwargs.get("pi_method", "nonparametric")
         beta = kwargs.get("beta", 1)
+        winsorize = kwargs.get("winsorize", False)
         robust = kwargs.get("robust", False)
         lambda_ = kwargs.get("lambda_", 0)
         save_output = kwargs.get("save_output", ["results"])
@@ -161,6 +174,7 @@ class ModelClient(object):
             "office": office,
             "geographic_unit_type": geographic_unit_type,
             "beta": beta,
+            "winsorize": winsorize,
             "robust": robust,
             "lambda_": lambda_,
             "features": features,
@@ -183,6 +197,7 @@ class ModelClient(object):
             fixed_effects,
             pi_method,
             beta,
+            winsorize,
             robust,
             lambda_,
             handle_unreporting,
@@ -228,7 +243,9 @@ class ModelClient(object):
         unexpected_units = data.get_unexpected_units(percent_reporting_threshold, aggregates)
 
         LOG.info(
-            "Model parameters: \n geographic_unit_type: %s, prediction intervals: %s, percent reporting threshold: %s, features: %s, pi_method: %s, aggregates: %s, fixed effects: %s, model settings: %s",
+            "Model parameters: \n geographic_unit_type: %s, prediction intervals: %s, \
+                percent reporting threshold: %s, features: %s, pi_method: %s, aggregates: %s, \
+                fixed effects: %s, model settings: %s",
             geographic_unit_type,
             prediction_intervals,
             percent_reporting_threshold,
@@ -295,7 +312,7 @@ class ModelClient(object):
             results_handler.add_unit_intervals(estimand, alpha_to_unit_prediction_intervals)
 
             for aggregate in results_handler.aggregates:
-                aggregate_list = sorted(list(set(["postal_code", aggregate])), key=lambda x: AGGREGATE_ORDER.index(x))
+                aggregate_list = self.get_aggregate_list(office, aggregate)
                 estimates_df = model.get_aggregate_predictions(
                     results_handler.reporting_units,
                     results_handler.nonreporting_units,
