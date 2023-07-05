@@ -235,5 +235,5 @@ def test_kfold_splits_bounds():
     test = X.iloc[test_index]  # [1, 2]
 
     # assert that we have not lost values to subsetting
-    assert len(train_index) == len(train)  # 8=8
+    assert len(train_index) == len(train)  # 7=7
     assert len(test_index) == len(test)  # 2=2
