@@ -65,7 +65,7 @@ Parameters for the CLI tool:
 | pi_method            | string  | method for constructing prediction intervals (`nonparametric` or `gaussian`) |
 | beta                 | numeric | variance inflation for `gaussian` model; | 
 | robust               | flag    | flag for larger set of prediction intervals in the nonparametric case |
-| lambda               | list    | list of floats and/or ints, ex: --lambda='[0.01, 0.05, 0.90, 0.56]' |
+| lambda               | list    | list of floats and/or ints, ex: --lambda=`[0.01, 0.05, 0.90, 0.56]` |
 | save_output          | list    | `results`, `data`, `config` |
 | unexpected_units     | int     | number of unexpected units to simulate; only used for testing and does not work with historical run |
 
