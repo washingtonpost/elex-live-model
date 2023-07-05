@@ -279,7 +279,7 @@ class BaseElectionModel:
         if len(possible_lambda_values) == 1:
             return possible_lambda_values[0], None
 
-        MAPE_arr = np.zeros_like(possible_lambda_values)  # array of MAPE sums for each lambda
+        MAPE_arr = np.zeros_like(possible_lambda_values)  # array of MAPE sums for each lambda input
 
         # loop through each lambda
         for loc, lam in enumerate(possible_lambda_values):
