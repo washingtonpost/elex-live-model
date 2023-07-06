@@ -86,15 +86,13 @@ class BootstrapElectionModel(BaseElectionModel):
         return 10
         #return math.ceil(-1 * (alpha + 1) / (alpha - 1))
 
-    def _james_stein_estimate(self):
-        pass
-
     def _estimate_conditional_distribution(self): 
         pass
 
     # TODO: 
     #  robust-ify OLS (e.g. regularization, quantile -> one bad AP county does not break everything)
     #  account for partial reporting in UB/LB
+    #  implement aggregation
     def compute_bootstrap_errors(self, reporting_units, nonreporting_units, unexpected_units):
         n_train = reporting_units.shape[0]
         n_test = nonreporting_units.shape[0]
@@ -125,15 +123,14 @@ class BootstrapElectionModel(BaseElectionModel):
         aggregate_indicator_train = aggregate_indicator_expected[:n_train]
         aggregate_indicator_test = aggregate_indicator_expected[n_train:]
 
-        epsilon_y_hat = np.nan_to_num((aggregate_indicator_train.T @ residuals_y) / aggregate_indicator_train.sum(axis=0).reshape(-1, 1))
-        epsilon_z_hat = np.nan_to_num((aggregate_indicator_train.T @ residuals_z) / aggregate_indicator_train.sum(axis=0).reshape(-1, 1))
+        epsilon_y_hat = (aggregate_indicator_train.T @ residuals_y) / aggregate_indicator_train.sum(axis=0).reshape(-1, 1)
+        epsilon_y_hat[aggregate_indicator_train.sum(axis=0) < 2] = 0 # can't estimate state random effecct if we only have 1 unit
+        epsilon_z_hat = (aggregate_indicator_train.T @ residuals_z) / aggregate_indicator_train.sum(axis=0).reshape(-1, 1)
+        epsilon_z_hat[aggregate_indicator_train.sum(axis=0) < 2] = 0
         epsilon_hat = np.concatenate([epsilon_y_hat, epsilon_z_hat], axis=1)
 
         delta_y_hat = (residuals_y - (aggregate_indicator_train @ epsilon_y_hat)).flatten()
         delta_z_hat = (residuals_z - (aggregate_indicator_train @ epsilon_z_hat)).flatten()
-
-        # TODO: replace gaussian model with QR (??)
-        cov_mat_epsilon = np.cov(epsilon_hat.T, ddof=1)
 
         taus_lower = np.arange(0.01, 0.5, 0.01)
         taus_upper = np.arange(0.50, 1, 0.01)
@@ -219,8 +216,8 @@ class BootstrapElectionModel(BaseElectionModel):
 
         var_epsilon_y /= aggregate_indicator_train.sum(axis=0)
         var_epsilon_z /= aggregate_indicator_train.sum(axis=0)
-        var_epsilon_y = np.nan_to_num(var_epsilon_y)
-        var_epsilon_z = np.nan_to_num(var_epsilon_z)
+        var_epsilon_y[aggregate_indicator_train.sum(axis=0) < 2] = 0
+        var_epsilon_z[aggregate_indicator_train.sum(axis=0) < 2] = 0
 
         epsilon_y_B = self.rng.multivariate_normal(mean=epsilon_hat[:,0], cov=np.diag(var_epsilon_y), size=self.B).T
         epsilon_z_B = self.rng.multivariate_normal(mean=epsilon_hat[:,1], cov=np.diag(var_epsilon_z), size=self.B).T
@@ -247,8 +244,10 @@ class BootstrapElectionModel(BaseElectionModel):
         residuals_y_B = ols_y_B.residuals(y_train_B, y_train_pred_B, loo=True, center=True)
         residuals_z_B = ols_z_B.residuals(z_train_B, z_train_pred_B, loo=True, center=True)
 
-        epsilon_y_hat_B = np.nan_to_num((aggregate_indicator_train.T @ residuals_y_B) / aggregate_indicator_train.sum(axis=0).reshape(-1, 1))
-        epsilon_z_hat_B = np.nan_to_num((aggregate_indicator_train.T @ residuals_z_B) / aggregate_indicator_train.sum(axis=0).reshape(-1, 1))
+        epsilon_y_hat_B = (aggregate_indicator_train.T @ residuals_y_B) / aggregate_indicator_train.sum(axis=0).reshape(-1, 1)
+        epsilon_y_hat_B[aggregate_indicator_train.sum(axis=0) < 2] = 0 
+        epsilon_z_hat_B = (aggregate_indicator_train.T @ residuals_z_B) / aggregate_indicator_train.sum(axis=0).reshape(-1, 1)
+        epsilon_z_hat_B[aggregate_indicator_train.sum(axis=0) < 2] = 0 
 
         y_test_pred_B = ols_y_B.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat_B)
         z_test_pred_B = ols_z_B.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat_B)
@@ -289,6 +288,10 @@ class BootstrapElectionModel(BaseElectionModel):
         states_in_nonreporting_units = np.where(np.any(aggregate_indicator_test > 0, axis=0))[0]
         states_that_need_random_effect = np.intersect1d(states_not_in_reporting_units, states_in_nonreporting_units)
         
+        # TODO: replace gaussian model with QR (??)
+        cov_mat_epsilon = np.cov(epsilon_hat.T, ddof=1)
+        # cov_mat_epsilon -= np.diag([var_epsilon_y, var_epsilon_z])
+
         test_epsilon = self.rng.multivariate_normal([0, 0], cov_mat_epsilon, size=(len(states_that_need_random_effect), self.B))
         test_epsilon_y = test_epsilon[:,:,0]
         test_epsilon_z = test_epsilon[:,:,1]
@@ -299,17 +302,19 @@ class BootstrapElectionModel(BaseElectionModel):
         self.errors_B_1 = yz_test_pred_B * weights_test
 
         errors_B_2 = (y_test_pred + test_residuals_y).clip(min=-1, max=1)
-        errors_B_2 *= (z_test_pred + test_residuals_z).clip(min=0)
+        errors_B_2 *= (z_test_pred + test_residuals_z).clip(min=0.5, max=1.5) # clipping: predicting turnout can't be less than 50% or more than 150% of previous election
 
         self.errors_B_2 = errors_B_2 * weights_test 
 
-        self.errors_B_3 = z_test_pred_B.clip(min=0) * weights_test # denominator for percentage margin
-        self.errors_B_4 = (z_test_pred + test_residuals_z).clip(min=0) * weights_test # clipping since this is the results turnout
+        self.errors_B_3 = z_test_pred_B.clip(min=0.5, max=1.5) * weights_test # denominator for percentage margin
+        self.errors_B_4 = (z_test_pred + test_residuals_z).clip(min=0.5, max=1.5) * weights_test # clipping: predicting turnout can't be less than 50% or more than 150% of previous election
 
         self.weighted_yz_test_pred = yz_test_pred * weights_test
         self.weighted_z_test_pred = z_test_pred * weights_test
 
         self.ran_bootstrap = True
+        # if n_train > 150:
+            # import pdb; pdb.set_trace()
 
     def get_unit_predictions(self,  reporting_units, nonreporting_units, estimand, **kwargs):
         if not self.ran_bootstrap:
