@@ -281,12 +281,13 @@ class BaseElectionModel:
 
         MAPE_arr = np.zeros_like(possible_lambda_values, dtype=float)  # array of MAPE sums for each lambda input
 
+        reporting_units_shuffled = reporting_units.reindex(np.random.permutation(reporting_units.index))
         # loop through each lambda
         for loc, lam in enumerate(possible_lambda_values):
-            for train_index, test_index in math_utils.get_kfold_splits(reporting_units, K):
+            for train_index, test_index in math_utils.get_kfold_splits(reporting_units_shuffled, K):
                 # build model with custom lambda
-                train = reporting_units.iloc[train_index]
-                test = reporting_units.iloc[test_index]
+                train = reporting_units_shuffled.iloc[train_index]
+                test = reporting_units_shuffled.iloc[test_index]
                 unit_predictions = self.get_unit_predictions(train, test, estimand, lam)
                 MAPE = math_utils.compute_error(
                     test[f"results_{estimand}"].values, unit_predictions.values, type_="mape"
@@ -294,9 +295,15 @@ class BaseElectionModel:
                 MAPE_arr[loc] += MAPE
 
         # determine average and best
-        MAPE_arr_avg = MAPE_arr / K
+        MAPE_arr_avg = np.round(MAPE_arr / K, 3)
         best_MAPE_index = np.argmin(MAPE_arr_avg)
         best_lambda = possible_lambda_values[best_MAPE_index]
         average_MAPE = MAPE_arr_avg[best_MAPE_index]
+        same_MAPE_indices = np.where(MAPE_arr_avg == average_MAPE)[0]
+
+        if len(same_MAPE_indices) > 1:
+            same_MAPE_lambdas = [possible_lambda_values[idx] for idx in same_MAPE_indices]
+            print("More than one lambda has the lowest average MAPE of: " + str(average_MAPE))
+            print(same_MAPE_lambdas)
 
         return best_lambda, average_MAPE
