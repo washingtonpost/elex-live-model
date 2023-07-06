@@ -195,29 +195,32 @@ class BootstrapElectionModel(BaseElectionModel):
             unifs.append(unifs_strata)
         unifs = np.concatenate(unifs, axis=0)
 
-        iqr_y_strata = {}
-        iqr_z_strata = {}
-        for x_stratum in x_strata:
-            x_stratum_delta_y_ppf = stratum_ppfs_delta_y[tuple(x_stratum)]
-            iqr_y = x_stratum_delta_y_ppf(.75) - x_stratum_delta_y_ppf(.25)
-            iqr_y_strata[tuple(x_stratum)] = iqr_y
+        # iqr_y_strata = {}
+        # iqr_z_strata = {}
+        # for x_stratum in x_strata:
+        #     x_stratum_delta_y_ppf = stratum_ppfs_delta_y[tuple(x_stratum)]
+        #     iqr_y = x_stratum_delta_y_ppf(.75) - x_stratum_delta_y_ppf(.25)
+        #     iqr_y_strata[tuple(x_stratum)] = iqr_y
 
-            x_stratum_delta_z_ppf = stratum_ppfs_delta_z[tuple(x_stratum)]
-            iqr_z = x_stratum_delta_z_ppf(.75) - x_stratum_delta_z_ppf(.25)
-            iqr_z_strata[tuple(x_stratum)] = iqr_z
+        #     x_stratum_delta_z_ppf = stratum_ppfs_delta_z[tuple(x_stratum)]
+        #     iqr_z = x_stratum_delta_z_ppf(.75) - x_stratum_delta_z_ppf(.25)
+        #     iqr_z_strata[tuple(x_stratum)] = iqr_z
 
-        var_epsilon_y = np.zeros((aggregate_indicator_train.shape[1], ))
-        var_epsilon_z = np.zeros((aggregate_indicator_train.shape[1], ))
+        # var_epsilon_y = np.zeros((aggregate_indicator_train.shape[1], ))
+        # var_epsilon_z = np.zeros((aggregate_indicator_train.shape[1], ))
 
-        for strata_dummies in x_train_strata_unique:
-            strata_indices = np.where((strata_dummies == x_train_strata).all(axis=1))[0]
-            var_epsilon_y += (aggregate_indicator_train[strata_indices] * (iqr_y_strata[tuple(strata_dummies)] ** 2)).sum(axis=0)
-            var_epsilon_z += (aggregate_indicator_train[strata_indices] * (iqr_z_strata[tuple(strata_dummies)] ** 2)).sum(axis=0)
+        # for strata_dummies in x_train_strata_unique:
+        #     strata_indices = np.where((strata_dummies == x_train_strata).all(axis=1))[0]
+        #     var_epsilon_y += (aggregate_indicator_train[strata_indices] * (iqr_y_strata[tuple(strata_dummies)] ** 2)).sum(axis=0)
+        #     var_epsilon_z += (aggregate_indicator_train[strata_indices] * (iqr_z_strata[tuple(strata_dummies)] ** 2)).sum(axis=0)
 
-        var_epsilon_y /= aggregate_indicator_train.sum(axis=0)
-        var_epsilon_z /= aggregate_indicator_train.sum(axis=0)
-        var_epsilon_y[aggregate_indicator_train.sum(axis=0) < 2] = 0
-        var_epsilon_z[aggregate_indicator_train.sum(axis=0) < 2] = 0
+        # var_epsilon_y /= aggregate_indicator_train.sum(axis=0)
+        # var_epsilon_z /= aggregate_indicator_train.sum(axis=0)
+        # var_epsilon_y[aggregate_indicator_train.sum(axis=0) < 2] = 0
+        # var_epsilon_z[aggregate_indicator_train.sum(axis=0) < 2] = 0
+
+        var_epsilon_y = np.var(aggregate_indicator_train * residuals_y, axis=0)
+        var_epsilon_z = np.var(aggregate_indicator_train * residuals_z, axis=0)
 
         epsilon_y_B = self.rng.multivariate_normal(mean=epsilon_hat[:,0], cov=np.diag(var_epsilon_y), size=self.B).T
         epsilon_z_B = self.rng.multivariate_normal(mean=epsilon_hat[:,1], cov=np.diag(var_epsilon_z), size=self.B).T
@@ -233,8 +236,8 @@ class BootstrapElectionModel(BaseElectionModel):
             delta_y_B[strata_indices] = stratum_ppfs_delta_y[tuple(strata_dummies)](unifs_strata[:,:,0])
             delta_z_B[strata_indices] = stratum_ppfs_delta_z[tuple(strata_dummies)](unifs_strata[:,:,1])
 
-        y_train_B = y_train_pred + (aggregate_indicator_train @ epsilon_y_B) + delta_y_B
-        z_train_B = z_train_pred + (aggregate_indicator_train @ epsilon_z_B) + delta_z_B
+        y_train_B = y_train_pred + (aggregate_indicator_train @ epsilon_y_B) + delta_y_B 
+        z_train_B = z_train_pred + (aggregate_indicator_train @ epsilon_z_B) + delta_z_B 
         ols_y_B = OLSRegression().fit(x_train, y_train_B, weights_train, normal_eqs=ols_y.normal_eqs)
         ols_z_B = OLSRegression().fit(x_train, z_train_B, weights_train, normal_eqs=ols_z.normal_eqs)
         
@@ -250,7 +253,7 @@ class BootstrapElectionModel(BaseElectionModel):
         epsilon_z_hat_B[aggregate_indicator_train.sum(axis=0) < 2] = 0 
 
         y_test_pred_B = ols_y_B.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat_B)
-        z_test_pred_B = ols_z_B.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat_B)
+        z_test_pred_B = ols_z_B.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat_B)
         yz_test_pred_B = y_test_pred_B * z_test_pred_B
         
         y_test_pred = ols_y.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat)
@@ -289,10 +292,20 @@ class BootstrapElectionModel(BaseElectionModel):
         states_that_need_random_effect = np.intersect1d(states_not_in_reporting_units, states_in_nonreporting_units)
         
         # TODO: replace gaussian model with QR (??)
-        cov_mat_epsilon = np.cov(epsilon_hat.T, ddof=1)
-        # cov_mat_epsilon -= np.diag([var_epsilon_y, var_epsilon_z])
+        sigma_hat = np.zeros((2, 2))
+        sigma_hat_denominator = 0
+        sample_var_epsilon_y = np.var(aggregate_indicator_train * residuals_y, axis=0)
+        sample_var_epsilon_z = np.var(aggregate_indicator_train * residuals_z, axis=0)
 
-        test_epsilon = self.rng.multivariate_normal([0, 0], cov_mat_epsilon, size=(len(states_that_need_random_effect), self.B))
+        for (epsilon_i, sample_var_epsilon_y_i, sample_var_epsilon_z_i) in zip(epsilon_hat, sample_var_epsilon_y, sample_var_epsilon_z):
+            if np.isclose(epsilon_i.sum(), 0): continue
+            sigma_hat += np.outer(epsilon_i, epsilon_i) - np.diag([sample_var_epsilon_y_i, sample_var_epsilon_z_i])
+            sigma_hat_denominator += 1
+        sigma_hat /= sigma_hat_denominator
+        sigma_hat[0, 1] = 0 # setting covariances to zero for now
+        sigma_hat[1, 0] = 0
+
+        test_epsilon = self.rng.multivariate_normal([0, 0], sigma_hat, size=(len(states_that_need_random_effect), self.B))
         test_epsilon_y = test_epsilon[:,:,0]
         test_epsilon_z = test_epsilon[:,:,1]
  
