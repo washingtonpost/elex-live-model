@@ -298,7 +298,7 @@ class ModelClient:
             alpha_to_unit_prediction_intervals = {}
             for alpha in prediction_intervals:
                 alpha_to_unit_prediction_intervals[alpha] = model.get_unit_prediction_intervals(
-                    results_handler.reporting_units, results_handler.nonreporting_units, alpha, estimand
+                    results_handler.reporting_units, results_handler.nonreporting_units, alpha, estimand, new_lambda
                 )
                 self.all_conformalization_data_unit_dict[alpha][estimand] = model.get_all_conformalization_data_unit()
 

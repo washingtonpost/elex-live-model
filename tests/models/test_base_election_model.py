@@ -18,7 +18,7 @@ def test_fit_model():
     df_X = pd.DataFrame({"a": [1, 1, 1, 1], "b": [1, 1, 1, 2]})
     df_y = pd.DataFrame({"y": [3, 8, 9, 15]}).y
     weights = pd.DataFrame({"weights": [1, 1, 1, 1]}).weights
-    model.fit_model(qr, df_X, df_y, 0.5, weights, True)
+    model.fit_model(qr, df_X, df_y, 0.5, weights, True, 0)
 
     assert all(np.abs(qr.predict(df_X) - [8, 8, 8, 15]) <= TOL)
     assert all(np.abs(qr.coefficients - [1, 7]) <= TOL)

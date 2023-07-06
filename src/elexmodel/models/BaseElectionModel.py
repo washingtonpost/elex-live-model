@@ -27,7 +27,7 @@ class BaseElectionModel:
         self.add_intercept = True
         self.seed = 4191  # set arbitrarily
 
-    def fit_model(self, model, df_X, df_y, tau, weights, normalize_weights, lambda_=0):
+    def fit_model(self, model, df_X, df_y, tau, weights, normalize_weights, lambda_):
         """
         Fits the quantile regression for the model
         """
@@ -53,7 +53,7 @@ class BaseElectionModel:
             LOG.warning("Warning: solution was inaccurate or solver broke. Re-running with normalize_weights=False.")
             model.fit(X, y, tau_value=tau, weights=weights, lambda_=lambda_, normalize_weights=False)
 
-    def get_unit_predictions(self, reporting_units, nonreporting_units, estimand, lambda_=0):
+    def get_unit_predictions(self, reporting_units, nonreporting_units, estimand, lambda_):
         """
         Produces unit level predictions. Fits quantile regression to reporting data, applies
         it to nonreporting data. The features are specified in model_settings.
@@ -191,7 +191,9 @@ class BaseElectionModel:
 
         return aggregate_data
 
-    def get_unit_prediction_interval_bounds(self, reporting_units, nonreporting_units, conf_frac, alpha, estimand):
+    def get_unit_prediction_interval_bounds(
+        self, reporting_units, nonreporting_units, conf_frac, alpha, estimand, lambda_
+    ):
         """
         Get unadjusted unit prediction intervals. Splits reporting data into training data and conformalization data,
         fits lower and upper quantile regression using training data and apply to both conformalization data
@@ -222,10 +224,14 @@ class BaseElectionModel:
 
         # fit lower and upper model to training data. ECOS solver is better than SCS.
         lower_qr = QuantileRegressionSolver(solver="ECOS")
-        self.fit_model(lower_qr, train_data_features, train_data_residuals, lower_bound, train_data_weights, True)
+        self.fit_model(
+            lower_qr, train_data_features, train_data_residuals, lower_bound, train_data_weights, True, lambda_
+        )
 
         upper_qr = QuantileRegressionSolver(solver="ECOS")
-        self.fit_model(upper_qr, train_data_features, train_data_residuals, upper_bound, train_data_weights, True)
+        self.fit_model(
+            upper_qr, train_data_features, train_data_residuals, upper_bound, train_data_weights, True, lambda_
+        )
 
         # apply to conformalization data. Conformalization bounds will later tell us how much to adjust lower/upper
         # bounds for nonreporting data.
@@ -294,6 +300,7 @@ class BaseElectionModel:
                     test[f"results_{estimand}"].values, unit_predictions.values, type_="mape"
                 )
                 MAPE_arr[loc] += MAPE
+                print(MAPE)
 
         # determine average and best
         MAPE_arr_avg = np.round(MAPE_arr / K, 3)
@@ -302,6 +309,7 @@ class BaseElectionModel:
         average_MAPE = MAPE_arr_avg[best_MAPE_index]
         same_MAPE_indices = np.where(MAPE_arr_avg == average_MAPE)[0]
 
+        print(K)
         if len(same_MAPE_indices) > 1:
             same_MAPE_lambdas = [possible_lambda_values[idx] for idx in same_MAPE_indices]
             print("More than one lambda has the lowest average MAPE of: " + str(average_MAPE))

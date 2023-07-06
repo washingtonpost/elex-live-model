@@ -44,7 +44,7 @@ class NonparametricElectionModel(BaseElectionModel):
         population_correction = np.min(population_correction.scores)
         return population_correction
 
-    def get_unit_prediction_intervals(self, reporting_units, nonreporting_units, alpha, estimand):
+    def get_unit_prediction_intervals(self, reporting_units, nonreporting_units, alpha, estimand, lambda_):
         """
         Get unit prediction intervals for non-parametric model. Adjust nonreporting unit prediction intervals based
         on conformalization.
@@ -53,7 +53,7 @@ class NonparametricElectionModel(BaseElectionModel):
         conf_frac = self._compute_conf_frac(reporting_units.shape[0], alpha)
         # compute unadjusted upper/lower unit bounds and get conformalization data
         prediction_intervals = self.get_unit_prediction_interval_bounds(
-            reporting_units, nonreporting_units, conf_frac, alpha, estimand
+            reporting_units, nonreporting_units, conf_frac, alpha, estimand, lambda_
         )
         self.conformalization_data_unit = prediction_intervals.conformalization
         # compute conformity scores (e_j). This is how well the the lower/upper model cover the conformalization data.
