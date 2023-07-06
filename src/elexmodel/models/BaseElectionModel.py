@@ -74,6 +74,7 @@ class BaseElectionModel:
         self.fit_model(
             self.qr, reporting_units_features, reporting_units_residuals, 0.5, weights, True, lambda_=lambda_
         )
+
         self.features_to_coefficients = dict(zip(self.featurizer.complete_features, self.qr.coefficients))
 
         preds = self.qr.predict(nonreporting_units_features)
