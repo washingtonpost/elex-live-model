@@ -279,7 +279,7 @@ class BaseElectionModel:
         if len(possible_lambda_values) == 1:
             return possible_lambda_values[0], None
 
-        MAPE_arr = np.zeros_like(possible_lambda_values)  # array of MAPE sums for each lambda input
+        MAPE_arr = np.zeros_like(possible_lambda_values, dtype=float)  # array of MAPE sums for each lambda input
 
         # loop through each lambda
         for loc, lam in enumerate(possible_lambda_values):
@@ -294,7 +294,7 @@ class BaseElectionModel:
                 MAPE_arr[loc] += MAPE
 
         # determine average and best
-        MAPE_arr_avg = MAPE_arr / len(possible_lambda_values)
+        MAPE_arr_avg = MAPE_arr / K
         best_MAPE_index = np.argmin(MAPE_arr_avg)
         best_lambda = possible_lambda_values[best_MAPE_index]
         average_MAPE = MAPE_arr_avg[best_MAPE_index]
