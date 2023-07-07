@@ -324,7 +324,7 @@ def test_find_optimal_lambda_under_one():
 
     new_lambda, avg_MAPE = model.find_optimal_lambda(df_X, lambda_, "a")
 
-    assert new_lambda in [0.01, 0.99]  # more than one lambda value can have the same average MAPE with a small dataset
+    assert new_lambda in [0.01, 0.99]  # ERROR: more than one lambda value can have the same average MAPE
 
 
 def test_find_optimal_lambda_over_one():
@@ -350,7 +350,8 @@ def test_find_optimal_lambda_over_one():
 
     new_lambda, avg_MAPE = model.find_optimal_lambda(df_X, lambda_, "a")
 
-    assert new_lambda in [0, 4]  # more than one lambda value can have the same average MAPE with a small dataset
+    print(new_lambda)
+    assert new_lambda in [0, 4]  # ERROR: more than one lambda value can have the same average MAPE
 
 
 def test_find_optimal_lambda_tens():
@@ -376,4 +377,4 @@ def test_find_optimal_lambda_tens():
 
     new_lambda, avg_MAPE = model.find_optimal_lambda(df_X, lambda_, "a")
 
-    assert new_lambda in [0.01, 10.0]  # more than one lambda value can have the same average MAPE with a small dataset
+    assert new_lambda in [0.01, 10.0]  # ERROR: more than one lambda value can have the same average MAPE
