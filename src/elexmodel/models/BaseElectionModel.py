@@ -300,7 +300,6 @@ class BaseElectionModel:
                     test[f"results_{estimand}"].values, unit_predictions.values, type_="mape"
                 )
                 MAPE_arr[loc] += MAPE
-                print(MAPE)
 
         # determine average and best
         MAPE_arr_avg = np.round(MAPE_arr / K, 3)
@@ -309,7 +308,6 @@ class BaseElectionModel:
         average_MAPE = MAPE_arr_avg[best_MAPE_index]
         same_MAPE_indices = np.where(MAPE_arr_avg == average_MAPE)[0]
 
-        print(K)
         if len(same_MAPE_indices) > 1:
             same_MAPE_lambdas = [possible_lambda_values[idx] for idx in same_MAPE_indices]
             print("More than one lambda has the lowest average MAPE of: " + str(average_MAPE))

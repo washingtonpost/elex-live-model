@@ -50,7 +50,7 @@ class PythonLiteralOption(click.Option):
 @click.option("--beta", "beta", default=1, type=int, help="manually add variance to Gaussian model")
 @click.option("--winsorize", "winsorize", is_flag=True, help="reduce outliers in the Gaussian model")
 @click.option("--robust", "robust", is_flag=True, help="robust prediction intervals for nonparametric model")
-@click.option("--lambda", "lambda_", default="[0.0]", cls=PythonLiteralOption, help="regularization parameter")
+@click.option("--lambda", "lambda_", default="[]", cls=PythonLiteralOption, help="regularization parameter")
 @click.option(
     "--percent_reporting",
     "percent_reporting",

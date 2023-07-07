@@ -160,7 +160,7 @@ class ModelClient:
         beta = kwargs.get("beta", 1)
         winsorize = kwargs.get("winsorize", False)
         robust = kwargs.get("robust", False)
-        lambda_ = kwargs.get("lambda_", [0])
+        lambda_ = kwargs.get("lambda_", [])
         save_output = kwargs.get("save_output", ["results"])
         save_results = "results" in save_output
         save_data = "data" in save_output
