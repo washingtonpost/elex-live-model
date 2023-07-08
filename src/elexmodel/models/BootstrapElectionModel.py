@@ -15,18 +15,21 @@ class OLSRegression(object):
         self.hat_matrix = None
         self.beta_hat = None
 
-    def _compute_normal_equations(self, x, L):
+    def _compute_normal_equations(self, x, L, lambda_):
         Q, R = np.linalg.qr(L @ x)
-        return np.linalg.inv(R.T @ R) @ R.T @ Q.T
+        lambda_I = (lambda_ * Q.shape[0]) * np.eye(R.shape[1])
+        lambda_I[0, 0] = 0
+        lambda_I[1, 1] = 0
+        return np.linalg.inv(R.T @ R + lambda_I) @ R.T @ Q.T
 
-    def fit(self, x, y, weights=None, normal_eqs=None):
+    def fit(self, x, y, weights=None, lambda_=0, normal_eqs=None):
         if weights is None:
             weights = np.ones((y.shape[0], ))
         L = np.diag(np.sqrt(weights.flatten()))
         if normal_eqs is not None:
             self.normal_eqs = normal_eqs
         else:
-            self.normal_eqs = self._compute_normal_equations(x, L)
+            self.normal_eqs = self._compute_normal_equations(x, L, lambda_)
         self.hat_vals = np.diag(x @ self.normal_eqs)
         self.beta_hat = self.normal_eqs @ L @ y
         return self
@@ -85,6 +88,29 @@ class BootstrapElectionModel(BaseElectionModel):
         self.rng = np.random.default_rng(seed=self.seed)
         self.ran_bootstrap = False
     
+    def cv_lambda(self, x, y, lambdas_, weights=None, k=5):
+        if weights is None:
+            weights = np.ones((y.shape[0], 1))
+        x_y_w = np.concatenate([x, y, weights], axis=1)
+        self.rng.shuffle(x_y_w)
+        chunks = np.array_split(x_y_w, k, axis=0)
+        ols = OLSRegression()
+        errors = np.zeros((len(lambdas_), ))
+        for i, lambda_ in enumerate(lambdas_):
+            for test_chunk in range(k):
+                x_y_w_test = chunks[test_chunk]
+                x_y_w_train = np.concatenate(chunks[:test_chunk] + chunks[test_chunk + 1:], axis=0)
+                x_test = x_y_w_test[:,:-2]
+                y_test = x_y_w_test[:,-2]
+                w_test = x_y_w_test[:,-1]
+                x_train = x_y_w_train[:,:-2]
+                y_train = x_y_w_train[:,-2]
+                w_train = x_y_w_train[:,-1]
+                ols_lambda = ols.fit(x_train, y_train, weights=w_train, lambda_=lambda_)
+                y_hat_lambda = ols_lambda.predict(x_test)
+                errors[i] += np.sum(w_test * ols_lambda.residuals(y_test, y_hat_lambda, loo=False, center=False) ** 2) / np.sum(w_test)
+        return lambdas_[np.argmin(errors)]
+
     def get_minimum_reporting_units(self, alpha):
         return 10
         #return math.ceil(-1 * (alpha + 1) / (alpha - 1))
@@ -112,8 +138,11 @@ class BootstrapElectionModel(BaseElectionModel):
 
         x_all = np.concatenate([x_train, x_test], axis=0)
 
-        ols_y = OLSRegression().fit(x_train, y_train, weights=weights_train)
-        ols_z = OLSRegression().fit(x_train, z_train, weights=weights_train)
+        optimal_lambda_y = self.cv_lambda(x_train, y_train, np.logspace(3, 10, 20), weights=weights_train)
+        optimal_lambda_z = self.cv_lambda(x_train, z_train, np.logspace(3, 10, 20), weights=weights_train)
+        print(optimal_lambda_y)
+        ols_y = OLSRegression().fit(x_train, y_train, weights=weights_train, lambda_=optimal_lambda_y)
+        ols_z = OLSRegression().fit(x_train, z_train, weights=weights_train, lambda_=optimal_lambda_z)
 
         y_train_pred = ols_y.predict(x_train)
         z_train_pred = ols_z.predict(x_train)
@@ -247,8 +276,7 @@ class BootstrapElectionModel(BaseElectionModel):
         
         y_train_pred_B = ols_y_B.predict(x_train)
         z_train_pred_B = ols_z_B.predict(x_train)
-        if n_train > 150:
-            import IPython; IPython.embed()
+
         residuals_y_B = ols_y_B.residuals(y_train_B, y_train_pred_B, loo=True, center=True)
         residuals_z_B = ols_z_B.residuals(z_train_B, z_train_pred_B, loo=True, center=True)
 
