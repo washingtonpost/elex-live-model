@@ -17,7 +17,7 @@ class OLSRegression(object):
 
     def _compute_normal_equations(self, x, L, lambda_):
         Q, R = np.linalg.qr(L @ x)
-        lambda_I = (lambda_ * Q.shape[0]) * np.eye(R.shape[1])
+        lambda_I = lambda_ * np.eye(R.shape[1])
         lambda_I[0, 0] = 0
         lambda_I[1, 1] = 0
         return np.linalg.inv(R.T @ R + lambda_I) @ R.T @ Q.T
@@ -25,13 +25,15 @@ class OLSRegression(object):
     def fit(self, x, y, weights=None, lambda_=0, normal_eqs=None):
         if weights is None:
             weights = np.ones((y.shape[0], ))
-        L = np.diag(np.sqrt(weights.flatten()))
+        # normalize + sqrt
+        L = np.diag(np.sqrt(weights.flatten() / weights.sum()))
         if normal_eqs is not None:
             self.normal_eqs = normal_eqs
         else:
             self.normal_eqs = self._compute_normal_equations(x, L, lambda_)
         self.hat_vals = np.diag(x @ self.normal_eqs)
         self.beta_hat = self.normal_eqs @ L @ y
+        print(self.beta_hat)
         return self
 
     def predict(self, x):
@@ -127,19 +129,21 @@ class BootstrapElectionModel(BaseElectionModel):
         n_test = nonreporting_units.shape[0]
 
         self.featurizer.compute_means_for_centering(reporting_units, nonreporting_units)
+        self.featurizer.compute_stds_for_scaling(reporting_units, nonreporting_units)
         
-        x_train = self.featurizer.featurize_fitting_data(reporting_units, add_intercept=self.add_intercept, center_features=False).values
+        x_train = self.featurizer.featurize_fitting_data(reporting_units, add_intercept=self.add_intercept, center_features=False, scale_features=False).values
         y_train = reporting_units['normalized_margin'].values.reshape(-1, 1)
         z_train = reporting_units['turnout_factor'].values.reshape(-1, 1)
         weights_train = reporting_units['weights'].values.reshape(-1, 1)
+       # weights_train = weights_train / np.sum(weights_train)
 
         x_test = self.featurizer.featurize_heldout_data(nonreporting_units).values
         weights_test = nonreporting_units['weights'].values.reshape(-1, 1)
 
         x_all = np.concatenate([x_train, x_test], axis=0)
 
-        optimal_lambda_y = self.cv_lambda(x_train, y_train, np.logspace(3, 10, 20), weights=weights_train)
-        optimal_lambda_z = self.cv_lambda(x_train, z_train, np.logspace(3, 10, 20), weights=weights_train)
+        optimal_lambda_y = 0 # self.cv_lambda(x_train, y_train, np.logspace(-3, 2, 20), weights=weights_train)
+        optimal_lambda_z = 0 # self.cv_lambda(x_train, z_train, np.logspace(-3, 2, 20), weights=weights_train)
         print(optimal_lambda_y)
         ols_y = OLSRegression().fit(x_train, y_train, weights=weights_train, lambda_=optimal_lambda_y)
         ols_z = OLSRegression().fit(x_train, z_train, weights=weights_train, lambda_=optimal_lambda_z)
@@ -273,7 +277,7 @@ class BootstrapElectionModel(BaseElectionModel):
         
         ols_y_B = OLSRegression().fit(x_train, y_train_B, weights_train, normal_eqs=ols_y.normal_eqs)
         ols_z_B = OLSRegression().fit(x_train, z_train_B, weights_train, normal_eqs=ols_z.normal_eqs)
-        
+
         y_train_pred_B = ols_y_B.predict(x_train)
         z_train_pred_B = ols_z_B.predict(x_train)
 

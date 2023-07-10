@@ -25,6 +25,7 @@ class Featurizer:
         self.expanded_fixed_effects_cols = []
         self.complete_features = None
         self.column_means = None
+        self.column_stds = None
 
     def compute_means_for_centering(self, *arg):
         """
@@ -34,6 +35,10 @@ class Featurizer:
         data = pd.concat(arg)
         self.column_means = data[self.features].mean()
 
+    def compute_stds_for_scaling(self, *arg):
+        data = pd.concat(arg)
+        self.column_stds = data[self.features].std()
+
     def _center_features(self, df):
         """
         Centers the features. This changes the interpretation of the intercept coefficient
@@ -41,6 +46,9 @@ class Featurizer:
         their average value
         """
         df[self.features] = df[self.features] - self.column_means
+
+    def _scale_features(self, df):
+        df[self.features] = df[self.features] / self.column_stds
 
     def _add_intercept(self, df):
         df["intercept"] = 1
@@ -73,7 +81,7 @@ class Featurizer:
         # effect columns for aggregation.
         return pd.concat([original_fixed_effect_columns, expanded_fixed_effects.drop(cols_to_drop, axis=1)], axis=1)
 
-    def featurize_fitting_data(self, fitting_data, center_features=True, add_intercept=True):
+    def featurize_fitting_data(self, fitting_data, center_features=True, add_intercept=True, scale_features=False):
         """
         Featurize the data that the model is fitted on.
         In our case fitting_data is either the reporting_units (when fitting a model for the point predictions)
@@ -83,9 +91,13 @@ class Featurizer:
         new_fitting_data = fitting_data.copy()
         self.center_features = center_features
         self.add_intercept = add_intercept
+        self.scale_features = scale_features
 
         if self.center_features:
             self._center_features(new_fitting_data)
+
+        if self.scale_features:
+            self._scale_features(new_fitting_data)
 
         self.complete_features = []
         if self.add_intercept:
@@ -125,6 +137,9 @@ class Featurizer:
 
         if self.center_features:
             self._center_features(new_heldout_data)
+
+        if self.scale_features:
+            self._scale_features(new_heldout_data)
 
         if self.add_intercept:
             self._add_intercept(new_heldout_data)
