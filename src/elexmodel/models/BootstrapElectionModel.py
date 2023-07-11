@@ -7,8 +7,6 @@ import math
 from elexmodel.models.BaseElectionModel import BaseElectionModel, PredictionIntervals
 from elexmodel.handlers.data.Featurizer import Featurizer
 
-import statsmodels.formula.api as smf
-
 class OLSRegression(object):
     def __init__(self):
         self.normal_eqs = None
@@ -31,7 +29,7 @@ class OLSRegression(object):
             self.normal_eqs = normal_eqs
         else:
             self.normal_eqs = self._compute_normal_equations(x, L, lambda_)
-        self.hat_vals = np.diag(x @ self.normal_eqs)
+        self.hat_vals = np.diag(x @ self.normal_eqs @ L)
         self.beta_hat = self.normal_eqs @ L @ y
         print(self.beta_hat)
         return self
