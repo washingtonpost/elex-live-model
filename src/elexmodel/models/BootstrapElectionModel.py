@@ -86,6 +86,9 @@ class BootstrapElectionModel(BaseElectionModel):
         self.featurizer = Featurizer(self.features, self.fixed_effects)
         self.rng = np.random.default_rng(seed=self.seed)
         self.ran_bootstrap = False
+        self.taus_lower = np.arange(0.01, 0.5, 0.01)
+        self.taus_upper = np.arange(0.50, 1, 0.01)
+        self.taus = np.concatenate([self.taus_lower, self.taus_upper])
     
     def cv_lambda(self, x, y, lambdas_, weights=None, k=5):
         if weights is None:
@@ -114,72 +117,25 @@ class BootstrapElectionModel(BaseElectionModel):
         return 10
         #return math.ceil(-1 * (alpha + 1) / (alpha - 1))
 
-    def _estimate_conditional_distribution(self): 
-        pass
+    def _estimate_epsilon(self, residuals, aggregate_indicator):
+        epsilon_hat = (aggregate_indicator.T @ residuals) / aggregate_indicator.sum(axis=0).reshape(-1, 1)
+        epsilon_hat[aggregate_indicator.sum(axis=0) < 2] = 0 # can't estimate state random effect if we only have 1 unit
+        return epsilon_hat
 
-    # TODO: 
-    #  robust-ify OLS (e.g. regularization, quantile -> one bad AP county does not break everything)
-    #  account for partial reporting in UB/LB
-    #  implement aggregation
-    def compute_bootstrap_errors(self, reporting_units, nonreporting_units, unexpected_units):
-        n_train = reporting_units.shape[0]
-        n_test = nonreporting_units.shape[0]
+    def _estimate_delta(self, residuals, epsilon_hat, aggregate_indicator):
+        return (residuals - (aggregate_indicator @ epsilon_hat)).flatten()
 
-        self.featurizer.compute_means_for_centering(reporting_units, nonreporting_units)
-        self.featurizer.compute_stds_for_scaling(reporting_units, nonreporting_units)
-        
-        x_train = self.featurizer.featurize_fitting_data(reporting_units, add_intercept=self.add_intercept, center_features=False, scale_features=False).values
-        y_train = reporting_units['normalized_margin'].values.reshape(-1, 1)
-        z_train = reporting_units['turnout_factor'].values.reshape(-1, 1)
-        weights_train = reporting_units['weights'].values.reshape(-1, 1)
-       # weights_train = weights_train / np.sum(weights_train)
-
-        x_test = self.featurizer.featurize_heldout_data(nonreporting_units).values
-        weights_test = nonreporting_units['weights'].values.reshape(-1, 1)
-
-        x_all = np.concatenate([x_train, x_test], axis=0)
-
-        optimal_lambda_y = 0.1 # self.cv_lambda(x_train, y_train, np.logspace(-3, 2, 20), weights=weights_train)
-        optimal_lambda_z = 0.1 # self.cv_lambda(x_train, z_train, np.logspace(-3, 2, 20), weights=weights_train)
-        ols_y = OLSRegression().fit(x_train, y_train, weights=weights_train, lambda_=optimal_lambda_y)
-        ols_z = OLSRegression().fit(x_train, z_train, weights=weights_train, lambda_=optimal_lambda_z)
-
-        y_train_pred = ols_y.predict(x_train)
-        z_train_pred = ols_z.predict(x_train)
-
-        residuals_y = ols_y.residuals(y_train, y_train_pred, loo=True, center=True)
-        residuals_z = ols_z.residuals(z_train, z_train_pred, loo=True, center=True)
-
-        aggregate_indicator = pd.get_dummies(pd.concat([reporting_units, nonreporting_units, unexpected_units], axis=0)['postal_code']).values
-        aggregate_indicator_expected = aggregate_indicator[:(n_train + n_test)]
-        aggregate_indicator_unexpected = aggregate_indicator[(n_train + n_test):]
-        
-        aggregate_indicator_train = aggregate_indicator_expected[:n_train]
-        aggregate_indicator_test = aggregate_indicator_expected[n_train:]
-
-        epsilon_y_hat = (aggregate_indicator_train.T @ residuals_y) / aggregate_indicator_train.sum(axis=0).reshape(-1, 1)
-        epsilon_y_hat[aggregate_indicator_train.sum(axis=0) < 2] = 0 # can't estimate state random effecct if we only have 1 unit
-        epsilon_z_hat = (aggregate_indicator_train.T @ residuals_z) / aggregate_indicator_train.sum(axis=0).reshape(-1, 1)
-        epsilon_z_hat[aggregate_indicator_train.sum(axis=0) < 2] = 0
-        epsilon_hat = np.concatenate([epsilon_y_hat, epsilon_z_hat], axis=1)
-
-        delta_y_hat = (residuals_y - (aggregate_indicator_train @ epsilon_y_hat)).flatten()
-        delta_z_hat = (residuals_z - (aggregate_indicator_train @ epsilon_z_hat)).flatten()
-
-        taus_lower = np.arange(0.01, 0.5, 0.01)
-        taus_upper = np.arange(0.50, 1, 0.01)
-        taus = np.concatenate([taus_lower, taus_upper])
-
-        x_strata_indices = [0] + self.featurizer.expanded_fixed_effects_cols
-        x_strata = np.unique(x_all[:,x_strata_indices], axis=0).astype(int)
-        x_train_strata = x_train[:,x_strata_indices]
-        x_test_strata = x_test[:,x_strata_indices]
-
-        stratum_ppfs_delta_y = {}
-        stratum_ppfs_delta_z = {}
-
-        stratum_cdfs_delta_y = {}
-        stratum_cdfs_delta_z = {}
+    # estimates epsilon and delta
+    def _estimate_model_errors(self, model, x, y, aggregate_indicator):
+        y_pred = model.predict(x)
+        residuals_y = model.residuals(y, y_pred, loo=True, center=True)
+        epsilon_y_hat = self._estimate_epsilon(residuals_y, aggregate_indicator)
+        delta_y_hat = self._estimate_delta(residuals_y, epsilon_y_hat, aggregate_indicator)
+        return residuals_y, epsilon_y_hat, delta_y_hat
+    
+    def _estimate_strata_dist(self, x_train, x_train_strata, x_test, x_test_strata, delta_hat, lb, ub):
+        stratum_ppfs_delta = {}
+        stratum_cdfs_delta = {}
 
         def ppf_creator(betas, taus, lb, ub):
             return lambda p: np.interp(p, taus, betas, lb, ub)
@@ -187,51 +143,56 @@ class BootstrapElectionModel(BaseElectionModel):
         def cdf_creator(betas, taus):
             return lambda x: np.interp(x, betas, taus, right=1)
         
+        x_strata = np.unique(np.concatenate([x_train_strata, x_test_strata], axis=0), axis=0).astype(int)
         for x_stratum in x_strata:
             x_train_aug = np.concatenate([x_train_strata, x_stratum.reshape(1, -1)], axis=0)
-            delta_y_aug_lb = np.concatenate([delta_y_hat, [self.y_LB]])
-            delta_y_aug_ub = np.concatenate([delta_y_hat, [self.y_UB]])
-            delta_z_aug_lb = np.concatenate([delta_z_hat, [self.z_LB]])
-            delta_z_aug_ub = np.concatenate([delta_z_hat, [self.z_UB]])
-            betas_y_lower = QuantileRegression().fit(x_train_aug, delta_y_aug_lb, taus_lower)
-            betas_y_upper = QuantileRegression().fit(x_train_aug, delta_y_aug_ub, taus_upper)
-            betas_y = np.concatenate([betas_y_lower, betas_y_upper])
-            betas_z_lower = QuantileRegression().fit(x_train_aug, delta_z_aug_lb, taus_lower)
-            betas_z_upper = QuantileRegression().fit(x_train_aug, delta_z_aug_ub, taus_upper)
-            betas_z = np.concatenate([betas_z_lower, betas_z_upper])
+            delta_aug_lb = np.concatenate([delta_hat, [lb]])
+            delta_aug_ub = np.concatenate([delta_hat, [ub]])
+            betas_lower = QuantileRegression().fit(x_train_aug, delta_aug_lb, self.taus_lower)
+            betas_upper = QuantileRegression().fit(x_train_aug, delta_aug_ub, self.taus_upper)
+            betas = np.concatenate([betas_lower, betas_upper])
 
-            betas_y_stratum = betas_y[:,np.where(x_stratum == 1)[0]].sum(axis=1)
-            betas_z_stratum = betas_z[:,np.where(x_stratum == 1)[0]].sum(axis=1)
+            betas_stratum = betas[:,np.where(x_stratum == 1)[0]].sum(axis=1)
 
-            stratum_ppfs_delta_y[tuple(x_stratum)] = ppf_creator(betas_y_stratum, taus, self.y_LB, self.y_UB)
-            stratum_ppfs_delta_z[tuple(x_stratum)] = ppf_creator(betas_z_stratum, taus, self.z_LB, self.z_UB)
+            stratum_ppfs_delta[tuple(x_stratum)] = ppf_creator(betas_stratum, self.taus, lb, ub)
 
-            stratum_cdfs_delta_y[tuple(x_stratum)] = cdf_creator(betas_y_stratum, taus)
-            stratum_cdfs_delta_z[tuple(x_stratum)] = cdf_creator(betas_y_stratum, taus)
+            stratum_cdfs_delta[tuple(x_stratum)] = cdf_creator(betas_stratum, self.taus)
 
+        return stratum_ppfs_delta, stratum_cdfs_delta
+
+    # probability integral transform for each stratum (lol)
+    def _strata_pit(self, x_train_strata, x_train_strata_unique, delta_hat, stratum_cdfs_delta):
         unifs = []
-        x_train_strata_unique = np.unique(x_train_strata, axis=0).astype(int)
         for strata_dummies in x_train_strata_unique:
-            delta_y_strata = delta_y_hat[np.where((strata_dummies == x_train_strata).all(axis=1))[0]]
-            delta_z_strata = delta_z_hat[np.where((strata_dummies == x_train_strata).all(axis=1))[0]]
+            delta_strata = delta_hat[np.where((strata_dummies == x_train_strata).all(axis=1))[0]]
 
-            unifs_y = stratum_cdfs_delta_y[tuple(strata_dummies)](delta_y_strata + 1e-6).reshape(-1, 1)
-            unifs_z = stratum_cdfs_delta_z[tuple(strata_dummies)](delta_z_strata + 1e-6).reshape(-1, 1)
+            unifs_strata = stratum_cdfs_delta[tuple(strata_dummies)](delta_strata + 1e-6).reshape(-1, 1)
 
-            unifs_y[np.isclose(unifs_y, 1)] = np.max(taus)
-            unifs_y[np.isclose(unifs_y, 0)] = np.min(taus)
-
-            unifs_z[np.isclose(unifs_z, 1)] = np.max(taus)
-            unifs_z[np.isclose(unifs_z, 0)] = np.min(taus)            
-
-            unifs_strata = np.concatenate([unifs_y, unifs_z], axis=1)
+            unifs_strata[np.isclose(unifs_strata, 1)] = np.max(self.taus)
+            unifs_strata[np.isclose(unifs_strata, 0)] = np.min(self.taus)      
 
             unifs.append(unifs_strata)
-        unifs = np.concatenate(unifs, axis=0)
+        return np.concatenate(unifs).reshape(-1, 1)
 
+    def _bootstrap_deltas(self, unifs, x_train_strata, x_train_strata_unique, stratum_ppfs_delta_y, stratum_ppfs_delta_z):
+        n_train = unifs.shape[0]
+
+        unifs_B = self.rng.choice(unifs, (n_train, self.B), replace=True)
+
+        delta_y_B = np.zeros((n_train, self.B))
+        delta_z_B = np.zeros((n_train, self.B))
+
+        for strata_dummies in x_train_strata_unique:
+            strata_indices = np.where((strata_dummies == x_train_strata).all(axis=1))[0]
+            unifs_strata = unifs_B[strata_indices]
+            delta_y_B[strata_indices] = stratum_ppfs_delta_y[tuple(strata_dummies)](unifs_strata[:,:,0])
+            delta_z_B[strata_indices] = stratum_ppfs_delta_z[tuple(strata_dummies)](unifs_strata[:,:,1])
+        return delta_y_B, delta_z_B
+    
+    def _bootstrap_epsilons(self, epsilon_y_hat, epsilon_z_hat, x_train_strata, x_train_strata_unique, stratum_ppfs_delta_y, stratum_ppfs_delta_z, aggregate_indicator_train):
         iqr_y_strata = {}
         iqr_z_strata = {}
-        for x_stratum in x_strata:
+        for x_stratum in x_train_strata_unique:
             x_stratum_delta_y_ppf = stratum_ppfs_delta_y[tuple(x_stratum)]
             iqr_y = x_stratum_delta_y_ppf(.75) - x_stratum_delta_y_ppf(.25)
             iqr_y_strata[tuple(x_stratum)] = iqr_y
@@ -247,53 +208,33 @@ class BootstrapElectionModel(BaseElectionModel):
             strata_indices = np.where((strata_dummies == x_train_strata).all(axis=1))[0]
             var_epsilon_y += (aggregate_indicator_train[strata_indices] * (iqr_y_strata[tuple(strata_dummies)] ** 2)).sum(axis=0)
             var_epsilon_z += (aggregate_indicator_train[strata_indices] * (iqr_z_strata[tuple(strata_dummies)] ** 2)).sum(axis=0)
-        var_epsilon_y /= (1.349 ** 2)
-        var_epsilon_z /= (1.349 ** 2)
+        iqr_scale = 1.349
+        var_epsilon_y /= (iqr_scale ** 2)
+        var_epsilon_z /= (iqr_scale ** 2)
         var_epsilon_y /= aggregate_indicator_train.sum(axis=0)
         var_epsilon_z /= aggregate_indicator_train.sum(axis=0)
         var_epsilon_y[aggregate_indicator_train.sum(axis=0) < 2] = 0
         var_epsilon_z[aggregate_indicator_train.sum(axis=0) < 2] = 0
 
-        epsilon_y_B = self.rng.multivariate_normal(mean=epsilon_hat[:,0], cov=np.diag(var_epsilon_y), size=self.B).T
-        epsilon_z_B = self.rng.multivariate_normal(mean=epsilon_hat[:,1], cov=np.diag(var_epsilon_z), size=self.B).T
-
-        unifs_B = self.rng.choice(unifs, (n_train, self.B), replace=True)
-
-        delta_y_B = np.zeros((n_train, self.B))
-        delta_z_B = np.zeros((n_train, self.B))
-
-        for strata_dummies in x_train_strata_unique:
-            strata_indices = np.where((strata_dummies == x_train_strata).all(axis=1))[0]
-            unifs_strata = unifs_B[strata_indices]
-            delta_y_B[strata_indices] = stratum_ppfs_delta_y[tuple(strata_dummies)](unifs_strata[:,:,0])
-            delta_z_B[strata_indices] = stratum_ppfs_delta_z[tuple(strata_dummies)](unifs_strata[:,:,1])
-
-        y_train_B = y_train_pred + (aggregate_indicator_train @ epsilon_y_B) + delta_y_B
-        z_train_B = z_train_pred + (aggregate_indicator_train @ epsilon_z_B) + delta_z_B
+        epsilon_y_B = self.rng.multivariate_normal(mean=epsilon_y_hat.flatten(), cov=np.diag(var_epsilon_y), size=self.B).T
+        epsilon_z_B = self.rng.multivariate_normal(mean=epsilon_z_hat.flatten(), cov=np.diag(var_epsilon_z), size=self.B).T
+        return epsilon_y_B, epsilon_z_B
+    
+    def _bootstrap_errors(self, epsilon_y_hat, epsilon_z_hat, delta_y_hat, delta_z_hat, x_train_strata, stratum_cdfs_y, stratum_cdfs_z, stratum_ppfs_delta_y, stratum_ppfs_delta_z, aggregate_indicator_train):
+        x_train_strata_unique = np.unique(x_train_strata, axis=0).astype(int)
         
-        ols_y_B = OLSRegression().fit(x_train, y_train_B, weights_train, normal_eqs=ols_y.normal_eqs)
-        ols_z_B = OLSRegression().fit(x_train, z_train_B, weights_train, normal_eqs=ols_z.normal_eqs)
+        epsilon_y_B, epsilon_z_B = self._bootstrap_epsilons(epsilon_y_hat, epsilon_z_hat, x_train_strata, x_train_strata_unique, stratum_ppfs_delta_y, stratum_ppfs_delta_z, aggregate_indicator_train)
 
-        y_train_pred_B = ols_y_B.predict(x_train)
-        z_train_pred_B = ols_z_B.predict(x_train)
+        unifs_y = self._strata_pit(x_train_strata, x_train_strata_unique, delta_y_hat, stratum_cdfs_y)
+        unifs_z = self._strata_pit(x_train_strata, x_train_strata_unique, delta_z_hat, stratum_cdfs_z)
+        unifs = np.concatenate([unifs_y, unifs_z], axis=1)
 
-        residuals_y_B = ols_y_B.residuals(y_train_B, y_train_pred_B, loo=True, center=True)
-        residuals_z_B = ols_z_B.residuals(z_train_B, z_train_pred_B, loo=True, center=True)
+        delta_y_B, delta_z_B = self._bootstrap_deltas(unifs, x_train_strata, x_train_strata_unique, stratum_ppfs_delta_y, stratum_ppfs_delta_z)
 
-        epsilon_y_hat_B = (aggregate_indicator_train.T @ residuals_y_B) / aggregate_indicator_train.sum(axis=0).reshape(-1, 1)
-        epsilon_y_hat_B[aggregate_indicator_train.sum(axis=0) < 2] = 0 
-        epsilon_z_hat_B = (aggregate_indicator_train.T @ residuals_z_B) / aggregate_indicator_train.sum(axis=0).reshape(-1, 1)
-        epsilon_z_hat_B[aggregate_indicator_train.sum(axis=0) < 2] = 0 
+        return (epsilon_y_B, epsilon_z_B), (delta_y_B, delta_z_B)
 
-        y_test_pred_B = ols_y_B.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat_B)
-        z_test_pred_B = ols_z_B.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat_B)
-        
-        yz_test_pred_B = y_test_pred_B * z_test_pred_B
-        
-        y_test_pred = ols_y.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat)
-        z_test_pred = ols_z.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat)
-        yz_test_pred = y_test_pred * z_test_pred
-
+    def _sample_test_delta(self, x_test_strata, stratum_ppfs_delta_y, stratum_ppfs_delta_z):
+        n_test = x_test_strata.shape[0]
         test_unifs = self.rng.uniform(low=0, high=1, size=(n_test, self.B, 2))
 
         # # sample uniforms for each outstanding state and outstanding stratum in state
@@ -309,16 +250,19 @@ class BootstrapElectionModel(BaseElectionModel):
         # # naive perfect correlation matching is below
         # test_unifs = test_unifs_groups[matching_groups]  
 
-        test_residuals_y = np.zeros((n_test, self.B))
-        test_residuals_z = np.zeros((n_test, self.B))
+        test_delta_y = np.zeros((n_test, self.B))
+        test_delta_z = np.zeros((n_test, self.B))
 
         x_test_strata_unique = np.unique(x_test_strata, axis=0).astype(int)
         for strata_dummies in x_test_strata_unique:
             strata_indices = np.where((strata_dummies == x_test_strata).all(axis=1))[0]
             unifs_strata = test_unifs[strata_indices]
-            test_residuals_y[strata_indices] = stratum_ppfs_delta_y[tuple(strata_dummies)](unifs_strata[:,:,0])
-            test_residuals_z[strata_indices] = stratum_ppfs_delta_z[tuple(strata_dummies)](unifs_strata[:,:,1])
+            test_delta_y[strata_indices] = stratum_ppfs_delta_y[tuple(strata_dummies)](unifs_strata[:,:,0])
+            test_delta_z[strata_indices] = stratum_ppfs_delta_z[tuple(strata_dummies)](unifs_strata[:,:,1])
         
+        return test_delta_y, test_delta_z
+    
+    def _sample_test_epsilon(self, residuals_y, residuals_z, epsilon_y_hat, epsilon_z_hat, aggregate_indicator_train, aggregate_indicator_test):
         # gives us indices of states for which we have no samples in the training set
         states_not_in_reporting_units = np.where(np.all(aggregate_indicator_train == 0, axis=0))[0]
         # gives us states for which there is at least one county not reporting
@@ -331,7 +275,8 @@ class BootstrapElectionModel(BaseElectionModel):
         sample_var_epsilon_y = np.var(aggregate_indicator_train * residuals_y, axis=0)
         sample_var_epsilon_z = np.var(aggregate_indicator_train * residuals_z, axis=0)
 
-        for (epsilon_i, sample_var_epsilon_y_i, sample_var_epsilon_z_i) in zip(epsilon_hat, sample_var_epsilon_y, sample_var_epsilon_z):
+        for (epsilon_y_i, epsilon_z_i, sample_var_epsilon_y_i, sample_var_epsilon_z_i) in zip(epsilon_y_hat, epsilon_z_hat, sample_var_epsilon_y, sample_var_epsilon_z):
+            epsilon_i = np.asarray([epsilon_y_i, epsilon_z_i])
             if np.isclose(epsilon_i.sum(), 0): continue
             sigma_hat += np.outer(epsilon_i, epsilon_i) - np.diag([sample_var_epsilon_y_i, sample_var_epsilon_z_i])
             sigma_hat_denominator += 1
@@ -340,11 +285,93 @@ class BootstrapElectionModel(BaseElectionModel):
         sigma_hat[1, 0] = 0
 
         test_epsilon = self.rng.multivariate_normal([0, 0], sigma_hat, size=(len(states_that_need_random_effect), self.B))
-        test_epsilon_y = test_epsilon[:,:,0]
-        test_epsilon_z = test_epsilon[:,:,1]
+        
+        test_epsilon_y = aggregate_indicator_test[:,states_that_need_random_effect] @ test_epsilon[:,:,0]
+        test_epsilon_z = aggregate_indicator_test[:,states_that_need_random_effect] @ test_epsilon[:,:,1]
+
+        return test_epsilon_y, test_epsilon_z
+
+    def _sample_test_errors(self, residuals_y, residuals_z, epsilon_y_hat, epsilon_z_hat, x_test_strata, stratum_ppfs_delta_y, stratum_ppfs_delta_z, aggregate_indicator_train, aggregate_indicator_test):
+        test_epsilon_y, test_epsilon_z = self._sample_test_epsilon(residuals_y, residuals_z, epsilon_y_hat, epsilon_z_hat, aggregate_indicator_train, aggregate_indicator_test)
+        test_delta_y, test_delta_z = self._sample_test_delta(x_test_strata, stratum_ppfs_delta_y, stratum_ppfs_delta_z)
+        return test_epsilon_y + test_delta_y, test_epsilon_z + test_delta_z
+
+
+    # TODO: 
+    # pre-Sally meeting:
+        #  fix strata
+        #  account for partial reporting in UB/LB
+    # post-Sally meeting:
+        #  more robust sampling scheme for test epsilons
+    def compute_bootstrap_errors(self, reporting_units, nonreporting_units, unexpected_units):
+        n_train = reporting_units.shape[0]
+        n_test = nonreporting_units.shape[0]
+
+        self.featurizer.compute_means_for_centering(reporting_units, nonreporting_units)
+        self.featurizer.compute_stds_for_scaling(reporting_units, nonreporting_units)
+        
+        x_train = self.featurizer.featurize_fitting_data(reporting_units, add_intercept=self.add_intercept, center_features=False, scale_features=False).values
+        y_train = reporting_units['normalized_margin'].values.reshape(-1, 1)
+        z_train = reporting_units['turnout_factor'].values.reshape(-1, 1)
+        weights_train = reporting_units['weights'].values.reshape(-1, 1)
+
+        x_test = self.featurizer.featurize_heldout_data(nonreporting_units).values
+        weights_test = nonreporting_units['weights'].values.reshape(-1, 1)
+
+        aggregate_indicator = pd.get_dummies(pd.concat([reporting_units, nonreporting_units, unexpected_units], axis=0)['postal_code']).values
+        aggregate_indicator_expected = aggregate_indicator[:(n_train + n_test)]
+        aggregate_indicator_unexpected = aggregate_indicator[(n_train + n_test):]
+        aggregate_indicator_train = aggregate_indicator_expected[:n_train]
+        aggregate_indicator_test = aggregate_indicator_expected[n_train:]
+        
+        optimal_lambda_y = 0.1 # self.cv_lambda(x_train, y_train, np.logspace(-3, 2, 20), weights=weights_train)
+        optimal_lambda_z = 0.1 # self.cv_lambda(x_train, z_train, np.logspace(-3, 2, 20), weights=weights_train)
+        ols_y = OLSRegression().fit(x_train, y_train, weights=weights_train, lambda_=optimal_lambda_y)
+        ols_z = OLSRegression().fit(x_train, z_train, weights=weights_train, lambda_=optimal_lambda_z)
+
+        y_train_pred = ols_y.predict(x_train)
+        z_train_pred = ols_z.predict(x_train)
+
+        residuals_y, epsilon_y_hat, delta_y_hat = self._estimate_model_errors(ols_y, x_train, y_train, aggregate_indicator_train)
+        residuals_z, epsilon_z_hat, delta_z_hat = self._estimate_model_errors(ols_z, x_train, z_train, aggregate_indicator_train)
+
+        x_strata_indices = [0] + self.featurizer.expanded_fixed_effects_cols
+        x_train_strata = x_train[:,x_strata_indices]
+        x_test_strata = x_test[:,x_strata_indices]
+        x_strata = np.unique(np.concatenate([x_train_strata, x_test_strata], axis=0), axis=0).astype(int)
+
+        stratum_ppfs_delta_y, stratum_cdfs_delta_y = self._estimate_strata_dist(x_train, x_train_strata, x_test, x_test_strata, delta_y_hat, self.y_LB, self.y_UB)
+        stratum_ppfs_delta_z, stratum_cdfs_delta_z = self._estimate_strata_dist(x_train, x_train_strata, x_test, x_test_strata, delta_z_hat, self.z_LB, self.z_UB)
+
+        epsilon_B, delta_B = self._bootstrap_errors(epsilon_y_hat, epsilon_z_hat, delta_y_hat, delta_z_hat, x_train_strata, stratum_cdfs_delta_y, stratum_cdfs_delta_z, stratum_ppfs_delta_y, stratum_ppfs_delta_z, aggregate_indicator_train)
+        epsilon_y_B, epsilon_z_B = epsilon_B
+        delta_y_B, delta_z_B = delta_B
  
-        test_residuals_y += aggregate_indicator_test[:,states_that_need_random_effect] @ test_epsilon_y
-        test_residuals_z += aggregate_indicator_test[:,states_that_need_random_effect] @ test_epsilon_z
+        y_train_B = y_train_pred + (aggregate_indicator_train @ epsilon_y_B) + delta_y_B
+        z_train_B = z_train_pred + (aggregate_indicator_train @ epsilon_z_B) + delta_z_B
+        
+        ols_y_B = OLSRegression().fit(x_train, y_train_B, weights_train, normal_eqs=ols_y.normal_eqs)
+        ols_z_B = OLSRegression().fit(x_train, z_train_B, weights_train, normal_eqs=ols_z.normal_eqs)
+
+        y_train_pred_B = ols_y_B.predict(x_train)
+        z_train_pred_B = ols_z_B.predict(x_train)
+
+        residuals_y_B = ols_y_B.residuals(y_train_B, y_train_pred_B, loo=True, center=True)
+        residuals_z_B = ols_z_B.residuals(z_train_B, z_train_pred_B, loo=True, center=True)
+
+        epsilon_y_hat_B = self._estimate_epsilon(residuals_y_B, aggregate_indicator_train)
+        epsilon_z_hat_B = self._estimate_epsilon(residuals_z_B, aggregate_indicator_train)
+
+        y_test_pred_B = ols_y_B.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat_B)
+        z_test_pred_B = ols_z_B.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat_B)
+        
+        yz_test_pred_B = y_test_pred_B * z_test_pred_B
+        
+        y_test_pred = ols_y.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat)
+        z_test_pred = ols_z.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat)
+        yz_test_pred = y_test_pred * z_test_pred
+
+        test_residuals_y, test_residuals_z = self._sample_test_errors(residuals_y, residuals_z, epsilon_y_hat, epsilon_z_hat, x_test_strata, stratum_ppfs_delta_y, stratum_ppfs_delta_z, aggregate_indicator_train, aggregate_indicator_test)
         
         self.errors_B_1 = yz_test_pred_B * weights_test
 
@@ -520,7 +547,7 @@ class BootstrapElectionModel(BaseElectionModel):
         upper_q = np.ceil(upper_alpha * (self.B - 1)) / self.B
 
         interval_upper, interval_lower = (
-            aggregate_dem_vals_pred - # move into y space from residual space
+            aggregate_dem_vals_pred - 
             np.quantile(
                 aggregate_dem_vals_B, 
                 q=[lower_q, upper_q],
