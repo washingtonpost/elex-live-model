@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import norm
 from scipy.optimize import linprog
+from scipy.special import expit
 import math
 
 from elexmodel.models.BaseElectionModel import BaseElectionModel, PredictionIntervals
@@ -31,7 +32,6 @@ class OLSRegression(object):
             self.normal_eqs = self._compute_normal_equations(x, L, lambda_)
         self.hat_vals = np.diag(x @ self.normal_eqs @ L)
         self.beta_hat = self.normal_eqs @ L @ y
-        print(self.beta_hat)
         return self
 
     def predict(self, x):
@@ -83,7 +83,6 @@ class BootstrapElectionModel(BaseElectionModel):
         super().__init__(model_settings)
         self.seed = model_settings.get("seed", 0)
         self.B = model_settings.get("B", 1000)
-        self.B = 40
         self.featurizer = Featurizer(self.features, self.fixed_effects)
         self.rng = np.random.default_rng(seed=self.seed)
         self.ran_bootstrap = False
@@ -140,9 +139,8 @@ class BootstrapElectionModel(BaseElectionModel):
 
         x_all = np.concatenate([x_train, x_test], axis=0)
 
-        optimal_lambda_y = 0 # self.cv_lambda(x_train, y_train, np.logspace(-3, 2, 20), weights=weights_train)
-        optimal_lambda_z = 0 # self.cv_lambda(x_train, z_train, np.logspace(-3, 2, 20), weights=weights_train)
-        print(optimal_lambda_y)
+        optimal_lambda_y = 0.1 # self.cv_lambda(x_train, y_train, np.logspace(-3, 2, 20), weights=weights_train)
+        optimal_lambda_z = 0.1 # self.cv_lambda(x_train, z_train, np.logspace(-3, 2, 20), weights=weights_train)
         ols_y = OLSRegression().fit(x_train, y_train, weights=weights_train, lambda_=optimal_lambda_y)
         ols_z = OLSRegression().fit(x_train, z_train, weights=weights_train, lambda_=optimal_lambda_z)
 
@@ -445,15 +443,22 @@ class BootstrapElectionModel(BaseElectionModel):
         aggregate_z_train = aggregate_indicator_train.T @ (weights_train * z_train)
         aggregate_yz_train = aggregate_indicator_train.T @ (weights_train * yz_train)
 
-        aggregate_yz_test_B = aggregate_yz_train + aggregate_indicator_test.T @ self.errors_B_1
-        aggregate_yz_test_pred = aggregate_yz_train + aggregate_indicator_test.T @ self.errors_B_2
-        aggregate_z_test_B = aggregate_z_train + aggregate_indicator_test.T @ self.errors_B_3
-        aggregate_z_test_pred = aggregate_z_train + aggregate_indicator_test.T @ self.errors_B_4
+        aggregate_yz_test_B =  aggregate_indicator_test.T @ self.errors_B_1
+        aggregate_yz_test_pred =  aggregate_indicator_test.T @ self.errors_B_2
+        aggregate_z_test_B = aggregate_indicator_test.T @ self.errors_B_3
+        aggregate_z_test_pred = aggregate_indicator_test.T @ self.errors_B_4
 
-        aggregate_error_B_1 = aggregate_yz_test_B
-        aggregate_error_B_2 = aggregate_yz_test_pred
-        aggregate_error_B_3 = aggregate_z_test_B
-        aggregate_error_B_4 = aggregate_z_test_pred
+        aggregate_yz_total_B = aggregate_yz_train + aggregate_yz_test_B  + aggregate_yz_unexpected
+        aggregate_yz_total_pred = aggregate_yz_train + aggregate_yz_test_pred + aggregate_yz_unexpected
+        aggregate_z_total_B = aggregate_z_train + aggregate_z_test_B + aggregate_z_unexpected
+        aggregate_z_total_pred = aggregate_z_train + aggregate_z_test_pred + aggregate_z_unexpected
+
+        aggregate_error_B_1 = aggregate_yz_total_B
+        aggregate_error_B_2 = aggregate_yz_total_pred
+        aggregate_error_B_3 = aggregate_z_total_B
+        aggregate_error_B_4 = aggregate_z_total_pred
+
+
 
         aggregate_error_B = (aggregate_error_B_1 / aggregate_error_B_3) - (aggregate_error_B_2 / aggregate_error_B_4)
 
@@ -464,8 +469,15 @@ class BootstrapElectionModel(BaseElectionModel):
 
         aggregate_z_total = aggregate_z_unexpected + aggregate_z_train + aggregate_indicator_test.T @ self.weighted_z_test_pred
         aggregate_yz_total = aggregate_yz_unexpected + aggregate_yz_train + aggregate_indicator_test.T @ self.weighted_yz_test_pred
-        aggregate_perc_margin_total = aggregate_yz_total / aggregate_z_total
+        aggregate_perc_margin_total = np.nan_to_num(aggregate_yz_total / aggregate_z_total)
         
+        if 'postal_code' in aggregate:
+            self.aggregate_error_B_1 = aggregate_error_B_1
+            self.aggregate_error_B_2 = aggregate_error_B_2
+            self.aggregate_error_B_3 = aggregate_error_B_3
+            self.aggregate_error_B_4 = aggregate_error_B_4
+            self.aggregate_perc_margin_total = aggregate_perc_margin_total
+
         interval_upper, interval_lower = (
             aggregate_perc_margin_total - # move into y space from residual space
             np.quantile(
@@ -484,3 +496,37 @@ class BootstrapElectionModel(BaseElectionModel):
     
     def get_all_conformalization_data_agg(self):
         return None, None
+
+    def get_national_summary_estimates(self, nat_sum_data_dict, called_states):
+        nat_sum_data_dict_sorted = sorted(nat_sum_data_dict.items())
+        nat_sum_data_dict_sorted_vals = np.asarray([x[1] for x in nat_sum_data_dict_sorted]).reshape(-1, 1)
+        # TODO: divide by states previous election raw margin instead of aggregate error B3/B4
+        # TODO: set T as parameter
+        # TODO: implement called_states
+        T = 50
+        aggregate_dem_prob_B_1 = expit(T * np.nan_to_num(self.aggregate_error_B_1 / self.aggregate_error_B_3))
+        aggregate_dem_prob_B_2 = expit(T * np.nan_to_num(self.aggregate_error_B_2 / self.aggregate_error_B_4))
+        
+        aggregate_dem_vals_B_1 = nat_sum_data_dict_sorted_vals * aggregate_dem_prob_B_1
+        aggregate_dem_vals_B_2 = nat_sum_data_dict_sorted_vals * aggregate_dem_prob_B_2
+        aggregate_dem_vals_B = np.sum(aggregate_dem_vals_B_1, axis=0) - np.sum(aggregate_dem_vals_B_2, axis=0)
+
+        aggregate_dem_vals_pred = np.sum(nat_sum_data_dict_sorted_vals * expit(T * self.aggregate_perc_margin_total))
+
+        alpha = 0.9
+        lower_alpha = (1 - alpha) / 2
+        upper_alpha = 1 - lower_alpha
+        lower_q = np.floor(lower_alpha * (self.B + 1)) / self.B
+        upper_q = np.ceil(upper_alpha * (self.B - 1)) / self.B
+
+        interval_upper, interval_lower = (
+            aggregate_dem_vals_pred - # move into y space from residual space
+            np.quantile(
+                aggregate_dem_vals_B, 
+                q=[lower_q, upper_q],
+                axis=-1
+            ).T
+        ).T
+
+        national_summary_estimates = {'margin': [aggregate_dem_vals_pred, interval_lower, interval_upper]}
+        return national_summary_estimates

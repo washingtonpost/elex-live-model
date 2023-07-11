@@ -38,6 +38,7 @@ class ModelClient:
         super().__init__()
         self.conformalization_data_unit_dict = None
         self.conformalization_data_agg_dict = None
+        self.model = None
 
     def _check_input_parameters(
         self,
@@ -130,6 +131,9 @@ class ModelClient:
         base_aggregate = default_aggregate[:-1]  # remove unit
         raw_aggregate_list = base_aggregate + [aggregate]
         return sorted(list(set(raw_aggregate_list)), key=lambda x: AGGREGATE_ORDER.index(x))
+
+    def get_national_summary_votes_estimates(self, nat_sum_data_dict, called_states):
+        return self.model.get_national_summary_estimates(nat_sum_data_dict, called_states)
 
     def get_estimates(
         self,
@@ -257,15 +261,15 @@ class ModelClient:
         )
 
         if pi_method == "nonparametric":
-            model = NonparametricElectionModel(model_settings=model_settings)
+            self.model = NonparametricElectionModel(model_settings=model_settings)
         elif pi_method == "gaussian":
-            model = GaussianElectionModel(model_settings=model_settings)
+            self.model = GaussianElectionModel(model_settings=model_settings)
         elif pi_method == 'bootstrap':
-            model = BootstrapElectionModel(model_settings=model_settings)
+            self.model = BootstrapElectionModel(model_settings=model_settings)
 
         minimum_reporting_units_max = 0
         for alpha in prediction_intervals:
-            minimum_reporting_units = model.get_minimum_reporting_units(alpha)
+            minimum_reporting_units = self.model.get_minimum_reporting_units(alpha)
             if minimum_reporting_units > minimum_reporting_units_max:
                 minimum_reporting_units_max = minimum_reporting_units
 
@@ -299,21 +303,21 @@ class ModelClient:
         self.all_conformalization_data_unit_dict = {alpha: {} for alpha in prediction_intervals}
         self.all_conformalization_data_agg_dict = {alpha: {} for alpha in prediction_intervals}
         for estimand in estimands:
-            unit_predictions = model.get_unit_predictions(reporting_units, nonreporting_units, estimand, unexpected_units=unexpected_units)
+            unit_predictions = self.model.get_unit_predictions(reporting_units, nonreporting_units, estimand, unexpected_units=unexpected_units)
             results_handler.add_unit_predictions(estimand, unit_predictions)
             # gets prediciton intervals for each alpha
             alpha_to_unit_prediction_intervals = {}
             for alpha in prediction_intervals:
-                alpha_to_unit_prediction_intervals[alpha] = model.get_unit_prediction_intervals(
+                alpha_to_unit_prediction_intervals[alpha] = self.model.get_unit_prediction_intervals(
                     results_handler.reporting_units, results_handler.nonreporting_units, alpha, estimand
                 )
-                self.all_conformalization_data_unit_dict[alpha][estimand] = model.get_all_conformalization_data_unit()
+                self.all_conformalization_data_unit_dict[alpha][estimand] = self.model.get_all_conformalization_data_unit()
 
             results_handler.add_unit_intervals(estimand, alpha_to_unit_prediction_intervals)
 
             for aggregate in results_handler.aggregates:
                 aggregate_list = self.get_aggregate_list(office, aggregate)
-                estimates_df = model.get_aggregate_predictions(
+                estimates_df = self.model.get_aggregate_predictions(
                     results_handler.reporting_units,
                     results_handler.nonreporting_units,
                     results_handler.unexpected_units,
@@ -322,7 +326,7 @@ class ModelClient:
                 )
                 alpha_to_agg_prediction_intervals = {}
                 for alpha in prediction_intervals:
-                    alpha_to_agg_prediction_intervals[alpha] = model.get_aggregate_prediction_intervals(
+                    alpha_to_agg_prediction_intervals[alpha] = self.model.get_aggregate_prediction_intervals(
                         results_handler.reporting_units,
                         results_handler.nonreporting_units,
                         results_handler.unexpected_units,
@@ -331,7 +335,7 @@ class ModelClient:
                         alpha_to_unit_prediction_intervals[alpha].conformalization,
                         estimand,
                     )
-                    self.all_conformalization_data_agg_dict[alpha][estimand] = model.get_all_conformalization_data_agg()
+                    self.all_conformalization_data_agg_dict[alpha][estimand] = self.model.get_all_conformalization_data_agg()
 
                 # get all of the prediction intervals here
                 results_handler.add_agg_predictions(
