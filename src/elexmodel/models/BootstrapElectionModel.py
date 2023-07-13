@@ -83,6 +83,7 @@ class BootstrapElectionModel(BaseElectionModel):
         super().__init__(model_settings)
         self.seed = model_settings.get("seed", 0)
         self.B = model_settings.get("B", 1000)
+        self.strata = model_settings.get("strata", ['county_classification']) # change this
         self.featurizer = Featurizer(self.features, self.fixed_effects)
         self.rng = np.random.default_rng(seed=self.seed)
         self.ran_bootstrap = False
@@ -296,6 +297,19 @@ class BootstrapElectionModel(BaseElectionModel):
         test_delta_y, test_delta_z = self._sample_test_delta(x_test_strata, stratum_ppfs_delta_y, stratum_ppfs_delta_z)
         return test_epsilon_y + test_delta_y, test_epsilon_z + test_delta_z
 
+    def _get_strata(self, reporting_units, nonreporting_units):
+        n_train = reporting_units.shape[0]
+        n_test = nonreporting_units.shape[0]
+        for stratum in self.strata:
+            to_bin = len(np.unique(reporting_units[stratum])) > 5 # assume continious
+            # TODO: actually bin those strata
+        strata_featurizer = Featurizer([], self.strata)
+        all_units = pd.concat([reporting_units, nonreporting_units], axis=0)
+        strata_all = strata_featurizer.prepare_data(all_units, center_features=False, scale_features=False, add_intercept=self.add_intercept)
+        x_train_strata = strata_all[:n_train]
+        x_test_strata = strata_all[n_train:]
+        return x_train_strata, x_test_strata
+
 
     # TODO: 
     # pre-Sally meeting:
@@ -304,18 +318,19 @@ class BootstrapElectionModel(BaseElectionModel):
     # post-Sally meeting:
         #  more robust sampling scheme for test epsilons
     def compute_bootstrap_errors(self, reporting_units, nonreporting_units, unexpected_units):
+        all_units = pd.concat([reporting_units, nonreporting_units, unexpected_units], axis=0)
+        x_all = self.featurizer.prepare_data(all_units, center_features=False, scale_features=False, add_intercept=self.add_intercept)
         n_train = reporting_units.shape[0]
         n_test = nonreporting_units.shape[0]
-
-        self.featurizer.compute_means_for_centering(reporting_units, nonreporting_units)
-        self.featurizer.compute_stds_for_scaling(reporting_units, nonreporting_units)
         
-        x_train = self.featurizer.featurize_fitting_data(reporting_units, add_intercept=self.add_intercept, center_features=False, scale_features=False).values
+        x_train_df = self.featurizer.filter_to_active_features(x_all[:n_train])
+        x_train = x_train_df.values
         y_train = reporting_units['normalized_margin'].values.reshape(-1, 1)
         z_train = reporting_units['turnout_factor'].values.reshape(-1, 1)
         weights_train = reporting_units['weights'].values.reshape(-1, 1)
 
-        x_test = self.featurizer.featurize_heldout_data(nonreporting_units).values
+        x_test_df = self.featurizer.generate_holdout_data(x_all[n_train:(n_train + n_test)])
+        x_test = x_test_df.values
         weights_test = nonreporting_units['weights'].values.reshape(-1, 1)
 
         aggregate_indicator = pd.get_dummies(pd.concat([reporting_units, nonreporting_units, unexpected_units], axis=0)['postal_code']).values
@@ -334,11 +349,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         residuals_y, epsilon_y_hat, delta_y_hat = self._estimate_model_errors(ols_y, x_train, y_train, aggregate_indicator_train)
         residuals_z, epsilon_z_hat, delta_z_hat = self._estimate_model_errors(ols_z, x_train, z_train, aggregate_indicator_train)
-
-        x_strata_indices = [0] + self.featurizer.expanded_fixed_effects_cols
-        x_train_strata = x_train[:,x_strata_indices]
-        x_test_strata = x_test[:,x_strata_indices]
-        x_strata = np.unique(np.concatenate([x_train_strata, x_test_strata], axis=0), axis=0).astype(int)
+        x_train_strata, x_test_strata = self._get_strata(reporting_units, nonreporting_units)
 
         stratum_ppfs_delta_y, stratum_cdfs_delta_y = self._estimate_strata_dist(x_train, x_train_strata, x_test, x_test_strata, delta_y_hat, self.y_LB, self.y_UB)
         stratum_ppfs_delta_z, stratum_cdfs_delta_z = self._estimate_strata_dist(x_train, x_train_strata, x_test, x_test_strata, delta_z_hat, self.z_LB, self.z_UB)
@@ -363,7 +374,7 @@ class BootstrapElectionModel(BaseElectionModel):
         epsilon_z_hat_B = self._estimate_epsilon(residuals_z_B, aggregate_indicator_train)
 
         y_test_pred_B = ols_y_B.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat_B)
-        z_test_pred_B = ols_z_B.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat_B)
+        z_test_pred_B = ols_z_B.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat_B)
         
         yz_test_pred_B = y_test_pred_B * z_test_pred_B
         
