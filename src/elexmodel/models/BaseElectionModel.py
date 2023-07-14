@@ -308,9 +308,18 @@ class BaseElectionModel:
         average_MAPE = MAPE_arr_avg[best_MAPE_index]
         same_MAPE_indices = np.where(MAPE_arr_avg == average_MAPE)[0]
 
+        print("The given lambda values were: ")
+        print(np.array(possible_lambda_values))
+
+        print("The associated MAPE values were: ")
+        print(np.array(MAPE_arr_avg))
+
+        same_MAPE_lambdas = []
         if len(same_MAPE_indices) > 1:
             same_MAPE_lambdas = [possible_lambda_values[idx] for idx in same_MAPE_indices]
             print("More than one lambda has the lowest average MAPE of: " + str(average_MAPE))
-            print(same_MAPE_lambdas)
+            print(np.array(same_MAPE_lambdas))
 
+        print("best: " + str(best_lambda))
+        print("best_avg: " + str(np.average(same_MAPE_lambdas)))
         return best_lambda, average_MAPE
