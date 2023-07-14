@@ -174,10 +174,9 @@ class BootstrapElectionModel(BaseElectionModel):
         return residuals_y, epsilon_y_hat, delta_y_hat
     
     # TODO:
-    # we defined all 4 reporting percentage strata at the same time, which means that the stratum
-    # is defined by the categories of all strata.
-    # we want to define the strata (ie. county class + y/z-upper/lower reporting percentage _estimata_dist_call)
-    # ie. the applicable strata depend on the quantile regression being used
+    # iterate over reporting "strata" to generate a quantile regression per county class category + percent nonreporting bound (ie. "stratum")
+    # figure out how to identify that: ie. stratum_ppfs_delta[tuple(x_stratum) + nonreporting__bound]
+    # pass in constraints to quantile regression for this to work
     def _estimate_strata_dist(self, x_train, x_train_strata, x_test, x_test_strata, delta_hat, lb, ub):
         stratum_ppfs_delta = {}
         stratum_cdfs_delta = {}
