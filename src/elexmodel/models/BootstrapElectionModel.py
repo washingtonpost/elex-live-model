@@ -49,13 +49,50 @@ class QuantileRegression(object):
     def __init__(self):
         self.beta_hats = []
 
-    def _fit(self, S, Phi, zeros, N, weights, tau):
-        bounds = weights.reshape(-1, 1) * np.asarray([(tau - 1, tau)] * N)
-        res = linprog(-1 * S, A_eq=Phi.T, b_eq=zeros, bounds=bounds, 
-            method='highs', options={'presolve': False})
+    def _fit(self, S, Phi, zeros, N, weights, tau, constraints, fit_type):
+        if constraints is not None and fit_type is None:
+            raise ValueError("If giving constraints, specify whether you are fitting an upper or lower bound")
+        import IPython; IPython.embed()
+        if constraints is None:
+            bounds = weights.reshape(-1, 1) * np.asarray([(tau - 1, tau)] * N)
+            res = linprog(-1 * S, A_eq=Phi.T, b_eq=zeros, bounds=bounds, 
+                method='highs', options={'presolve': False})
+        elif fit_type == 'upper':
+            S[-1] = min(S[-1], constraints[1])
+            constraints[1] = S[-1]
+            S = np.concatenate([S, [constraints[1] - constraints[0]]]) # shape of S is likely wrong
+            Phi = np.concatenate([Phi, np.zeros((1, Phi.shape[1]))], axis=0)
+            zeros = np.zeros((Phi.shape[1], ))
+            weights = np.concatenate([weights, [1]])
+            bounds = weights.reshape(-1, 1) * np.asarray([(tau - 1, tau)] * (N + 1))
+            bounds[-2] = np.asarray([None, None])
+            bounds[-1] = np.asarray([0, None])
+            b_ub = np.asarray([tau])
+            A_ub = np.zeros((1, weights.shape[0]))
+            A_ub[-2] = weights[-2]
+            A_ub[-1] = -1 * weights[-2]
+            res = linprog(-1 * S, A_eq=Phi.T, b_eq=zeros, bounds=bounds, A_ub=A_ub, b_ub=b_ub,
+                method='highs', options={'presolve': False})
+        elif fit_type == 'lower':
+            S[-1] = max(S[-1], constraints[1])
+            constraints[1] = S[-1]
+            S = np.concatenate([S, [constraints[1] - constraints[0]]]) # shape of S is likely wrong
+            Phi = np.concatenate([Phi, np.zeros((1, Phi.shape[1]))], axis=0)
+            zeros = np.zeros((Phi.shape[1], ))
+            weights = np.concatenate([weights, [1]])
+            bounds = weights.reshape(-1, 1) * np.asarray([(tau - 1, tau)] * (N + 1))
+            bounds[-2] = np.asarray([None, None])
+            bounds[-1] = np.asarray([0, None])
+            b_ub = np.asarray([1 - tau])
+            A_ub = np.zeros((1, weights.shape[0]))
+            A_ub[-2] = -1 * weights[-2]
+            A_ub[-1] = -1 * weights[-2]
+            res = linprog(-1 * S, A_eq=Phi.T, b_eq=zeros, bounds=bounds, A_ub=A_ub, b_ub=b_ub,
+                method='highs', options={'presolve': False})
         return -1 * res.eqlin.marginals
-    
-    def fit(self, x, y, taus=0.5, weights=None):
+            
+
+    def fit(self, x, y, taus=0.5, weights=None, constraints=None, fit_type=None):
         if weights is None:
             weights = np.ones((y.shape[0], ))
 
@@ -69,7 +106,7 @@ class QuantileRegression(object):
             taus = [taus]
         
         for tau in taus:
-            self.beta_hats.append(self._fit(S, Phi, zeros, N, weights, tau))
+            self.beta_hats.append(self._fit(S, Phi, zeros, N, weights, tau, constraints, fit_type))
 
         return self.beta_hats
     
@@ -84,6 +121,8 @@ class BootstrapElectionModel(BaseElectionModel):
         self.seed = model_settings.get("seed", 0)
         self.B = model_settings.get("B", 1000)
         self.strata = model_settings.get("strata", ['county_classification']) # change this
+        self.strata.extend(["normalized_margin_upper", "normalized_margin_lower", "turnout_factor_upper", "turnout_factor_lower"])
+        self.T = model_settings.get("T", 50)
         self.featurizer = Featurizer(self.features, self.fixed_effects)
         self.rng = np.random.default_rng(seed=self.seed)
         self.ran_bootstrap = False
@@ -134,6 +173,11 @@ class BootstrapElectionModel(BaseElectionModel):
         delta_y_hat = self._estimate_delta(residuals_y, epsilon_y_hat, aggregate_indicator)
         return residuals_y, epsilon_y_hat, delta_y_hat
     
+    # TODO:
+    # we defined all 4 reporting percentage strata at the same time, which means that the stratum
+    # is defined by the categories of all strata.
+    # we want to define the strata (ie. county class + y/z-upper/lower reporting percentage _estimata_dist_call)
+    # ie. the applicable strata depend on the quantile regression being used
     def _estimate_strata_dist(self, x_train, x_train_strata, x_test, x_test_strata, delta_hat, lb, ub):
         stratum_ppfs_delta = {}
         stratum_cdfs_delta = {}
@@ -149,8 +193,8 @@ class BootstrapElectionModel(BaseElectionModel):
             x_train_aug = np.concatenate([x_train_strata, x_stratum.reshape(1, -1)], axis=0)
             delta_aug_lb = np.concatenate([delta_hat, [lb]])
             delta_aug_ub = np.concatenate([delta_hat, [ub]])
-            betas_lower = QuantileRegression().fit(x_train_aug, delta_aug_lb, self.taus_lower)
-            betas_upper = QuantileRegression().fit(x_train_aug, delta_aug_ub, self.taus_upper)
+            betas_lower = QuantileRegression().fit(x_train_aug, delta_aug_lb, self.taus_lower, fit_type='lower')
+            betas_upper = QuantileRegression().fit(x_train_aug, delta_aug_ub, self.taus_upper, fit_type='upper')
             betas = np.concatenate([betas_lower, betas_upper])
 
             betas_stratum = betas[:,np.where(x_stratum == 1)[0]].sum(axis=1)
@@ -297,12 +341,50 @@ class BootstrapElectionModel(BaseElectionModel):
         test_delta_y, test_delta_z = self._sample_test_delta(x_test_strata, stratum_ppfs_delta_y, stratum_ppfs_delta_z)
         return test_epsilon_y + test_delta_y, test_epsilon_z + test_delta_z
 
+    def _get_nonreporting_bound_bins(self, nonreporting_units, n_bins=10):
+        # TODO: figure out how to better estimate margin_upper/lower_bound
+        unobserved_y_upper_bound = 1
+        unobserved_y_lower_bound = -1
+        nonreporting_expected_vote_frac = nonreporting_units.percent_expected_vote.values.clip(max=100) / 100
+        y_upper_bound = nonreporting_expected_vote_frac * nonreporting_units.normalized_margin + (1 - nonreporting_expected_vote_frac) * unobserved_y_upper_bound
+        y_lower_bound = nonreporting_expected_vote_frac * nonreporting_units.normalized_margin + (1 - nonreporting_expected_vote_frac) * unobserved_y_lower_bound
+
+        percent_expected_vote_error_bound = 0.25
+        z_lower_bound = nonreporting_units.turnout_factor / (nonreporting_expected_vote_frac + percent_expected_vote_error_bound)
+        z_upper_bound = nonreporting_units.turnout_factor / (nonreporting_expected_vote_frac - percent_expected_vote_error_bound).clip(min=0.01)
+        
+        quantiles = np.linspace(0, 1, num=n_bins+1) # linspace returns the start, but we want to upper bound
+        
+        y_upper_quantiles = np.quantile(y_upper_bound, q=quantiles[1:])
+        y_upper_quantiles[-1] += 1e-6 # lol wtf
+        y_upper_bins = y_upper_quantiles[np.digitize(y_upper_bound, bins=y_upper_quantiles)]
+        y_lower_quantiles = np.quantile(y_lower_bound, q=quantiles)
+        y_lower_bins = y_lower_quantiles[np.digitize(y_lower_bound, bins=y_lower_quantiles[1:])]
+        
+        z_upper_quantiles = np.quantile(z_upper_bound, q=quantiles[1:])
+        z_upper_quantiles[-1] += 1e-6 # lol wtf
+        z_upper_bins = z_upper_quantiles[np.digitize(z_upper_bound, bins=z_upper_quantiles)]
+        z_lower_quantiles = np.quantile(z_lower_bound, q=quantiles)
+        z_lower_bins = z_lower_quantiles[np.digitize(z_lower_bound, bins=z_lower_quantiles[1:])]
+
+        return (y_lower_bins, y_upper_bins), (z_lower_bins, z_upper_bins)
+
+
     def _get_strata(self, reporting_units, nonreporting_units):
+        # TODO: potentially generalize binning features for strata
         n_train = reporting_units.shape[0]
         n_test = nonreporting_units.shape[0]
-        for stratum in self.strata:
-            to_bin = len(np.unique(reporting_units[stratum])) > 5 # assume continious
-            # TODO: actually bin those strata
+        y_bins, z_bins = self._get_nonreporting_bound_bins(nonreporting_units)
+        y_lower_bins, y_upper_bins = y_bins
+        z_lower_bins, z_upper_bins = z_bins
+        if 'normalized_margin_upper' in self.strata:
+            nonreporting_units['normalized_margin_upper'] = y_upper_bins
+        if 'normalized_margin_lower' in self.strata:
+            nonreporting_units['normalized_margin_lower'] = y_lower_bins
+        if 'turnout_factor_upper' in self.strata:
+            nonreporting_units['turnout_factor_upper'] = z_upper_bins
+        if 'turnout_factor_lower' in self.strata:
+            nonreporting_units['turnout_factor_lower'] = z_lower_bins
         strata_featurizer = Featurizer([], self.strata)
         all_units = pd.concat([reporting_units, nonreporting_units], axis=0)
         strata_all = strata_featurizer.prepare_data(all_units, center_features=False, scale_features=False, add_intercept=self.add_intercept)
@@ -313,7 +395,6 @@ class BootstrapElectionModel(BaseElectionModel):
 
     # TODO: 
     # pre-Sally meeting:
-        #  fix strata
         #  account for partial reporting in UB/LB
     # post-Sally meeting:
         #  more robust sampling scheme for test epsilons
@@ -432,6 +513,7 @@ class BootstrapElectionModel(BaseElectionModel):
         raw_margin_df = super().get_aggregate_predictions(reporting_units, nonreporting_units, unexpected_units, aggregate, estimand)
         raw_margin_df['pred_margin'] /= (aggregate_z_total.flatten() + 1)
         raw_margin_df['results_margin'] /= (aggregate_z_total.flatten() + 1) # avoid NaN
+
         return raw_margin_df
 
     def get_unit_prediction_intervals(self, reporting_units, non_reporting_units, alpha, estimand):
@@ -539,17 +621,16 @@ class BootstrapElectionModel(BaseElectionModel):
         nat_sum_data_dict_sorted = sorted(nat_sum_data_dict.items())
         nat_sum_data_dict_sorted_vals = np.asarray([x[1] for x in nat_sum_data_dict_sorted]).reshape(-1, 1)
         # TODO: divide by states previous election raw margin instead of aggregate error B3/B4
-        # TODO: set T as parameter
         # TODO: implement called_states
-        T = 50
-        aggregate_dem_prob_B_1 = expit(T * np.nan_to_num(self.aggregate_error_B_1 / self.aggregate_error_B_3))
-        aggregate_dem_prob_B_2 = expit(T * np.nan_to_num(self.aggregate_error_B_2 / self.aggregate_error_B_4))
+        # TODO: we could get more conservative uncertainty from the hard threshold
+        aggregate_dem_prob_B_1 = expit(self.T * np.nan_to_num(self.aggregate_error_B_1 / self.aggregate_error_B_3))
+        aggregate_dem_prob_B_2 = expit(self.T * np.nan_to_num(self.aggregate_error_B_2 / self.aggregate_error_B_4))
         
         aggregate_dem_vals_B_1 = nat_sum_data_dict_sorted_vals * aggregate_dem_prob_B_1
         aggregate_dem_vals_B_2 = nat_sum_data_dict_sorted_vals * aggregate_dem_prob_B_2
         aggregate_dem_vals_B = np.sum(aggregate_dem_vals_B_1, axis=0) - np.sum(aggregate_dem_vals_B_2, axis=0)
 
-        aggregate_dem_vals_pred = np.sum(nat_sum_data_dict_sorted_vals * expit(T * self.aggregate_perc_margin_total))
+        aggregate_dem_vals_pred = np.sum(nat_sum_data_dict_sorted_vals * expit(self.T * self.aggregate_perc_margin_total))
 
         alpha = 0.9
         lower_alpha = (1 - alpha) / 2
