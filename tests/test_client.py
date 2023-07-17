@@ -799,7 +799,10 @@ def test_winsorize_intervals(model_client, va_governor_county_data, va_config):
     preprocessed_data = va_governor_county_data.copy()
     preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
 
-    winsorize_results = model_client.get_estimates(
+    model_client_winsorize = model_client
+    model_client_non_winsorize = model_client
+
+    winsorize_results = model_client_winsorize.get_estimates(
         data,
         election_id,
         office_id,
@@ -814,7 +817,9 @@ def test_winsorize_intervals(model_client, va_governor_county_data, va_config):
         save_output=[],
     )
 
-    non_winsorize_results = model_client.get_estimates(
+    winsorize_data = winsorize_results["unit_data"]
+
+    non_winsorize_results = model_client_non_winsorize.get_estimates(
         data,
         election_id,
         office_id,
@@ -828,14 +833,14 @@ def test_winsorize_intervals(model_client, va_governor_county_data, va_config):
         winsorize=False,
         save_output=[],
     )
-    winsorize_results = winsorize_results.get("state_data")
-    non_winsorize_results = non_winsorize_results.get("state_data")
+
+    non_winsorize_data = non_winsorize_results["unit_data"]
 
     assert (
-        winsorize_results.loc[:, "lower_0.9_turnout"].values[0]
-        >= non_winsorize_results.loc[:, "lower_0.9_turnout"].values[0]
+        winsorize_data["lower_0.9_turnout"].values[0]
+        >= non_winsorize_data["lower_0.9_turnout"].values[0]
     )
     assert (
-        winsorize_results.loc[:, "upper_0.9_turnout"].values[0]
-        <= non_winsorize_results.loc[:, "upper_0.9_turnout"].values[0]
+        winsorize_data["upper_0.9_turnout"].values[0]
+        <= non_winsorize_data["upper_0.9_turnout"].values[0]
     )
