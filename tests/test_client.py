@@ -836,11 +836,5 @@ def test_winsorize_intervals(model_client, va_governor_county_data, va_config):
 
     non_winsorize_data = non_winsorize_results["unit_data"]
 
-    assert (
-        winsorize_data["lower_0.9_turnout"].values[0]
-        >= non_winsorize_data["lower_0.9_turnout"].values[0]
-    )
-    assert (
-        winsorize_data["upper_0.9_turnout"].values[0]
-        <= non_winsorize_data["upper_0.9_turnout"].values[0]
-    )
+    assert (winsorize_data["lower_0.9_turnout"].values[0] >= non_winsorize_data["lower_0.9_turnout"].values[0])
+    assert (winsorize_data["upper_0.9_turnout"].values[0] <= non_winsorize_data["upper_0.9_turnout"].values[0])
