@@ -49,50 +49,31 @@ class QuantileRegression(object):
     def __init__(self):
         self.beta_hats = []
 
-    def _fit(self, S, Phi, zeros, N, weights, tau, constraints, fit_type):
-        if constraints is not None and fit_type is None:
-            raise ValueError("If giving constraints, specify whether you are fitting an upper or lower bound")
-        import IPython; IPython.embed()
+    def _fit(self, S, Phi, zeros, N, weights, tau, constraints):
         if constraints is None:
             bounds = weights.reshape(-1, 1) * np.asarray([(tau - 1, tau)] * N)
             res = linprog(-1 * S, A_eq=Phi.T, b_eq=zeros, bounds=bounds, 
                 method='highs', options={'presolve': False})
-        elif fit_type == 'upper':
-            S[-1] = min(S[-1], constraints[1])
-            constraints[1] = S[-1]
-            S = np.concatenate([S, [constraints[1] - constraints[0]]]) # shape of S is likely wrong
-            Phi = np.concatenate([Phi, np.zeros((1, Phi.shape[1]))], axis=0)
-            zeros = np.zeros((Phi.shape[1], ))
-            weights = np.concatenate([weights, [1]])
-            bounds = weights.reshape(-1, 1) * np.asarray([(tau - 1, tau)] * (N + 1))
-            bounds[-2] = np.asarray([None, None])
-            bounds[-1] = np.asarray([0, None])
-            b_ub = np.asarray([tau])
-            A_ub = np.zeros((1, weights.shape[0]))
-            A_ub[-2] = weights[-2]
-            A_ub[-1] = -1 * weights[-2]
-            res = linprog(-1 * S, A_eq=Phi.T, b_eq=zeros, bounds=bounds, A_ub=A_ub, b_ub=b_ub,
-                method='highs', options={'presolve': False})
-        elif fit_type == 'lower':
-            S[-1] = max(S[-1], constraints[1])
-            constraints[1] = S[-1]
-            S = np.concatenate([S, [constraints[1] - constraints[0]]]) # shape of S is likely wrong
-            Phi = np.concatenate([Phi, np.zeros((1, Phi.shape[1]))], axis=0)
-            zeros = np.zeros((Phi.shape[1], ))
-            weights = np.concatenate([weights, [1]])
-            bounds = weights.reshape(-1, 1) * np.asarray([(tau - 1, tau)] * (N + 1))
-            bounds[-2] = np.asarray([None, None])
-            bounds[-1] = np.asarray([0, None])
-            b_ub = np.asarray([1 - tau])
-            A_ub = np.zeros((1, weights.shape[0]))
-            A_ub[-2] = -1 * weights[-2]
-            A_ub[-1] = -1 * weights[-2]
-            res = linprog(-1 * S, A_eq=Phi.T, b_eq=zeros, bounds=bounds, A_ub=A_ub, b_ub=b_ub,
+        else:
+            S_aug = np.concatenate([S, [constraints[0] - S[-1]], [S[-1] - constraints[1]]])
+            Phi_aug = np.concatenate([Phi, np.zeros((2, Phi.shape[1]))], axis=0)
+            zeros_aug = np.zeros((Phi_aug.shape[1], ))
+            weights_aug = np.concatenate([weights, [1], [1]])
+            bounds_aug = weights_aug.reshape(-1, 1) * np.asarray([(tau - 1, tau)] * (N + 2))
+            bounds_aug[-3] = np.asarray([None, None])
+            bounds_aug[-2] = np.asarray([0, None])
+            bounds_aug[-1] = np.asarray([0, None])
+            b_ub = np.asarray([tau, 1 - tau])
+            A_ub = np.zeros((2, weights_aug.shape[0]))
+            A_ub[0,-2] = weights_aug[-3]
+            A_ub[0,-1] = -1 * weights_aug[-3]
+            A_ub[1,-2] = -1 * weights_aug[-3]
+            A_ub[1,-1] = -1 * weights_aug[-3]
+            res = linprog(-1 * S_aug, A_eq=Phi_aug.T, b_eq=zeros_aug, bounds=bounds_aug, A_ub=A_ub, b_ub=b_ub,
                 method='highs', options={'presolve': False})
         return -1 * res.eqlin.marginals
             
-
-    def fit(self, x, y, taus=0.5, weights=None, constraints=None, fit_type=None):
+    def fit(self, x, y, taus=0.5, weights=None, constraints=None):
         if weights is None:
             weights = np.ones((y.shape[0], ))
 
@@ -106,7 +87,7 @@ class QuantileRegression(object):
             taus = [taus]
         
         for tau in taus:
-            self.beta_hats.append(self._fit(S, Phi, zeros, N, weights, tau, constraints, fit_type))
+            self.beta_hats.append(self._fit(S, Phi, zeros, N, weights, tau, constraints))
 
         return self.beta_hats
     
@@ -121,7 +102,6 @@ class BootstrapElectionModel(BaseElectionModel):
         self.seed = model_settings.get("seed", 0)
         self.B = model_settings.get("B", 1000)
         self.strata = model_settings.get("strata", ['county_classification']) # change this
-        self.strata.extend(["normalized_margin_upper", "normalized_margin_lower", "turnout_factor_upper", "turnout_factor_lower"])
         self.T = model_settings.get("T", 50)
         self.featurizer = Featurizer(self.features, self.fixed_effects)
         self.rng = np.random.default_rng(seed=self.seed)
@@ -171,8 +151,8 @@ class BootstrapElectionModel(BaseElectionModel):
         residuals_y = model.residuals(y, y_pred, loo=True, center=True)
         epsilon_y_hat = self._estimate_epsilon(residuals_y, aggregate_indicator)
         delta_y_hat = self._estimate_delta(residuals_y, epsilon_y_hat, aggregate_indicator)
-        return residuals_y, epsilon_y_hat, delta_y_hat
-    
+        return residuals_y, epsilon_y_hat, delta_y_hat       
+
     # TODO:
     # iterate over reporting "strata" to generate a quantile regression per county class category + percent nonreporting bound (ie. "stratum")
     # figure out how to identify that: ie. stratum_ppfs_delta[tuple(x_stratum) + nonreporting__bound]
@@ -192,8 +172,9 @@ class BootstrapElectionModel(BaseElectionModel):
             x_train_aug = np.concatenate([x_train_strata, x_stratum.reshape(1, -1)], axis=0)
             delta_aug_lb = np.concatenate([delta_hat, [lb]])
             delta_aug_ub = np.concatenate([delta_hat, [ub]])
-            betas_lower = QuantileRegression().fit(x_train_aug, delta_aug_lb, self.taus_lower, fit_type='lower')
-            betas_upper = QuantileRegression().fit(x_train_aug, delta_aug_ub, self.taus_upper, fit_type='upper')
+            betas_lower = QuantileRegression().fit(x_train_aug, delta_aug_lb, self.taus_lower)
+            betas_upper = QuantileRegression().fit(x_train_aug, delta_aug_ub, self.taus_upper)
+
             betas = np.concatenate([betas_lower, betas_upper])
 
             betas_stratum = betas[:,np.where(x_stratum == 1)[0]].sum(axis=1)
@@ -203,6 +184,34 @@ class BootstrapElectionModel(BaseElectionModel):
             stratum_cdfs_delta[tuple(x_stratum)] = cdf_creator(betas_stratum, self.taus)
 
         return stratum_ppfs_delta, stratum_cdfs_delta
+
+    def _generate_nonreporting_bounds(self, nonreporting_units, bootstrap_estimand, n_bins=10):
+        # TODO: figure out how to better estimate margin_upper/lower_bound
+        # TODO: pass in the magic numbers
+        nonreporting_expected_vote_frac = nonreporting_units.percent_expected_vote.values.clip(max=100) / 100
+        if bootstrap_estimand == 'normalized_margin':
+            unobserved_y_upper_bound = 1
+            unobserved_y_lower_bound = -1
+            upper_bound = nonreporting_expected_vote_frac * nonreporting_units[bootstrap_estimand] + (1 - nonreporting_expected_vote_frac) * unobserved_y_upper_bound
+            lower_bound = nonreporting_expected_vote_frac * nonreporting_units[bootstrap_estimand] + (1 - nonreporting_expected_vote_frac) * unobserved_y_lower_bound
+        elif bootstrap_estimand == 'turnout_factor':
+            percent_expected_vote_error_bound = 0.25
+            unobserved_z_upper_bound = 1.5
+            lower_bound = nonreporting_units[bootstrap_estimand] / (nonreporting_expected_vote_frac + percent_expected_vote_error_bound)
+            upper_bound = nonreporting_units[bootstrap_estimand] / (nonreporting_expected_vote_frac - percent_expected_vote_error_bound).clip(min=0.01)
+            upper_bound[np.isclose(upper_bound, 0)] = unobserved_z_upper_bound # turnout is at m
+        return lower_bound.values.reshape(-1, 1), upper_bound.values.reshape(-1, 1)
+        # quantiles = np.linspace(0, 1, num=n_bins+1) # linspace returns the start, but we want to upper bound
+        
+        # upper_quantiles = np.quantile(upper_bound, q=quantiles[1:])
+        # upper_quantiles[-1] += 1e-6 # lol wtf
+        # upper_bins = upper_quantiles[np.digitize(upper_bound, bins=upper_quantiles)]
+        # lower_quantiles = np.quantile(lower_bound, q=quantiles)
+        # lower_bins = lower_quantiles[np.digitize(lower_bound, bins=lower_quantiles[1:])]
+
+        # nonreporting_units[f'{bootstrap_estimand}_upper'] = upper_bins
+        # nonreporting_units[f'{bootstrap_estimand}_lower'] = lower_bins
+        # return np.unique(nonreporting_units[[f'{bootstrap_estimand}_lower', f'{bootstrap_estimand}_upper']].values, axis=0)
 
     # probability integral transform for each stratum (lol)
     def _strata_pit(self, x_train_strata, x_train_strata_unique, delta_hat, stratum_cdfs_delta):
@@ -338,52 +347,14 @@ class BootstrapElectionModel(BaseElectionModel):
     def _sample_test_errors(self, residuals_y, residuals_z, epsilon_y_hat, epsilon_z_hat, x_test_strata, stratum_ppfs_delta_y, stratum_ppfs_delta_z, aggregate_indicator_train, aggregate_indicator_test):
         test_epsilon_y, test_epsilon_z = self._sample_test_epsilon(residuals_y, residuals_z, epsilon_y_hat, epsilon_z_hat, aggregate_indicator_train, aggregate_indicator_test)
         test_delta_y, test_delta_z = self._sample_test_delta(x_test_strata, stratum_ppfs_delta_y, stratum_ppfs_delta_z)
-        return test_epsilon_y + test_delta_y, test_epsilon_z + test_delta_z
-
-    def _get_nonreporting_bound_bins(self, nonreporting_units, n_bins=10):
-        # TODO: figure out how to better estimate margin_upper/lower_bound
-        unobserved_y_upper_bound = 1
-        unobserved_y_lower_bound = -1
-        nonreporting_expected_vote_frac = nonreporting_units.percent_expected_vote.values.clip(max=100) / 100
-        y_upper_bound = nonreporting_expected_vote_frac * nonreporting_units.normalized_margin + (1 - nonreporting_expected_vote_frac) * unobserved_y_upper_bound
-        y_lower_bound = nonreporting_expected_vote_frac * nonreporting_units.normalized_margin + (1 - nonreporting_expected_vote_frac) * unobserved_y_lower_bound
-
-        percent_expected_vote_error_bound = 0.25
-        z_lower_bound = nonreporting_units.turnout_factor / (nonreporting_expected_vote_frac + percent_expected_vote_error_bound)
-        z_upper_bound = nonreporting_units.turnout_factor / (nonreporting_expected_vote_frac - percent_expected_vote_error_bound).clip(min=0.01)
-        
-        quantiles = np.linspace(0, 1, num=n_bins+1) # linspace returns the start, but we want to upper bound
-        
-        y_upper_quantiles = np.quantile(y_upper_bound, q=quantiles[1:])
-        y_upper_quantiles[-1] += 1e-6 # lol wtf
-        y_upper_bins = y_upper_quantiles[np.digitize(y_upper_bound, bins=y_upper_quantiles)]
-        y_lower_quantiles = np.quantile(y_lower_bound, q=quantiles)
-        y_lower_bins = y_lower_quantiles[np.digitize(y_lower_bound, bins=y_lower_quantiles[1:])]
-        
-        z_upper_quantiles = np.quantile(z_upper_bound, q=quantiles[1:])
-        z_upper_quantiles[-1] += 1e-6 # lol wtf
-        z_upper_bins = z_upper_quantiles[np.digitize(z_upper_bound, bins=z_upper_quantiles)]
-        z_lower_quantiles = np.quantile(z_lower_bound, q=quantiles)
-        z_lower_bins = z_lower_quantiles[np.digitize(z_lower_bound, bins=z_lower_quantiles[1:])]
-
-        return (y_lower_bins, y_upper_bins), (z_lower_bins, z_upper_bins)
-
+        test_error_y = test_epsilon_y + test_delta_y
+        test_error_z = test_epsilon_z + test_delta_z
+        return test_error_y, test_error_z
 
     def _get_strata(self, reporting_units, nonreporting_units):
         # TODO: potentially generalize binning features for strata
         n_train = reporting_units.shape[0]
         n_test = nonreporting_units.shape[0]
-        y_bins, z_bins = self._get_nonreporting_bound_bins(nonreporting_units)
-        y_lower_bins, y_upper_bins = y_bins
-        z_lower_bins, z_upper_bins = z_bins
-        if 'normalized_margin_upper' in self.strata:
-            nonreporting_units['normalized_margin_upper'] = y_upper_bins
-        if 'normalized_margin_lower' in self.strata:
-            nonreporting_units['normalized_margin_lower'] = y_lower_bins
-        if 'turnout_factor_upper' in self.strata:
-            nonreporting_units['turnout_factor_upper'] = z_upper_bins
-        if 'turnout_factor_lower' in self.strata:
-            nonreporting_units['turnout_factor_lower'] = z_lower_bins
         strata_featurizer = Featurizer([], self.strata)
         all_units = pd.concat([reporting_units, nonreporting_units], axis=0)
         strata_all = strata_featurizer.prepare_data(all_units, center_features=False, scale_features=False, add_intercept=self.add_intercept)
@@ -453,32 +424,44 @@ class BootstrapElectionModel(BaseElectionModel):
         epsilon_y_hat_B = self._estimate_epsilon(residuals_y_B, aggregate_indicator_train)
         epsilon_z_hat_B = self._estimate_epsilon(residuals_z_B, aggregate_indicator_train)
 
-        y_test_pred_B = ols_y_B.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat_B)
-        z_test_pred_B = ols_z_B.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat_B)
+        y_partial_reporting_lower, y_partial_reporting_upper = self._generate_nonreporting_bounds(nonreporting_units, 'normalized_margin')
+        z_partial_reporting_lower, z_partial_reporting_upper = self._generate_nonreporting_bounds(nonreporting_units, 'turnout_factor')
+
+        y_test_pred_B = (ols_y_B.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat_B)).clip(min=y_partial_reporting_lower, max=y_partial_reporting_upper)
+        z_test_pred_B = (ols_z_B.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat_B)).clip(min=z_partial_reporting_lower, max=z_partial_reporting_upper)
         
         yz_test_pred_B = y_test_pred_B * z_test_pred_B
         
-        y_test_pred = ols_y.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat)
-        z_test_pred = ols_z.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat)
+        y_test_pred = (ols_y.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat)).clip(min=y_partial_reporting_lower, max=y_partial_reporting_upper)
+        z_test_pred = (ols_z.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat)).clip(min=z_partial_reporting_lower, max=z_partial_reporting_upper)
         yz_test_pred = y_test_pred * z_test_pred
 
-        test_residuals_y, test_residuals_z = self._sample_test_errors(residuals_y, residuals_z, epsilon_y_hat, epsilon_z_hat, x_test_strata, stratum_ppfs_delta_y, stratum_ppfs_delta_z, aggregate_indicator_train, aggregate_indicator_test)
+        test_residuals_y, test_residuals_z = self._sample_test_errors(
+            residuals_y, 
+            residuals_z, 
+            epsilon_y_hat, 
+            epsilon_z_hat, 
+            x_test_strata, 
+            stratum_ppfs_delta_y, 
+            stratum_ppfs_delta_z,
+            aggregate_indicator_train, 
+            aggregate_indicator_test
+        )
         
         self.errors_B_1 = yz_test_pred_B * weights_test
 
-        errors_B_2 = (y_test_pred + test_residuals_y).clip(min=-1, max=1)
-        errors_B_2 *= (z_test_pred + test_residuals_z).clip(min=0.5, max=1.5) # clipping: predicting turnout can't be less than 50% or more than 150% of previous election
+        errors_B_2 = (y_test_pred + test_residuals_y).clip(min=y_partial_reporting_lower, max=y_partial_reporting_upper)
+        errors_B_2 *= (z_test_pred + test_residuals_z).clip(min=z_partial_reporting_lower, max=z_partial_reporting_upper)
 
         self.errors_B_2 = errors_B_2 * weights_test 
 
-        self.errors_B_3 = z_test_pred_B.clip(min=0.5, max=1.5) * weights_test # denominator for percentage margin
-        self.errors_B_4 = (z_test_pred + test_residuals_z).clip(min=0.5, max=1.5) * weights_test # clipping: predicting turnout can't be less than 50% or more than 150% of previous election
+        self.errors_B_3 = z_test_pred_B * weights_test # has already been clipped above
+        self.errors_B_4 = (z_test_pred + test_residuals_z).clip(min=z_partial_reporting_lower, max=z_partial_reporting_upper) * weights_test 
 
         self.weighted_yz_test_pred = yz_test_pred * weights_test
         self.weighted_z_test_pred = z_test_pred * weights_test
 
         self.ran_bootstrap = True
-
         # if n_train > 150:
             # import pdb; pdb.set_trace()
 
