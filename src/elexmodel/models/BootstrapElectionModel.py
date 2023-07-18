@@ -153,10 +153,6 @@ class BootstrapElectionModel(BaseElectionModel):
         delta_y_hat = self._estimate_delta(residuals_y, epsilon_y_hat, aggregate_indicator)
         return residuals_y, epsilon_y_hat, delta_y_hat       
 
-    # TODO:
-    # iterate over reporting "strata" to generate a quantile regression per county class category + percent nonreporting bound (ie. "stratum")
-    # figure out how to identify that: ie. stratum_ppfs_delta[tuple(x_stratum) + nonreporting__bound]
-    # pass in constraints to quantile regression for this to work
     def _estimate_strata_dist(self, x_train, x_train_strata, x_test, x_test_strata, delta_hat, lb, ub):
         stratum_ppfs_delta = {}
         stratum_cdfs_delta = {}
@@ -290,19 +286,6 @@ class BootstrapElectionModel(BaseElectionModel):
         n_test = x_test_strata.shape[0]
         test_unifs = self.rng.uniform(low=0, high=1, size=(n_test, self.B, 2))
 
-        # # sample uniforms for each outstanding state and outstanding stratum in state
-        # groups_test = nonreporting_units[['postal_code']].values.astype(str)
-        # unique_groups = np.unique(groups_test, axis=0)
-        # test_unifs_groups = self.rng.uniform(low=0, high=1, size=(len(unique_groups), self.B, 2))
-        # # test_unifs_groups = self.rng.uniform(low=0, high=1, size=(len(unique_groups), self.B))
-
-        # # for each row in groups_test, fetch the index of the matching row in unique_groups
-        # # matching_groups is the answer to ^this problem: matching_groups.shape = (groups_test.shape[0], ) 
-        # matching_groups = np.where((unique_groups == groups_test[:, None]).all(axis=-1))[1]
-
-        # # naive perfect correlation matching is below
-        # test_unifs = test_unifs_groups[matching_groups]  
-
         test_delta_y = np.zeros((n_test, self.B))
         test_delta_z = np.zeros((n_test, self.B))
 
@@ -364,10 +347,9 @@ class BootstrapElectionModel(BaseElectionModel):
 
 
     # TODO: 
-    # pre-Sally meeting:
-        #  account for partial reporting in UB/LB
     # post-Sally meeting:
         #  more robust sampling scheme for test epsilons
+        #  less conservative accounting of partial reporting (unit level predictions should adapt and not just snap to lower/upper bounds)
     def compute_bootstrap_errors(self, reporting_units, nonreporting_units, unexpected_units):
         all_units = pd.concat([reporting_units, nonreporting_units, unexpected_units], axis=0)
         x_all = self.featurizer.prepare_data(all_units, center_features=False, scale_features=False, add_intercept=self.add_intercept)
@@ -462,8 +444,6 @@ class BootstrapElectionModel(BaseElectionModel):
         self.weighted_z_test_pred = z_test_pred * weights_test
 
         self.ran_bootstrap = True
-        # if n_train > 150:
-            # import pdb; pdb.set_trace()
 
     def get_unit_predictions(self,  reporting_units, nonreporting_units, estimand, **kwargs):
         if not self.ran_bootstrap:
