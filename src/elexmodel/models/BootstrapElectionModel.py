@@ -366,7 +366,7 @@ class BootstrapElectionModel(BaseElectionModel):
         x_test = x_test_df.values
         # y_test = nonreporting_units['normalized_margin'].values.reshape(-1, 1)
         # z_test = nonreporting_units['turnout_factor'].values.reshape(-1, 1)
-        # weights_test = nonreporting_units['weights'].values.reshape(-1, 1)
+        weights_test = nonreporting_units['weights'].values.reshape(-1, 1)
 
         aggregate_indicator = pd.get_dummies(pd.concat([reporting_units, nonreporting_units, unexpected_units], axis=0)['postal_code']).values
         aggregate_indicator_expected = aggregate_indicator[:(n_train + n_test)]
