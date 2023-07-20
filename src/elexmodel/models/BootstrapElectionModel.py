@@ -100,7 +100,7 @@ class BootstrapElectionModel(BaseElectionModel):
     def __init__(self, model_settings={}):
         super().__init__(model_settings)
         self.seed = model_settings.get("seed", 0)
-        self.B = model_settings.get("B", 1000)
+        self.B = model_settings.get("B", 2000)
         self.strata = model_settings.get("strata", ['county_classification']) # change this
         self.T = model_settings.get("T", 50)
         self.featurizer = Featurizer(self.features, self.fixed_effects)
@@ -364,7 +364,9 @@ class BootstrapElectionModel(BaseElectionModel):
 
         x_test_df = self.featurizer.generate_holdout_data(x_all[n_train:(n_train + n_test)])
         x_test = x_test_df.values
-        weights_test = nonreporting_units['weights'].values.reshape(-1, 1)
+        # y_test = nonreporting_units['normalized_margin'].values.reshape(-1, 1)
+        # z_test = nonreporting_units['turnout_factor'].values.reshape(-1, 1)
+        # weights_test = nonreporting_units['weights'].values.reshape(-1, 1)
 
         aggregate_indicator = pd.get_dummies(pd.concat([reporting_units, nonreporting_units, unexpected_units], axis=0)['postal_code']).values
         aggregate_indicator_expected = aggregate_indicator[:(n_train + n_test)]
@@ -372,8 +374,25 @@ class BootstrapElectionModel(BaseElectionModel):
         aggregate_indicator_train = aggregate_indicator_expected[:n_train]
         aggregate_indicator_test = aggregate_indicator_expected[n_train:]
         
+        y_partial_reporting_lower, y_partial_reporting_upper = self._generate_nonreporting_bounds(nonreporting_units, 'normalized_margin')
+        z_partial_reporting_lower, z_partial_reporting_upper = self._generate_nonreporting_bounds(nonreporting_units, 'turnout_factor')
         optimal_lambda_y = 0.1 # self.cv_lambda(x_train, y_train, np.logspace(-3, 2, 20), weights=weights_train)
         optimal_lambda_z = 0.1 # self.cv_lambda(x_train, z_train, np.logspace(-3, 2, 20), weights=weights_train)
+        
+        # nonreporting_units_to_keep = ((y_partial_reporting_upper - y_partial_reporting_lower) < 0.1).flatten()
+        # x_all = np.concatenate([x_train, x_test[nonreporting_units_to_keep]], axis=0)
+        # y_all = np.concatenate([y_train, y_test[nonreporting_units_to_keep]])
+        # z_all = np.concatenate([z_train, z_test[nonreporting_units_to_keep]])
+        # weights_all_y = np.concatenate([weights_train, weights_test[nonreporting_units_to_keep]])
+        # weights_all_z = np.concatenate([weights_train, weights_test[nonreporting_units_to_keep]])
+        # weights_bound_y = (1 / ((y_partial_reporting_upper - y_partial_reporting_lower)**2 + 1))[nonreporting_units_to_keep]
+        # weights_bound_z = (1 / ((z_partial_reporting_upper - z_partial_reporting_lower)**2 + 1))[nonreporting_units_to_keep]
+        # weights_all_y[n_train:] *= weights_bound_y
+        # weights_all_z[n_train:] *= weights_bound_z
+
+        # ols_y_all = OLSRegression().fit(x_all, y_all, weights=weights_all_y, lambda_=optimal_lambda_y)
+        # ols_z_all = OLSRegression().fit(x_all, z_all, weights=weights_all_z, lambda_=optimal_lambda_z)
+
         ols_y = OLSRegression().fit(x_train, y_train, weights=weights_train, lambda_=optimal_lambda_y)
         ols_z = OLSRegression().fit(x_train, z_train, weights=weights_train, lambda_=optimal_lambda_z)
 
@@ -406,9 +425,6 @@ class BootstrapElectionModel(BaseElectionModel):
         epsilon_y_hat_B = self._estimate_epsilon(residuals_y_B, aggregate_indicator_train)
         epsilon_z_hat_B = self._estimate_epsilon(residuals_z_B, aggregate_indicator_train)
 
-        y_partial_reporting_lower, y_partial_reporting_upper = self._generate_nonreporting_bounds(nonreporting_units, 'normalized_margin')
-        z_partial_reporting_lower, z_partial_reporting_upper = self._generate_nonreporting_bounds(nonreporting_units, 'turnout_factor')
-
         y_test_pred_B = (ols_y_B.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat_B)).clip(min=y_partial_reporting_lower, max=y_partial_reporting_upper)
         z_test_pred_B = (ols_z_B.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat_B)).clip(min=z_partial_reporting_lower, max=z_partial_reporting_upper)
         
@@ -440,9 +456,11 @@ class BootstrapElectionModel(BaseElectionModel):
         self.errors_B_3 = z_test_pred_B * weights_test # has already been clipped above
         self.errors_B_4 = (z_test_pred + test_residuals_z).clip(min=z_partial_reporting_lower, max=z_partial_reporting_upper) * weights_test 
 
+        # y_test_pred_all = (ols_y_all.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat)).clip(min=y_partial_reporting_lower, max=y_partial_reporting_upper)
+        # z_test_pred_all = (ols_z_all.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat)).clip(min=z_partial_reporting_lower, max=z_partial_reporting_upper)
+
         self.weighted_yz_test_pred = yz_test_pred * weights_test
         self.weighted_z_test_pred = z_test_pred * weights_test
-
         self.ran_bootstrap = True
 
     def get_unit_predictions(self,  reporting_units, nonreporting_units, estimand, **kwargs):
@@ -570,7 +588,6 @@ class BootstrapElectionModel(BaseElectionModel):
         ).T
         interval_upper = interval_upper.reshape(-1,1)
         interval_lower = interval_lower.reshape(-1,1)
-
         return PredictionIntervals(interval_lower, interval_upper) # removed round
 
     def get_all_conformalization_data_unit(self):
@@ -594,7 +611,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         aggregate_dem_vals_pred = np.sum(nat_sum_data_dict_sorted_vals * expit(self.T * self.aggregate_perc_margin_total))
 
-        alpha = 0.9
+        alpha = 0.99
         lower_alpha = (1 - alpha) / 2
         upper_alpha = 1 - lower_alpha
         lower_q = np.floor(lower_alpha * (self.B + 1)) / self.B
@@ -610,4 +627,5 @@ class BootstrapElectionModel(BaseElectionModel):
         ).T
 
         national_summary_estimates = {'margin': [aggregate_dem_vals_pred, interval_lower, interval_upper]}
+
         return national_summary_estimates
