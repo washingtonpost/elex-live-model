@@ -87,9 +87,10 @@ class PreprocessedDataHandler:
             # the historical election results of the currently reporting units.
             # so we don't care about the total voters or the baseline election.
             return preprocessed_data
-        
+
+        preprocessed_data['weights'] = preprocessed_data.baseline_dem + preprocessed_data.baseline_gop + 1
+
         if 'margin' in estimand_baselines:
-            preprocessed_data['weights'] = preprocessed_data.baseline_dem + preprocessed_data.baseline_gop + 1
             preprocessed_data['baseline_margin'] = preprocessed_data.baseline_dem - preprocessed_data.baseline_gop
             preprocessed_data['baseline_normalized_margin'] = (preprocessed_data.baseline_dem - preprocessed_data.baseline_gop) / preprocessed_data.weights
 
