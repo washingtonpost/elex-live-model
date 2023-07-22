@@ -186,16 +186,22 @@ class BootstrapElectionModel(BaseElectionModel):
         # TODO: pass in the magic numbers
         nonreporting_expected_vote_frac = nonreporting_units.percent_expected_vote.values.clip(max=100) / 100
         if bootstrap_estimand == 'normalized_margin':
-            unobserved_y_upper_bound = 1
-            unobserved_y_lower_bound = -1
-            upper_bound = nonreporting_expected_vote_frac * nonreporting_units[bootstrap_estimand] + (1 - nonreporting_expected_vote_frac) * unobserved_y_upper_bound
-            lower_bound = nonreporting_expected_vote_frac * nonreporting_units[bootstrap_estimand] + (1 - nonreporting_expected_vote_frac) * unobserved_y_lower_bound
+            unobserved_upper_bound = 1
+            unobserved_lower_bound = -1
+            upper_bound = nonreporting_expected_vote_frac * nonreporting_units[bootstrap_estimand] + (1 - nonreporting_expected_vote_frac) * unobserved_upper_bound
+            lower_bound = nonreporting_expected_vote_frac * nonreporting_units[bootstrap_estimand] + (1 - nonreporting_expected_vote_frac) * unobserved_lower_bound
         elif bootstrap_estimand == 'turnout_factor':
             percent_expected_vote_error_bound = 0.25
-            unobserved_z_upper_bound = 1.5
+            unobserved_upper_bound = 1.5
+            unobserved_lower_bound = 0.5
             lower_bound = nonreporting_units[bootstrap_estimand] / (nonreporting_expected_vote_frac + percent_expected_vote_error_bound)
             upper_bound = nonreporting_units[bootstrap_estimand] / (nonreporting_expected_vote_frac - percent_expected_vote_error_bound).clip(min=0.01)
-            upper_bound[np.isclose(upper_bound, 0)] = unobserved_z_upper_bound # turnout is at m
+            upper_bound[np.isclose(upper_bound, 0)] = unobserved_upper_bound # turnout is at m
+
+        # if percent reporting is 0 or 1, don't try to compute anything and revert to naive bounds
+        lower_bound[np.isclose(nonreporting_expected_vote_frac, 0) | np.isclose(nonreporting_expected_vote_frac, 1)] = unobserved_lower_bound
+        upper_bound[np.isclose(nonreporting_expected_vote_frac, 0) | np.isclose(nonreporting_expected_vote_frac, 1)] = unobserved_upper_bound
+
         return lower_bound.values.reshape(-1, 1), upper_bound.values.reshape(-1, 1)
         # quantiles = np.linspace(0, 1, num=n_bins+1) # linspace returns the start, but we want to upper bound
         
@@ -376,8 +382,8 @@ class BootstrapElectionModel(BaseElectionModel):
         
         y_partial_reporting_lower, y_partial_reporting_upper = self._generate_nonreporting_bounds(nonreporting_units, 'normalized_margin')
         z_partial_reporting_lower, z_partial_reporting_upper = self._generate_nonreporting_bounds(nonreporting_units, 'turnout_factor')
-        optimal_lambda_y = 0.1 # self.cv_lambda(x_train, y_train, np.logspace(-3, 2, 20), weights=weights_train)
-        optimal_lambda_z = 0.1 # self.cv_lambda(x_train, z_train, np.logspace(-3, 2, 20), weights=weights_train)
+        optimal_lambda_y = self.cv_lambda(x_train, y_train, np.logspace(-3, 2, 20), weights=weights_train)
+        optimal_lambda_z = self.cv_lambda(x_train, z_train, np.logspace(-3, 2, 20), weights=weights_train)
         
         # nonreporting_units_to_keep = ((y_partial_reporting_upper - y_partial_reporting_lower) < 0.1).flatten()
         # x_all = np.concatenate([x_train, x_test[nonreporting_units_to_keep]], axis=0)
@@ -609,9 +615,9 @@ class BootstrapElectionModel(BaseElectionModel):
         aggregate_dem_vals_B_2 = nat_sum_data_dict_sorted_vals * aggregate_dem_prob_B_2
         aggregate_dem_vals_B = np.sum(aggregate_dem_vals_B_1, axis=0) - np.sum(aggregate_dem_vals_B_2, axis=0)
 
-        aggregate_dem_vals_pred = np.sum(nat_sum_data_dict_sorted_vals * expit(self.T * self.aggregate_perc_margin_total))
+        aggregate_dem_vals_pred = np.sum(nat_sum_data_dict_sorted_vals * expit(self.T * 1000 * self.aggregate_perc_margin_total))
 
-        alpha = 0.99
+        alpha = 0.9
         lower_alpha = (1 - alpha) / 2
         upper_alpha = 1 - lower_alpha
         lower_q = np.floor(lower_alpha * (self.B + 1)) / self.B
