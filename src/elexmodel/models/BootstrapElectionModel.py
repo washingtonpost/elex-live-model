@@ -102,7 +102,7 @@ class BootstrapElectionModel(BaseElectionModel):
         self.seed = model_settings.get("seed", 0)
         self.B = model_settings.get("B", 2000)
         self.strata = model_settings.get("strata", ['county_classification']) # change this
-        self.T = model_settings.get("T", 50)
+        self.T = model_settings.get("T", 5000)
         self.featurizer = Featurizer(self.features, self.fixed_effects)
         self.rng = np.random.default_rng(seed=self.seed)
         self.ran_bootstrap = False
@@ -137,9 +137,19 @@ class BootstrapElectionModel(BaseElectionModel):
         return 10
         #return math.ceil(-1 * (alpha + 1) / (alpha - 1))
 
-    def _estimate_epsilon(self, residuals, aggregate_indicator):
+    def _estimate_epsilon(self, residuals, aggregate_indicator, shrinkage=False):
         epsilon_hat = (aggregate_indicator.T @ residuals) / aggregate_indicator.sum(axis=0).reshape(-1, 1)
         epsilon_hat[aggregate_indicator.sum(axis=0) < 2] = 0 # can't estimate state random effect if we only have 1 unit
+
+        if shrinkage:
+            # shrinkage code
+            epsilon_hat_centered = (aggregate_indicator * (aggregate_indicator * residuals - epsilon_hat.T))**2
+            epsilon_hat_var = epsilon_hat_centered.sum(axis=0) / aggregate_indicator.sum(axis=0)
+            epsilon_hat_var = np.apply_along_axis(lambda v: np.median(v[np.nonzero(v)]), 0, epsilon_hat_centered)
+            epsilon_hat_var = np.nan_to_num(epsilon_hat_var) # get rid of divide by zero nan
+            epsilon_hat_var = epsilon_hat_var.reshape(-1,1)
+            shrinkage_factor = (1 - (epsilon_hat.shape[0] - 2) * epsilon_hat_var / np.linalg.norm(epsilon_hat)**2).clip(min=0)
+            return shrinkage_factor * epsilon_hat
         return epsilon_hat
 
     def _estimate_delta(self, residuals, epsilon_hat, aggregate_indicator):
@@ -149,7 +159,7 @@ class BootstrapElectionModel(BaseElectionModel):
     def _estimate_model_errors(self, model, x, y, aggregate_indicator):
         y_pred = model.predict(x)
         residuals_y = model.residuals(y, y_pred, loo=True, center=True)
-        epsilon_y_hat = self._estimate_epsilon(residuals_y, aggregate_indicator)
+        epsilon_y_hat = self._estimate_epsilon(residuals_y, aggregate_indicator, shrinkage=True)
         delta_y_hat = self._estimate_delta(residuals_y, epsilon_y_hat, aggregate_indicator)
         return residuals_y, epsilon_y_hat, delta_y_hat       
 
@@ -326,6 +336,8 @@ class BootstrapElectionModel(BaseElectionModel):
         sigma_hat[0, 1] = 0 # setting covariances to zero for now
         sigma_hat[1, 0] = 0
 
+        sigma_hat = 1e-5 * np.eye(2)
+
         test_epsilon = self.rng.multivariate_normal([0, 0], sigma_hat, size=(len(states_that_need_random_effect), self.B))
         
         test_epsilon_y = aggregate_indicator_test[:,states_that_need_random_effect] @ test_epsilon[:,:,0]
@@ -382,8 +394,8 @@ class BootstrapElectionModel(BaseElectionModel):
         
         y_partial_reporting_lower, y_partial_reporting_upper = self._generate_nonreporting_bounds(nonreporting_units, 'normalized_margin')
         z_partial_reporting_lower, z_partial_reporting_upper = self._generate_nonreporting_bounds(nonreporting_units, 'turnout_factor')
-        optimal_lambda_y = self.cv_lambda(x_train, y_train, np.logspace(-3, 2, 20), weights=weights_train)
-        optimal_lambda_z = self.cv_lambda(x_train, z_train, np.logspace(-3, 2, 20), weights=weights_train)
+        optimal_lambda_y = 0.1 # self.cv_lambda(x_train, y_train, np.logspace(-3, 2, 20), weights=weights_train)
+        optimal_lambda_z = 0.1 # self.cv_lambda(x_train, z_train, np.logspace(-3, 2, 20), weights=weights_train)
         
         # nonreporting_units_to_keep = ((y_partial_reporting_upper - y_partial_reporting_lower) < 0.1).flatten()
         # x_all = np.concatenate([x_train, x_test[nonreporting_units_to_keep]], axis=0)
@@ -464,6 +476,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         # y_test_pred_all = (ols_y_all.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat)).clip(min=y_partial_reporting_lower, max=y_partial_reporting_upper)
         # z_test_pred_all = (ols_z_all.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat)).clip(min=z_partial_reporting_lower, max=z_partial_reporting_upper)
+        # import IPython; IPython.embed()
 
         self.weighted_yz_test_pred = yz_test_pred * weights_test
         self.weighted_z_test_pred = z_test_pred * weights_test
@@ -615,8 +628,7 @@ class BootstrapElectionModel(BaseElectionModel):
         aggregate_dem_vals_B_2 = nat_sum_data_dict_sorted_vals * aggregate_dem_prob_B_2
         aggregate_dem_vals_B = np.sum(aggregate_dem_vals_B_1, axis=0) - np.sum(aggregate_dem_vals_B_2, axis=0)
 
-        aggregate_dem_vals_pred = np.sum(nat_sum_data_dict_sorted_vals * expit(self.T * 1000 * self.aggregate_perc_margin_total))
-
+        aggregate_dem_vals_pred = np.sum(nat_sum_data_dict_sorted_vals * expit(self.T * self.aggregate_perc_margin_total))
         alpha = 0.9
         lower_alpha = (1 - alpha) / 2
         upper_alpha = 1 - lower_alpha
