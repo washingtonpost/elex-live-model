@@ -839,35 +839,56 @@ def test_winsorize_intervals(model_client, va_governor_county_data, va_config):
     non_winsorize_data_state = non_winsorize_results["state_data"]
 
     print("TESTING")
+    winsorize_lower_sum = 0
+    winsorize_upper_sum = 0
+    non_winsorize_lower_sum = 0
+    non_winsorize_upper_sum = 0
     for index, value in enumerate(winsorize_data_unit["lower_0.9_turnout"].values):
-        if value < non_winsorize_data_unit["lower_0.9_turnout"].values[index]:
+        winsorize_lower_sum = value + winsorize_lower_sum
+        non_value = non_winsorize_data_unit["lower_0.9_turnout"].values[index]
+        non_winsorize_lower_sum =  non_winsorize_lower_sum + non_value
+        if value < non_value:
             print(
                 "LOWER: "
                 + str(value)
                 + " is less than "
-                + str(non_winsorize_data_unit["lower_0.9_turnout"].values[index])
+                + str(non_value)
                 + " at "
                 + str(index)
             )
 
     for index, value in enumerate(winsorize_data_unit["upper_0.9_turnout"].values):
-        if value > non_winsorize_data_unit["upper_0.9_turnout"].values[index]:
+        winsorize_upper_sum = value + winsorize_upper_sum
+        non_value = non_winsorize_data_unit["upper_0.9_turnout"].values[index]
+        non_winsorize_upper_sum = non_winsorize_upper_sum + non_value
+        if value > non_value:
             print(
                 "UPPER: "
                 + str(value)
                 + " is greater than "
-                + str(non_winsorize_data_unit["upper_0.9_turnout"].values[index])
+                + str(non_value)
                 + " at "
                 + str(index)
             )
 
-    print(winsorize_data_state["lower_0.9_turnout"].values)
-    print(non_winsorize_data_state["lower_0.9_turnout"].values)
-    print(winsorize_data_state["upper_0.9_turnout"].values)
-    print(non_winsorize_data_state["upper_0.9_turnout"].values)
+    print("winsorize_lower_sum")
+    print(winsorize_data_state["lower_0.9_turnout"].values[0])
+    #print(winsorize_lower_sum)
+    print("non_winsorize_lower_sum")
+    print(non_winsorize_data_state["lower_0.9_turnout"].values[0])
+    #print(non_winsorize_lower_sum)
+    print("winsorize_upper_sum")
+    print(winsorize_data_state["upper_0.9_turnout"].values[0])
+    #print(winsorize_upper_sum)
+    print("non_winsorize_upper_sum")
+    print(non_winsorize_data_state["upper_0.9_turnout"].values[0])
+    #print(non_winsorize_upper_sum)
 
-    assert winsorize_data_state["lower_0.9_turnout"].values >= non_winsorize_data_state["lower_0.9_turnout"].values
-    assert winsorize_data_state["upper_0.9_turnout"].values <= non_winsorize_data_state["upper_0.9_turnout"].values
+    assert winsorize_lower_sum >= non_winsorize_lower_sum
+    assert winsorize_upper_sum <= non_winsorize_upper_sum
+
+    assert winsorize_data_state["lower_0.9_turnout"].values[0] >= non_winsorize_data_state["lower_0.9_turnout"].values[0]
+    assert winsorize_data_state["upper_0.9_turnout"].values[0] <= non_winsorize_data_state["upper_0.9_turnout"].values[0]
 
     # assert winsorize_data_unit["lower_0.9_turnout"].values[0] >= non_winsorize_data_unit["lower_0.9_turnout"].values[0]
     # assert winsorize_data_unit["upper_0.9_turnout"].values[0] <= non_winsorize_data_unit["upper_0.9_turnout"].values[0]
