@@ -828,14 +828,25 @@ def test_winsorize_intervals(model_client, va_governor_county_data, va_config):
         winsorize=False,
         save_output=[],
     )
-    winsorize_results = winsorize_results.get("state_data")
-    non_winsorize_results = non_winsorize_results.get("state_data")
+    winsorize_results_state = winsorize_results.get("state_data")
+    non_winsorize_results_state = non_winsorize_results.get("state_data")
 
-    assert (
-        winsorize_results.loc[:, "lower_0.9_turnout"].values[0]
-        >= non_winsorize_results.loc[:, "lower_0.9_turnout"].values[0]
-    )
-    assert (
-        winsorize_results.loc[:, "upper_0.9_turnout"].values[0]
-        <= non_winsorize_results.loc[:, "upper_0.9_turnout"].values[0]
-    )
+    for i, val in enumerate(winsorize_results_state.loc[:, "lower_0.9_turnout"].values):
+        print(i, val, non_winsorize_results_state.loc[:, "lower_0.9_turnout"].values[i])
+        assert val >= non_winsorize_results_state.loc[:, "lower_0.9_turnout"].values[i]
+
+    for i, val in enumerate(winsorize_results_state.loc[:, "upper_0.9_turnout"].values):
+        print(i, val, non_winsorize_results_state.loc[:, "upper_0.9_turnout"].values[i])
+        assert val <= non_winsorize_results_state.loc[:, "upper_0.9_turnout"].values[i]
+
+
+    winsorize_results_unit = winsorize_results.get("unit_data")
+    non_winsorize_results_unit = non_winsorize_results.get("unit_data")
+
+    for i, val in enumerate(winsorize_results_unit.loc[:, "lower_0.9_turnout"].values):
+        print(i, val, non_winsorize_results_unit.loc[:, "lower_0.9_turnout"].values[i])
+        assert val >= non_winsorize_results_unit.loc[:, "lower_0.9_turnout"].values[i]
+
+    for i, val in enumerate(winsorize_results_unit.loc[:, "upper_0.9_turnout"].values):
+        print(i, val, non_winsorize_results_unit.loc[:, "upper_0.9_turnout"].values[i])
+        assert val <= non_winsorize_results_unit.loc[:, "upper_0.9_turnout"].values[i]
