@@ -17,6 +17,7 @@ class GaussianModel:
         self.election_id = model_settings.get("election_id")
         self.office = model_settings.get("office")
         self.geographic_unit_type = model_settings.get("geographic_unit_type")
+        self.model_settings = model_settings
 
     def _empty_gaussian_model(self, conformalization_data, aggregate):
         """
@@ -70,7 +71,7 @@ class GaussianModel:
             .fillna({"n": 0})
         )
 
-    def _fit(self, conformalization_data, estimand, aggregate, alpha, beta):
+    def _fit(self, conformalization_data, estimand, aggregate, alpha):
         """
         Compute fit for Gaussian Model
         """
@@ -105,8 +106,14 @@ class GaussianModel:
                                 x[f"last_election_results_{estimand}"] / np.sum(x[f"last_election_results_{estimand}"])
                             ).to_numpy(),
                         ),
-                        "sigma_lower_bound": beta * math_utils.boot_sigma(x.lower_bounds.values, conf=(3 + alpha) / 4),
-                        "sigma_upper_bound": beta * math_utils.boot_sigma(x.upper_bounds.values, conf=(3 + alpha) / 4),
+                        "sigma_lower_bound": self.model_settings["beta"]
+                        * math_utils.boot_sigma(
+                            x.lower_bounds.values, conf=(3 + alpha) / 4, winsorize=self.model_settings["winsorize"]
+                        ),
+                        "sigma_upper_bound": self.model_settings["beta"]
+                        * math_utils.boot_sigma(
+                            x.upper_bounds.values, conf=(3 + alpha) / 4, winsorize=self.model_settings["winsorize"]
+                        ),
                     }
                 )
             )
@@ -123,7 +130,6 @@ class GaussianModel:
         aggregate=[],
         alpha=0.9,
         reweight=False,
-        beta=1,
         top_level=True,
     ):
         """
@@ -156,7 +162,6 @@ class GaussianModel:
                 aggregate=aggregate[:-1],  # remove the last (smallest) aggregate
                 alpha=alpha,
                 reweight=reweight,
-                beta=beta,
                 top_level=False,
             )
 
@@ -188,7 +193,6 @@ class GaussianModel:
                 aggregate=aggregate,  # remove the last (smallest) aggregate
                 alpha=alpha,
                 reweight=reweight,
-                beta=beta,
                 top_level=False,
             )
 
@@ -196,7 +200,7 @@ class GaussianModel:
             x = pd.concat([gaussian_model_small_groups, gaussian_model_large_groups]).reset_index(drop=True)
         else:
             # when the group is large enough we can compute the Gaussian model for conformalization
-            x = self._fit(conformalization_data, estimand, aggregate, alpha, beta)
+            x = self._fit(conformalization_data, estimand, aggregate, alpha)
 
         # Write to s3 at the highest level of recursion before we exit GaussianModel
         # and return to GaussianElectionModel
