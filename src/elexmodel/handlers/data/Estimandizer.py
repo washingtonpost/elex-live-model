@@ -3,26 +3,14 @@ import numpy as np
 
 class Estimandizer:
     """
-    Generate estimands explicitly.
+    Estimandizer. Generate estimands explicitly.
     """
 
     def __init__(self, data_handler, estimands):
         self.data_handler = data_handler
         self.estimands = estimands
         self.transformations = []
-
-    def check_estimand(self, estimand):
-        already_included = ["dem_votes", "gop_votes", "total_votes"]
-        if estimand in already_included:
-            return False
-        return True
-
-    def check_input_columns(self, columns):
-        missing_columns = [col for col in columns if col not in self.data_handler.data.columns]
-        return len(missing_columns) == 0
-
-    def predict_estimands(self, estimand):
-        transformation_map = {
+        self.transformation_map = {
             "margin": [self.calculate_margin],
             "voter_turnout_rate": [self.calculate_voter_turnout_rate],
             "standardized_income": [self.standardize_median_household_income],
@@ -36,25 +24,58 @@ class Estimandizer:
                 self.standardize_median_household_income,
                 self.explore_income_impact,
             ],
+            "candidate": [self.candidate],
         }
-        if estimand not in transformation_map:
+
+    def check_estimand(self, estimand):
+        """
+        Ensure estimand isn't one of the pre-specified values that are already included
+        """
+        already_included = ["dem_votes", "gop_votes", "total_votes"]
+        if estimand in already_included:
+            return False
+        return True
+
+    def check_input_columns(self, columns):
+        """
+        Check that input columns contain all neccessary values for a calculation
+        """
+        missing_columns = [col for col in columns if col not in self.data_handler.data.columns]
+        return len(missing_columns) == 0
+
+    def predict_estimands(self, estimand):
+        """
+        Predict which estimands can be formed given a dataset and a list of estimands we would like to create
+        """
+        if estimand not in self.transformation_map:
             raise ValueError(f"Estimand '{estimand}' is not supported.")
-        self.transformations = transformation_map[estimand]
+        self.transformations = self.transformation_map[estimand]
+        """
         if not self.check_input_columns(
             [col for transform in self.transformations for col in transform.__code__.co_varnames[1:]]
         ):
             return []
+        """
         return self.transformations
 
     def create_estimand(self, estimand):
-        if estimand in self.transformations:
-            transformation_func = self.transformations[estimand]
-            new_column = transformation_func()
-            self.data_handler.data[estimand] = new_column
+        """
+        Create an estimand
+        """
+        if estimand in self.transformation_map:
+            if self.transformation_map[estimand][0] in self.transformations:
+                transformation_func = self.transformations[
+                    self.transformations.index(self.transformation_map[estimand][0])
+                ]
+                transformation_func()
 
     def generate_estimands(self):
+        """
+        Main function to generate estimands
+        """
         for estimand in self.estimands:
             if self.check_estimand(estimand):
+                self.predict_estimands(estimand)
                 self.create_estimand(estimand)
         return self.data_handler
 
@@ -115,6 +136,14 @@ class Estimandizer:
                 self.data_handler.data[f"ethnicity_{ethnicity}"] * self.data_handler.data["results_turnout"]
             )
 
+    def candidate(self):
+        election_data = self.data_handler.data[self.data_handler.election_id][0]
+        candidate_data = election_data["baseline_pointer"]
+        # cand_set = set(candidate_data)
+        for cand_name in candidate_data:
+            if cand_name != "turnout":
+                election_data[cand_name] = candidate_data[cand_name]
+
     def explore_income_impact(self):
         self.data_handler.data["income_impact_dem"] = (
             self.data_handler.data["standardized_income"] * self.data_handler.data["party_vote_share_dem"]
@@ -122,8 +151,3 @@ class Estimandizer:
         self.data_handler.data["income_impact_gop"] = (
             self.data_handler.data["standardized_income"] * self.data_handler.data["party_vote_share_gop"]
         )
-
-    def generate_estimand(self):
-        for estimand in self.estimands:
-            if self.check_estimand(estimand):
-                self.create_estimand(estimand)
