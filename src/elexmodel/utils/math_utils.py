@@ -83,7 +83,7 @@ def boot_sigma(data, conf, num_iterations=10000, winsorize=False):
         std_func = sample_std
 
     return bootstrap(
-        data.reshape(1, -1), std_func, confidence_level=conf, method="basic", n_resamples=num_iterations
+        data.reshape(1, -1), std_func, confidence_level=conf, method="basic", n_resamples=num_iterations, random_state=7
     ).confidence_interval.high
 
 
