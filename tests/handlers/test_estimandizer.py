@@ -8,7 +8,7 @@ def test_create_estimand_margin_preprocessed(va_governor_county_data):
     """
     Tests margin estimand generation (for preprocessed data only)
     """
-    va_data_copy = va_governor_county_data
+    va_data_copy = va_governor_county_data.copy()
     election_id = "2017-11-07_VA_G"
     office = "G"
     geographic_unit_type = "county"
@@ -31,7 +31,7 @@ def test_create_estimand_voter_turnout_rate(va_governor_county_data):
     """
     Tests voter turnout rate estimand generation on preprocessed data of the VA general
     """
-    va_data_copy = va_governor_county_data
+    va_data_copy = va_governor_county_data.copy()
     election_id = "2017-11-07_VA_G"
     office = "G"
     geographic_unit_type = "county"
@@ -54,7 +54,7 @@ def test_create_estimand_age_combined(va_governor_county_data):
     """
     Tests age bracket estimand generation on a combined data handler
     """
-    va_data_copy = va_governor_county_data
+    va_data_copy = va_governor_county_data.copy()
     election_id = "2017-11-07_VA_G"
     office = "G"
     geographic_unit_type = "county"
@@ -65,11 +65,9 @@ def test_create_estimand_age_combined(va_governor_county_data):
         election_id, office, geographic_unit_type, estimands, estimand_baseline, data=va_data_copy
     )
 
-    live_data_handler = MockLiveDataHandler(
-        election_id, office, geographic_unit_type, estimands, data=va_governor_county_data
-    )
+    live_data_handler = MockLiveDataHandler(election_id, office, geographic_unit_type, estimands, data=va_data_copy)
 
-    current_data = live_data_handler.get_n_fully_reported(n=va_governor_county_data.shape[0])
+    current_data = live_data_handler.get_n_fully_reported(n=va_data_copy.shape[0])
 
     combined_data_handler = CombinedDataHandler(
         preprocessed_data_handler.data,
@@ -104,7 +102,7 @@ def test_candidate(tx_primary_governor_config):
 
     This function adds the combined values for each candidate (ex: all abbott_41404) to the main list under '2018-03-06_TX_R'
     """
-    tx_data_copy = tx_primary_governor_config
+    tx_data_copy = tx_primary_governor_config.copy()
     election_id = "2018-03-06_TX_R"
     office = "G"
     geographic_unit_type = "county"
