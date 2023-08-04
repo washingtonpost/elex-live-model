@@ -22,7 +22,7 @@ def test_create_estimand_margin_preprocessed(va_governor_county_data):
     new_estimands = ["margin"]
 
     estimandizer = Estimandizer(preprocessed_data_handler, new_estimands)
-    new_data_handler = estimandizer.generate_estimands()
+    new_data_handler = estimandizer.generate_estimands("G")
 
     assert "margin" in new_data_handler.data
 
@@ -45,7 +45,7 @@ def test_create_estimand_voter_turnout_rate(va_governor_county_data):
     new_estimands = ["voter_turnout_rate"]
 
     estimandizer = Estimandizer(preprocessed_data_handler, new_estimands)
-    new_data_handler = estimandizer.generate_estimands()
+    new_data_handler = estimandizer.generate_estimands("G")
 
     assert "voter_turnout_rate" in new_data_handler.data
 
@@ -80,7 +80,7 @@ def test_create_estimand_age_combined(va_governor_county_data):
     new_estimands = ["age_groups"]
 
     estimandizer = Estimandizer(combined_data_handler, new_estimands)
-    new_data_handler = estimandizer.generate_estimands()
+    new_data_handler = estimandizer.generate_estimands("G")
 
     assert "age_group_30_45" in new_data_handler.data
 
@@ -116,6 +116,6 @@ def test_candidate(tx_primary_governor_config):
     new_estimands = ["candidate"]
 
     estimandizer = Estimandizer(preprocessed_data_handler, new_estimands)
-    new_data_handler = estimandizer.generate_estimands()
+    new_data_handler = estimandizer.generate_estimands("P")
 
     assert "abbott_41404" in new_data_handler.data[new_data_handler.election_id][0]

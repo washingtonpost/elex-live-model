@@ -6,10 +6,11 @@ class Estimandizer:
     Estimandizer. Generate estimands explicitly.
     """
 
-    def __init__(self, data_handler, estimands):
+    def __init__(self, data_handler, estimands, given_function_dict={}):
         self.data_handler = data_handler
         self.estimands = estimands
         self.transformations = []
+        self.given_function_dict = given_function_dict
         self.transformation_map = {
             "margin": [self.calculate_margin],
             "voter_turnout_rate": [self.calculate_voter_turnout_rate],
@@ -36,47 +37,62 @@ class Estimandizer:
             return False
         return True
 
-    def check_input_columns(self, columns):
+    def check_input_columns(self, columns, election_id):
         """
         Check that input columns contain all neccessary values for a calculation
         """
-        missing_columns = [col for col in columns if col not in self.data_handler.data.columns]
+        missing_columns = []
+        if election_id == "G":
+            missing_columns = [col for col in columns if col not in self.data_handler.data.columns]
+        elif election_id == "P":
+            missing_columns = [
+                col for col in columns if col not in self.data_handler.data[self.data_handler.election_id]
+            ]
         return len(missing_columns) == 0
 
-    def predict_estimands(self, estimand):
+    def verify_estimand(self, estimand, election_id):
         """
-        Predict which estimands can be formed given a dataset and a list of estimands we would like to create
+        Verify which estimands can be formed given a dataset and a list of estimands we would like to create
         """
         if estimand not in self.transformation_map:
             raise ValueError(f"Estimand '{estimand}' is not supported.")
         self.transformations = self.transformation_map[estimand]
-        """
+
         if not self.check_input_columns(
-            [col for transform in self.transformations for col in transform.__code__.co_varnames[1:]]
+            [col for transform in self.transformations for col in transform.__code__.co_varnames[1:]], election_id
         ):
             return []
-        """
+
         return self.transformations
 
-    def create_estimand(self, estimand):
+    def create_estimand(self, estimand, given_function):
         """
         Create an estimand
         """
-        if estimand in self.transformation_map:
-            if self.transformation_map[estimand][0] in self.transformations:
-                transformation_func = self.transformations[
-                    self.transformations.index(self.transformation_map[estimand][0])
-                ]
-                transformation_func()
+        if estimand is None:
+            given_function()
+        elif given_function is None:
+            if estimand in self.transformation_map:
+                if self.transformation_map[estimand][0] in self.transformations:
+                    transformation_func = self.transformations[
+                        self.transformations.index(self.transformation_map[estimand][0])
+                    ]
+                    transformation_func()
 
-    def generate_estimands(self):
+    def generate_estimands(self, election_id):
         """
         Main function to generate estimands
         """
+        if self.given_function_dict != {}:
+            for estimand, function in self.given_function_dict.items():
+                if self.check_estimand(estimand):
+                    self.verify_estimand(estimand, election_id)
+                    self.create_estimand(None, function)
+
         for estimand in self.estimands:
             if self.check_estimand(estimand):
-                self.predict_estimands(estimand)
-                self.create_estimand(estimand)
+                self.verify_estimand(estimand, election_id)
+                self.create_estimand(estimand, None)
         return self.data_handler
 
     # Transformation methods
