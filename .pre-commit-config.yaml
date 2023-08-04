@@ -36,4 +36,4 @@ repos:
           # these are errors that will be ignored by flake8
           # definitions here
           # https://flake8.pycqa.org/en/latest/user/error-codes.html
-          - "--ignore=E266,E501,W503,C901"
+          - "--ignore=E266,E501,W503,F811,C901"
