@@ -15,10 +15,12 @@ features = ["gender_f", "median_household_income"]
 aggregates = ["postal_code", "county_fips"]
 fixed_effects = []
 pi_method = "gaussian"
-beta = 3
-winsorize = False
-robust = True
-lambda_ = 0
+model_parameters = {
+    "beta": 3,
+    "winsorize": False,
+    "robust": True,
+    "lambda_": 0,
+}
 handle_unreporting = "drop"
 
 
@@ -35,10 +37,7 @@ def test_check_input_parameters(model_client, va_config):
         aggregates,
         fixed_effects,
         pi_method,
-        beta,
-        winsorize,
-        robust,
-        lambda_,
+        model_parameters,
         handle_unreporting,
     )
 
@@ -57,10 +56,7 @@ def test_check_input_parameters_office(model_client, va_config):
             aggregates,
             fixed_effects,
             pi_method,
-            beta,
-            winsorize,
-            robust,
-            lambda_,
+            model_parameters,
             handle_unreporting,
         )
 
@@ -79,10 +75,7 @@ def test_check_input_parameters_pi_method(model_client, va_config):
             aggregates,
             fixed_effects,
             "bad_pi_method",
-            beta,
-            winsorize,
-            robust,
-            lambda_,
+            model_parameters,
             handle_unreporting,
         )
 
@@ -101,10 +94,7 @@ def test_check_input_parameters_estimand(model_client, va_config):
             aggregates,
             fixed_effects,
             pi_method,
-            beta,
-            winsorize,
-            robust,
-            lambda_,
+            model_parameters,
             handle_unreporting,
         )
 
@@ -123,10 +113,7 @@ def test_check_input_parameters_geographic_unit_type(model_client, va_config):
             aggregates,
             fixed_effects,
             pi_method,
-            beta,
-            winsorize,
-            robust,
-            lambda_,
+            model_parameters,
             handle_unreporting,
         )
 
@@ -145,10 +132,7 @@ def test_check_input_parameters_features(model_client, va_config):
             aggregates,
             fixed_effects,
             pi_method,
-            beta,
-            winsorize,
-            robust,
-            lambda_,
+            model_parameters,
             handle_unreporting,
         )
 
@@ -167,10 +151,7 @@ def test_check_input_parameters_aggregates(model_client, va_config):
             ["bad_aggregate_1", "postal_code", "bad_aggregate2"],
             fixed_effects,
             pi_method,
-            beta,
-            winsorize,
-            robust,
-            lambda_,
+            model_parameters,
             handle_unreporting,
         )
 
@@ -189,10 +170,7 @@ def test_check_input_parameters_fixed_effect_list(model_client, va_config):
             aggregates,
             ["bad_fixed_effect"],
             pi_method,
-            beta,
-            winsorize,
-            robust,
-            lambda_,
+            model_parameters,
             handle_unreporting,
         )
 
@@ -211,10 +189,7 @@ def test_check_input_parameters_fixed_effect_dict(model_client, va_config):
             aggregates,
             {"bad_fixed_effect": ["a", "b"]},
             pi_method,
-            beta,
-            winsorize,
-            robust,
-            lambda_,
+            model_parameters,
             handle_unreporting,
         )
 
@@ -222,6 +197,7 @@ def test_check_input_parameters_fixed_effect_dict(model_client, va_config):
 def test_check_input_parameters_beta(model_client, va_config):
     election_id = "2017-11-07_VA_G"
     config_handler = ConfigHandler(election_id, config=va_config)
+    model_parameters["beta"] = "bad_beta"
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
@@ -233,10 +209,7 @@ def test_check_input_parameters_beta(model_client, va_config):
             aggregates,
             fixed_effects,
             pi_method,
-            "bad_beta",
-            winsorize,
-            robust,
-            lambda_,
+            model_parameters,
             handle_unreporting,
         )
 
@@ -244,6 +217,7 @@ def test_check_input_parameters_beta(model_client, va_config):
 def test_check_input_parameters_winsorize(model_client, va_config):
     election_id = "2017-11-07_VA_G"
     config_handler = ConfigHandler(election_id, config=va_config)
+    model_parameters["winsorize"] = "bad_winsorize"
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
@@ -255,10 +229,7 @@ def test_check_input_parameters_winsorize(model_client, va_config):
             aggregates,
             fixed_effects,
             pi_method,
-            beta,
-            "bad_winsorize",
-            robust,
-            lambda_,
+            model_parameters,
             handle_unreporting,
         )
 
@@ -266,6 +237,7 @@ def test_check_input_parameters_winsorize(model_client, va_config):
 def test_check_input_parameters_robust(model_client, va_config):
     election_id = "2017-11-07_VA_G"
     config_handler = ConfigHandler(election_id, config=va_config)
+    model_parameters["robust"] = "bad_robust"
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
@@ -277,10 +249,7 @@ def test_check_input_parameters_robust(model_client, va_config):
             aggregates,
             fixed_effects,
             pi_method,
-            beta,
-            winsorize,
-            "bad_robust",
-            lambda_,
+            model_parameters,
             handle_unreporting,
         )
 
@@ -288,6 +257,7 @@ def test_check_input_parameters_robust(model_client, va_config):
 def test_check_input_parameters_lambda_(model_client, va_config):
     election_id = "2017-11-07_VA_G"
     config_handler = ConfigHandler(election_id, config=va_config)
+    model_parameters["lambda_"] = -1
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
@@ -299,10 +269,7 @@ def test_check_input_parameters_lambda_(model_client, va_config):
             aggregates,
             fixed_effects,
             pi_method,
-            beta,
-            winsorize,
-            robust,
-            -1,
+            model_parameters,
             handle_unreporting,
         )
 
@@ -321,10 +288,7 @@ def test_check_input_parameters_handle_unreporting(model_client, va_config):
             aggregates,
             fixed_effects,
             pi_method,
-            beta,
-            winsorize,
-            robust,
-            lambda_,
+            model_parameters,
             "bad_handle_unreporting",
         )
 
@@ -799,6 +763,7 @@ def test_winsorize_intervals(model_client, va_governor_county_data, va_config):
     preprocessed_data = va_governor_county_data.copy()
     preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
 
+    model_parameters = {"winsorize": True}
     winsorize_results = model_client.get_estimates(
         data,
         election_id,
@@ -810,10 +775,11 @@ def test_winsorize_intervals(model_client, va_governor_county_data, va_config):
         raw_config=va_config,
         preprocessed_data=preprocessed_data,
         pi_method="gaussian",
-        winsorize=True,
+        model_parameters=model_parameters,
         save_output=[],
     )
 
+    model_parameters = {"winsorize": False}
     non_winsorize_results = model_client.get_estimates(
         data,
         election_id,
@@ -825,7 +791,7 @@ def test_winsorize_intervals(model_client, va_governor_county_data, va_config):
         raw_config=va_config,
         preprocessed_data=preprocessed_data,
         pi_method="gaussian",
-        winsorize=False,
+        model_parameters=model_parameters,
         save_output=[],
     )
     winsorize_results = winsorize_results.get("state_data")
