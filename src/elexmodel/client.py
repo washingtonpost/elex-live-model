@@ -48,10 +48,7 @@ class ModelClient:
         aggregates,
         fixed_effects,
         pi_method,
-        beta,
-        winsorize,
-        robust,
-        lambda_,
+        model_parameters,
         handle_unreporting,
     ):
         offices = config_handler.get_offices()
@@ -88,16 +85,21 @@ class ModelClient:
                 f"Prediction interval method: {pi_method} is not valid. \
                     pi_method has to be either `gaussian` or `nonparametric`."
             )
-        if not isinstance(beta, (int, float)):
-            raise ValueError("beta is not valid. Has to be either an integer or a float.")
-        if not isinstance(winsorize, bool):
-            raise ValueError("winsorize is not valid. Has to be an boolean.")
-        if not isinstance(robust, bool):
-            raise ValueError("robust is not valid. Has to be a boolean.")
-        if not isinstance(lambda_, (float, int)):
-            raise ValueError("lambda is not valid. It has to be numeric.")
-        if lambda_ < 0:
-            raise ValueError("lambda is not valid. It has to be greater than zero.")
+        if not isinstance(model_parameters, dict):
+            raise ValueError("model_paramters is not valid. Has to be a dict.")
+        elif model_parameters != {}:
+            if "lambda_" in model_parameters and (
+                not isinstance(model_parameters["lambda_"], (float, int)) or model_parameters["lambda_"] < 0
+            ):
+                raise ValueError("lambda is not valid. It has to be numeric and greater than zero.")
+            if pi_method == "gaussian":
+                if "beta" in model_parameters and not isinstance(model_parameters["beta"], (int, float)):
+                    raise ValueError("beta is not valid. Has to be either an integer or a float.")
+                if "winsorize" in model_parameters and not isinstance(model_parameters["winsorize"], bool):
+                    raise ValueError("winsorize is not valid. Has to be an boolean.")
+            elif pi_method == "nonparametric":
+                if "robust" in model_parameters and not isinstance(model_parameters["robust"], bool):
+                    raise ValueError("robust is not valid. Has to be a boolean.")
         if handle_unreporting not in {"drop", "zero"}:
             raise ValueError("handle_unreporting must be either `drop` or `zero`")
         return True
@@ -141,6 +143,7 @@ class ModelClient:
         geographic_unit_type="county",
         raw_config=None,
         preprocessed_data=None,
+        model_parameters={},
         **kwargs,
     ):
         """
@@ -157,10 +160,10 @@ class ModelClient:
         aggregates = kwargs.get("aggregates", DEFAULT_AGGREGATES[office])
         fixed_effects = kwargs.get("fixed_effects", {})
         pi_method = kwargs.get("pi_method", "nonparametric")
-        beta = kwargs.get("beta", 1)
-        winsorize = kwargs.get("winsorize", False)
-        robust = kwargs.get("robust", False)
-        lambda_ = kwargs.get("lambda_", 0)
+        beta = model_parameters.get("beta", 1)
+        winsorize = model_parameters.get("winsorize", False)
+        robust = model_parameters.get("robust", False)
+        lambda_ = model_parameters.get("lambda_", 0)
         save_output = kwargs.get("save_output", ["results"])
         save_results = "results" in save_output
         save_data = "data" in save_output
@@ -194,10 +197,7 @@ class ModelClient:
             aggregates,
             fixed_effects,
             pi_method,
-            beta,
-            winsorize,
-            robust,
-            lambda_,
+            model_parameters,
             handle_unreporting,
         )
         states_with_election = config_handler.get_states(office)
