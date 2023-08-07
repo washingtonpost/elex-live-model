@@ -28,14 +28,13 @@ class Estimandizer:
             "candidate": [self.candidate],
         }
 
-    def check_estimand(self, estimand):
+    def pre_check_estimands(self, election_id):
         """
         Ensure estimand isn't one of the pre-specified values that are already included
         """
-        already_included = ["dem_votes", "gop_votes", "total_votes"]
-        if estimand in already_included:
-            return False
-        return True
+        standard = ["dem_votes", "gop_votes", "total_votes"]
+        if not self.check_input_columns(standard, election_id):
+            self.create_estimand(None, self.standard)
 
     def check_input_columns(self, columns, election_id):
         """
@@ -65,13 +64,13 @@ class Estimandizer:
 
         return self.transformations
 
-    def create_estimand(self, estimand, given_function):
+    def create_estimand(self, estimand=None, given_function=None):
         """
-        Create an estimand
+        Create an estimand. You must give either a estimand name or a pre-written function.
         """
-        if estimand is None:
+        if estimand is None and given_function is not None:
             given_function()
-        elif given_function is None:
+        elif given_function is None and estimand is not None:
             if estimand in self.transformation_map:
                 if self.transformation_map[estimand][0] in self.transformations:
                     transformation_func = self.transformations[
@@ -83,25 +82,40 @@ class Estimandizer:
         """
         Main function to generate estimands
         """
+        if election_id == "G":
+            self.pre_check_estimands(election_id)
+        # Option 1: Pass in a dict of new functions of estimands we want to build
         if self.given_function_dict != {}:
             for estimand, function in self.given_function_dict.items():
-                if self.check_estimand(estimand):
-                    self.verify_estimand(estimand, election_id)
-                    self.create_estimand(None, function)
-
-        for estimand in self.estimands:
-            if self.check_estimand(estimand):
                 self.verify_estimand(estimand, election_id)
-                self.create_estimand(estimand, None)
+                self.create_estimand(None, function)
+
+        # Option 2: Pass in a list of estimands we want to build from a pre-set list
+        for estimand in self.estimands:
+            self.verify_estimand(estimand, election_id)
+            self.create_estimand(estimand, None)
         return self.data_handler
 
     # Transformation methods
+    def standard(self):
+        """
+        Create/overwrite the standard estimands: ["dem_votes", "gop_votes", "total_votes"]
+        """
+        if "results_turnout" in self.data_handler.data.columns:
+            self.data_handler.data["dem_votes"] = self.data_handler.data["results_dem"]
+            self.data_handler.data["gop_votes"] = self.data_handler.data["results_gop"]
+            self.data_handler.data["total_votes"] = self.data_handler.data["results_turnout"]
+        else:
+            self.data_handler.data["dem_votes"] = None
+            self.data_handler.data["gop_votes"] = None
+            self.data_handler.data["total_votes"] = None
+
     def calculate_margin(self):
-        self.data_handler.data["margin"] = self.data_handler.data["results_dem"] - self.data_handler.data["results_gop"]
+        self.data_handler.data["margin"] = self.data_handler.data["dem_votes"] - self.data_handler.data["gop_votes"]
 
     def calculate_voter_turnout_rate(self):
         self.data_handler.data["voter_turnout_rate"] = (
-            self.data_handler.data["results_turnout"] / self.data_handler.data["total_gen_voters"]
+            self.data_handler.data["total_votes"] / self.data_handler.data["total_gen_voters"]
         )
 
     def standardize_median_household_income(self):
@@ -119,10 +133,10 @@ class Estimandizer:
 
     def calculate_party_vote_share(self):
         self.data_handler.data["party_vote_share_dem"] = (
-            self.data_handler.data["results_dem"] / self.data_handler.data["results_turnout"]
+            self.data_handler.data["dem_votes"] / self.data_handler.data["total_votes"]
         )
         self.data_handler.data["party_vote_share_gop"] = (
-            self.data_handler.data["results_gop"] / self.data_handler.data["results_turnout"]
+            self.data_handler.data["gop_votes"] / self.data_handler.data["total_votes"]
         )
 
     def analyze_education_impact(self):
@@ -149,7 +163,7 @@ class Estimandizer:
         ]
         for ethnicity in ethnicities:
             self.data_handler.data[f"vote_share_{ethnicity}"] = (
-                self.data_handler.data[f"ethnicity_{ethnicity}"] * self.data_handler.data["results_turnout"]
+                self.data_handler.data[f"ethnicity_{ethnicity}"] * self.data_handler.data["total_votes"]
             )
 
     def candidate(self):

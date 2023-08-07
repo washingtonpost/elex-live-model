@@ -7,6 +7,19 @@ from elexmodel.handlers.data.PreprocessedData import PreprocessedDataHandler
 def test_create_estimand_margin_preprocessed(va_governor_county_data):
     """
     Tests margin estimand generation (for preprocessed data only)
+
+    Structure of a "G" election:
+    (['postal_code', 'state_fips', 'county_fips', 'geographic_unit_name',
+       'geographic_unit_fips', 'geographic_unit_type', 'county_classification',
+       'results_turnout', 'results_dem', 'results_gop', 'baseline_turnout',
+       'baseline_dem', 'baseline_gop', 'age_le_30', 'age_geq_30_le_45',
+       'age_geq_45_le_65', 'age_geq_65', 'ethnicity_east_and_south_asian',
+       'ethnicity_european', 'ethnicity_hispanic_and_portuguese',
+       'ethnicity_likely_african_american', 'ethnicity_other',
+       'ethnicity_unknown', 'gender_f', 'gender_m', 'gender_unknown',
+       'median_household_income', 'percent_bachelor_or_higher',
+       'total_age_voters', 'total_eth_voters', 'total_gen_voters'],
+      dtype='object')
     """
     va_data_copy = va_governor_county_data.copy()
     election_id = "2017-11-07_VA_G"
@@ -18,7 +31,6 @@ def test_create_estimand_margin_preprocessed(va_governor_county_data):
     preprocessed_data_handler = PreprocessedDataHandler(
         election_id, office, geographic_unit_type, estimands, estimand_baseline, data=va_data_copy
     )
-
     new_estimands = ["margin"]
 
     estimandizer = Estimandizer(preprocessed_data_handler, new_estimands)
@@ -89,6 +101,7 @@ def test_candidate(tx_primary_governor_config):
     """
     Tests `{candidate_last_name}_{polID}` estimand generation on a preprocessed data handler for tx primaries
 
+    Structure of a "P" election:
     {'2018-03-06_TX_R': [{
         'office': 'G',
         'states': ['TX'],
