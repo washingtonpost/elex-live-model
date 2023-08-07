@@ -84,7 +84,7 @@ class Estimandizer:
         """
         if election_id == "G":
             self.pre_check_estimands(election_id)
-            
+
         # Option 1: Pass in a dict of new functions of estimands we want to build
         if self.given_function_dict != {}:
             for estimand, function in self.given_function_dict.items():
