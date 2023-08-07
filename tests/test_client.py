@@ -763,7 +763,6 @@ def test_winsorize_intervals(model_client, va_governor_county_data, va_config):
     preprocessed_data = va_governor_county_data.copy()
     preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
 
-
     model_client_winsorize = model_client
     model_client_non_winsorize = model_client
 
