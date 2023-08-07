@@ -147,6 +147,6 @@ class Featurizer:
             # if we use this method to add the missing expanded fixed effects because doing it manually
             # ie. new_heldout_data[expanded_fixed_effect] = 0
             # can throw a fragmentation warning when there are many missing fixed effects.
-            new_heldout_data = new_heldout_data.join(missing_expanded_fixed_effects_df)
+            new_heldout_data = new_heldout_data.join(missing_expanded_fixed_effects_df).fillna(0)
 
         return new_heldout_data[self.complete_features]

@@ -26,7 +26,7 @@ class GaussianElectionModel(BaseElectionModel):
     def get_minimum_reporting_units(self, alpha):
         return 10 * self._compute_conf_frac()
 
-    def get_unit_prediction_intervals(self, reporting_units, nonreporting_units, alpha, estimand):
+    def get_unit_prediction_intervals(self, reporting_units, nonreporting_units, alpha, estimand, lambda_):
         """
         Get unit prediction intervals in Gaussian case. Adjust unit prediction intervals based on Gaussian model
         that is fit to conformalization data.
@@ -34,7 +34,7 @@ class GaussianElectionModel(BaseElectionModel):
         conf_frac = self._compute_conf_frac()
         # compute unadjusted upper/lower unit bounds and get conformalization data
         prediction_intervals = self.get_unit_prediction_interval_bounds(
-            reporting_units, nonreporting_units, conf_frac, alpha, estimand
+            reporting_units, nonreporting_units, conf_frac, alpha, estimand, lambda_
         )
 
         # fit gaussian model to nonconformity scores

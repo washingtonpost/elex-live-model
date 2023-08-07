@@ -8,6 +8,7 @@ import numpy as np
 from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
 
 from elexmodel.handlers.data.Featurizer import Featurizer
+from elexmodel.utils import math_utils
 
 warnings.filterwarnings("error", category=UserWarning, module="cvxpy")
 
@@ -21,13 +22,12 @@ class BaseElectionModel:
         self.qr = QuantileRegressionSolver(solver="ECOS")
         self.features = model_settings.get("features", [])
         self.fixed_effects = model_settings.get("fixed_effects", {})
-        self.lambda_ = model_settings.get("lambda_", 0)
         self.features_to_coefficients = {}
         self.featurizer = Featurizer(self.features, self.fixed_effects)
         self.add_intercept = True
         self.seed = 4191  # set arbitrarily
 
-    def fit_model(self, model, df_X, df_y, tau, weights, normalize_weights):
+    def fit_model(self, model, df_X, df_y, tau, weights, normalize_weights, lambda_):
         """
         Fits the quantile regression for the model
         """
@@ -45,15 +45,15 @@ class BaseElectionModel:
                 y,
                 tau_value=tau,
                 weights=weights,
-                lambda_=self.lambda_,
+                lambda_=lambda_,
                 fit_intercept=self.add_intercept,
                 normalize_weights=normalize_weights,
             )
         except (UserWarning, cvxpy.error.SolverError):
             LOG.warning("Warning: solution was inaccurate or solver broke. Re-running with normalize_weights=False.")
-            model.fit(X, y, tau_value=tau, weights=weights, lambda_=self.lambda_, normalize_weights=False)
+            model.fit(X, y, tau_value=tau, weights=weights, lambda_=lambda_, normalize_weights=False)
 
-    def get_unit_predictions(self, reporting_units, nonreporting_units, estimand):
+    def get_unit_predictions(self, reporting_units, nonreporting_units, estimand, lambda_):
         """
         Produces unit level predictions. Fits quantile regression to reporting data, applies
         it to nonreporting data. The features are specified in model_settings.
@@ -71,7 +71,10 @@ class BaseElectionModel:
         weights = reporting_units[f"last_election_results_{estimand}"]
         reporting_units_residuals = reporting_units[f"residuals_{estimand}"]
 
-        self.fit_model(self.qr, reporting_units_features, reporting_units_residuals, 0.5, weights, True)
+        self.fit_model(
+            self.qr, reporting_units_features, reporting_units_residuals, 0.5, weights, True, lambda_=lambda_
+        )
+
         self.features_to_coefficients = dict(zip(self.featurizer.complete_features, self.qr.coefficients))
 
         preds = self.qr.predict(nonreporting_units_features)
@@ -188,7 +191,9 @@ class BaseElectionModel:
 
         return aggregate_data
 
-    def get_unit_prediction_interval_bounds(self, reporting_units, nonreporting_units, conf_frac, alpha, estimand):
+    def get_unit_prediction_interval_bounds(
+        self, reporting_units, nonreporting_units, conf_frac, alpha, estimand, lambda_
+    ):
         """
         Get unadjusted unit prediction intervals. Splits reporting data into training data and conformalization data,
         fits lower and upper quantile regression using training data and apply to both conformalization data
@@ -219,10 +224,14 @@ class BaseElectionModel:
 
         # fit lower and upper model to training data. ECOS solver is better than SCS.
         lower_qr = QuantileRegressionSolver(solver="ECOS")
-        self.fit_model(lower_qr, train_data_features, train_data_residuals, lower_bound, train_data_weights, True)
+        self.fit_model(
+            lower_qr, train_data_features, train_data_residuals, lower_bound, train_data_weights, True, lambda_
+        )
 
         upper_qr = QuantileRegressionSolver(solver="ECOS")
-        self.fit_model(upper_qr, train_data_features, train_data_residuals, upper_bound, train_data_weights, True)
+        self.fit_model(
+            upper_qr, train_data_features, train_data_residuals, upper_bound, train_data_weights, True, lambda_
+        )
 
         # apply to conformalization data. Conformalization bounds will later tell us how much to adjust lower/upper
         # bounds for nonreporting data.
@@ -264,3 +273,53 @@ class BaseElectionModel:
         These coefficients are for the point prediciton only, not for the lower or upper intervals models.
         """
         return self.features_to_coefficients
+
+    def find_optimal_lambda(
+        self,
+        reporting_units,
+        possible_lambda_values=[],
+        estimand="",
+        K=3,
+    ):
+        if len(possible_lambda_values) == 0:
+            return 0, None
+        if len(possible_lambda_values) == 1:
+            return possible_lambda_values[0], None
+
+        MAPE_arr = np.zeros_like(possible_lambda_values, dtype=float)  # array of MAPE sums for each lambda input
+
+        reporting_units_shuffled = reporting_units.reindex(np.random.permutation(reporting_units.index))
+        # loop through each lambda
+        for loc, lam in enumerate(possible_lambda_values):
+            for train_index, test_index in math_utils.get_kfold_splits(reporting_units_shuffled, K):
+                # build model with custom lambda
+                train = reporting_units_shuffled.iloc[train_index]
+                test = reporting_units_shuffled.iloc[test_index]
+                unit_predictions = self.get_unit_predictions(train, test, estimand, lam)
+                MAPE = math_utils.compute_error(
+                    test[f"results_{estimand}"].values, unit_predictions.values, type_="mape"
+                )
+                MAPE_arr[loc] += MAPE
+
+        # determine average and best
+        MAPE_arr_avg = np.round(MAPE_arr / K, 3)
+        best_MAPE_index = np.argmin(MAPE_arr_avg)
+        best_lambda = possible_lambda_values[best_MAPE_index]
+        average_MAPE = MAPE_arr_avg[best_MAPE_index]
+        same_MAPE_indices = np.where(MAPE_arr_avg == average_MAPE)[0]
+
+        print("The given lambda values were: ")
+        print(np.array(possible_lambda_values))
+
+        print("The associated MAPE values were: ")
+        print(np.array(MAPE_arr_avg))
+
+        same_MAPE_lambdas = []
+        if len(same_MAPE_indices) > 1:
+            same_MAPE_lambdas = [possible_lambda_values[idx] for idx in same_MAPE_indices]
+            print("More than one lambda has the lowest average MAPE of: " + str(average_MAPE))
+            print(np.array(same_MAPE_lambdas))
+
+        print("best: " + str(best_lambda))
+        print("best_avg: " + str(np.average(same_MAPE_lambdas)))
+        return best_lambda, average_MAPE

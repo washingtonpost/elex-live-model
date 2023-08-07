@@ -16,17 +16,16 @@ def test_fit_model():
     qr = QuantileRegressionSolver(solver="ECOS")
 
     df_X = pd.DataFrame({"a": [1, 1, 1, 1], "b": [1, 1, 1, 2]})
-
     df_y = pd.DataFrame({"y": [3, 8, 9, 15]}).y
     weights = pd.DataFrame({"weights": [1, 1, 1, 1]}).weights
-    model.fit_model(qr, df_X, df_y, 0.5, weights, True)
+    model.fit_model(qr, df_X, df_y, 0.5, weights, True, 0)
 
     assert all(np.abs(qr.predict(df_X) - [8, 8, 8, 15]) <= TOL)
     assert all(np.abs(qr.coefficients - [1, 7]) <= TOL)
 
 
 def test_get_unit_predictions():
-    model_settings = {"lambda_": 1, "features": ["b"]}
+    model_settings = {"features": ["b"]}
     model = BaseElectionModel.BaseElectionModel(model_settings)
     df_X = pd.DataFrame(
         {
@@ -37,7 +36,7 @@ def test_get_unit_predictions():
             "b": [2, 3, 4, 5],
         }
     )
-    model.get_unit_predictions(df_X, df_X, estimand="a")
+    model.get_unit_predictions(df_X, df_X, estimand="a", lambda_=1)
 
     "intercept" in model.features_to_coefficients
     "b" in model.features_to_coefficients
@@ -300,3 +299,82 @@ def test_get_aggregate_predictions(va_governor_precinct_data):
         + df2.groupby("county_classification").sum().reset_index(drop=False)[f"pred_{estimand}"].values[0]
         == df4[f"pred_{estimand}"].values[0]
     )
+
+
+def test_find_optimal_lambda_under_one():
+    """
+    Test/view computing lambda
+    """
+    lambda_ = [0.01, 0.05, 0.99, 0.56]
+    model_settings = {"features": ["b"]}
+    model = BaseElectionModel.BaseElectionModel(model_settings)
+    df_X = pd.DataFrame(
+        {
+            "residuals_a": [1, 2, 3, 4],
+            "total_voters_a": [4, 2, 9, 5],
+            "last_election_results_a": [5, 1, 4, 2],
+            "results_a": [5, 2, 8, 4],
+            "results_b": [3, 6, 2, 1],
+            "baseline_a": [9, 2, 4, 5],
+            "baseline_b": [9, 2, 4, 5],
+            "a": [2, 2, 3, 7],
+            "b": [2, 3, 4, 5],
+        }
+    )
+
+    new_lambda, avg_MAPE = model.find_optimal_lambda(df_X, lambda_, "a")
+
+    assert new_lambda in [0.01, 0.99]  # ERROR: more than one lambda value can have the same average MAPE
+
+
+def test_find_optimal_lambda_over_one():
+    """
+    Test/view computing lambda
+    """
+    lambda_ = [4, 7, 21, 3, 0, 1, 0.5]
+    model_settings = {"features": ["b"]}
+    model = BaseElectionModel.BaseElectionModel(model_settings)
+    df_X = pd.DataFrame(
+        {
+            "residuals_a": [1, 2, 3, 4],
+            "total_voters_a": [4, 2, 9, 5],
+            "last_election_results_a": [5, 1, 4, 2],
+            "results_a": [5, 2, 8, 4],
+            "results_b": [3, 6, 2, 1],
+            "baseline_a": [9, 2, 4, 5],
+            "baseline_b": [9, 2, 4, 5],
+            "a": [2, 2, 3, 7],
+            "b": [2, 3, 4, 5],
+        }
+    )
+
+    new_lambda, avg_MAPE = model.find_optimal_lambda(df_X, lambda_, "a")
+
+    print(new_lambda)
+    assert new_lambda in [0, 4]  # ERROR: more than one lambda value can have the same average MAPE
+
+
+def test_find_optimal_lambda_tens():
+    """
+    Test/view computing lambda
+    """
+    lambda_ = [0.01, 0.1, 1.0, 10.0, 100.0, 1000.0]
+    model_settings = {"features": ["b"]}
+    model = BaseElectionModel.BaseElectionModel(model_settings)
+    df_X = pd.DataFrame(
+        {
+            "residuals_a": [1, 2, 3, 4],
+            "total_voters_a": [4, 2, 9, 5],
+            "last_election_results_a": [5, 1, 4, 2],
+            "results_a": [5, 2, 8, 4],
+            "results_b": [3, 6, 2, 1],
+            "baseline_a": [9, 2, 4, 5],
+            "baseline_b": [9, 2, 4, 5],
+            "a": [2, 2, 3, 7],
+            "b": [2, 3, 4, 5],
+        }
+    )
+
+    new_lambda, avg_MAPE = model.find_optimal_lambda(df_X, lambda_, "a")
+
+    assert new_lambda in [0.01, 10.0]  # ERROR: more than one lambda value can have the same average MAPE

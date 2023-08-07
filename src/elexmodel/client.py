@@ -89,9 +89,13 @@ class ModelClient:
             raise ValueError("model_paramters is not valid. Has to be a dict.")
         elif model_parameters != {}:
             if "lambda_" in model_parameters and (
-                not isinstance(model_parameters["lambda_"], (float, int)) or model_parameters["lambda_"] < 0
+                not isinstance(model_parameters["lambda_"], list)
+                or (
+                    len(model_parameters["lambda_"]) > 0
+                    and not all(isinstance(e, (int, float)) for e in model_parameters["lambda_"])
+                )
             ):
-                raise ValueError("lambda is not valid. It has to be numeric and greater than zero.")
+                raise ValueError("lambda is not valid. It has to be a list of numbers greater than zero")
             if pi_method == "gaussian":
                 if "beta" in model_parameters and not isinstance(model_parameters["beta"], (int, float)):
                     raise ValueError("beta is not valid. Has to be either an integer or a float.")
@@ -163,7 +167,7 @@ class ModelClient:
         beta = model_parameters.get("beta", 1)
         winsorize = model_parameters.get("winsorize", False)
         robust = model_parameters.get("robust", False)
-        lambda_ = model_parameters.get("lambda_", 0)
+        lambda_ = model_parameters.get("lambda_", [])
         save_output = kwargs.get("save_output", ["results"])
         save_results = "results" in save_output
         save_data = "data" in save_output
@@ -178,7 +182,6 @@ class ModelClient:
             "beta": beta,
             "winsorize": winsorize,
             "robust": robust,
-            "lambda_": lambda_,
             "features": features,
             "fixed_effects": fixed_effects,
             "save_conformalization": save_conformalization,
@@ -292,13 +295,14 @@ class ModelClient:
         self.all_conformalization_data_unit_dict = {alpha: {} for alpha in prediction_intervals}
         self.all_conformalization_data_agg_dict = {alpha: {} for alpha in prediction_intervals}
         for estimand in estimands:
-            unit_predictions = model.get_unit_predictions(reporting_units, nonreporting_units, estimand)
+            new_lambda, avg_MAPE = model.find_optimal_lambda(reporting_units, lambda_, estimand)
+            unit_predictions = model.get_unit_predictions(reporting_units, nonreporting_units, estimand, new_lambda)
             results_handler.add_unit_predictions(estimand, unit_predictions)
             # gets prediciton intervals for each alpha
             alpha_to_unit_prediction_intervals = {}
             for alpha in prediction_intervals:
                 alpha_to_unit_prediction_intervals[alpha] = model.get_unit_prediction_intervals(
-                    results_handler.reporting_units, results_handler.nonreporting_units, alpha, estimand
+                    results_handler.reporting_units, results_handler.nonreporting_units, alpha, estimand, new_lambda
                 )
                 self.all_conformalization_data_unit_dict[alpha][estimand] = model.get_all_conformalization_data_unit()
 

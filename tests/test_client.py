@@ -19,7 +19,7 @@ model_parameters = {
     "beta": 3,
     "winsorize": False,
     "robust": True,
-    "lambda_": 0,
+    "lambda_": [],
 }
 handle_unreporting = "drop"
 
@@ -212,6 +212,7 @@ def test_check_input_parameters_beta(model_client, va_config):
             model_parameters,
             handle_unreporting,
         )
+    model_parameters["beta"] = 3
 
 
 def test_check_input_parameters_winsorize(model_client, va_config):
@@ -232,6 +233,7 @@ def test_check_input_parameters_winsorize(model_client, va_config):
             model_parameters,
             handle_unreporting,
         )
+    model_parameters["winsorize"] = "False"
 
 
 def test_check_input_parameters_robust(model_client, va_config):
@@ -252,12 +254,13 @@ def test_check_input_parameters_robust(model_client, va_config):
             model_parameters,
             handle_unreporting,
         )
+    model_parameters["robust"] = True
 
 
 def test_check_input_parameters_lambda_(model_client, va_config):
     election_id = "2017-11-07_VA_G"
     config_handler = ConfigHandler(election_id, config=va_config)
-    model_parameters["lambda_"] = -1
+    model_parameters["lambda_"] = [-1]
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
@@ -272,6 +275,7 @@ def test_check_input_parameters_lambda_(model_client, va_config):
             model_parameters,
             handle_unreporting,
         )
+    model_parameters["lambda_"] = []
 
 
 def test_check_input_parameters_handle_unreporting(model_client, va_config):
@@ -291,6 +295,69 @@ def test_check_input_parameters_handle_unreporting(model_client, va_config):
             model_parameters,
             "bad_handle_unreporting",
         )
+
+
+def test_check_input_parameters_lambda_empty(model_client, va_config):
+    election_id = "2017-11-07_VA_G"
+    config_handler = ConfigHandler(election_id, config=va_config)
+    model_parameters["lambda_"] = []
+
+    with pytest.raises(ValueError):
+        model_client._check_input_parameters(
+            config_handler,
+            office,
+            estimands,
+            geographic_unit_type,
+            features,
+            aggregates,
+            fixed_effects,
+            pi_method,
+            model_parameters,
+            handle_unreporting,
+        )
+    model_parameters["lambda_"] = []
+
+
+def test_check_input_parameters_lambda_bad_values(model_client, va_config):
+    election_id = "2017-11-07_VA_G"
+    config_handler = ConfigHandler(election_id, config=va_config)
+    model_parameters["lambda_"] = ["bad_lambda"]
+
+    with pytest.raises(ValueError):
+        model_client._check_input_parameters(
+            config_handler,
+            office,
+            estimands,
+            geographic_unit_type,
+            features,
+            aggregates,
+            fixed_effects,
+            pi_method,
+            model_parameters,
+            handle_unreporting,
+        )
+    model_parameters["lambda_"] = []
+
+
+def test_check_input_parameters_lambda_bad_type(model_client, va_config):
+    election_id = "2017-11-07_VA_G"
+    config_handler = ConfigHandler(election_id, config=va_config)
+    model_parameters["lambda_"] = "bad_lambda"
+
+    with pytest.raises(ValueError):
+        model_client._check_input_parameters(
+            config_handler,
+            office,
+            estimands,
+            geographic_unit_type,
+            features,
+            aggregates,
+            fixed_effects,
+            pi_method,
+            model_parameters,
+            handle_unreporting,
+        )
+        model_parameters["lambda_"] = []
 
 
 def test_get_aggregate_list(model_client):
@@ -399,6 +466,67 @@ def test_get_estimates_fully_reporting(model_client, va_governor_county_data, va
         geographic_unit_type,
         raw_config=va_config,
         preprocessed_data=preprocessed_data,
+        save_output=[],
+    )
+
+    assert result["state_data"].shape == (1, 6)
+    assert result["unit_data"].shape == (133, 7)
+
+    assert list(result["state_data"].columns.values) == [
+        "postal_code",
+        "pred_turnout",
+        "results_turnout",
+        "reporting",
+        "lower_0.9_turnout",
+        "upper_0.9_turnout",
+    ]
+    assert list(result["unit_data"].columns.values) == [
+        "postal_code",
+        "geographic_unit_fips",
+        "pred_turnout",
+        "reporting",
+        "lower_0.9_turnout",
+        "upper_0.9_turnout",
+        "results_turnout",
+    ]
+
+    assert result["state_data"]["postal_code"][0] == "VA"
+    assert result["state_data"]["pred_turnout"][0] == 2614065.0
+    assert result["state_data"]["results_turnout"][0] == 2614065.0
+    assert result["state_data"]["reporting"][0] == 133.0
+    assert result["state_data"]["lower_0.9_turnout"][0] == 2614065.0
+    assert result["state_data"]["upper_0.9_turnout"][0] == 2614065.0
+
+
+def test_get_estimates_fully_reporting_lambda(model_client, va_governor_county_data, va_config):
+    election_id = "2017-11-07_VA_G"
+    office_id = "G"
+    geographic_unit_type = "county"
+    estimands = ["turnout"]
+    prediction_intervals = [0.9]
+    percent_reporting_threshold = 100
+
+    data_handler = MockLiveDataHandler(
+        election_id, office_id, geographic_unit_type, estimands, data=va_governor_county_data
+    )
+
+    data_handler.shuffle()
+    data = data_handler.get_percent_fully_reported(100)
+
+    preprocessed_data = va_governor_county_data.copy()
+    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
+
+    result = model_client.get_estimates(
+        data,
+        election_id,
+        office_id,
+        estimands,
+        prediction_intervals,
+        percent_reporting_threshold,
+        geographic_unit_type,
+        raw_config=va_config,
+        preprocessed_data=preprocessed_data,
+        lambda_=[0.1, 0.05, 0.56, 0.99],
         save_output=[],
     )
 

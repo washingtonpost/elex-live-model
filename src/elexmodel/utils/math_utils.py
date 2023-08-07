@@ -2,6 +2,7 @@ import logging
 import math
 
 import numpy as np
+import pandas as pd
 from scipy.stats import bootstrap
 from scipy.stats.mstats import winsorize
 
@@ -89,7 +90,7 @@ def boot_sigma(data, conf, num_iterations=10000, winsorize=False):
 
 def compute_error(true, pred, type_="mae"):
     """
-    computes error. either mean absolute error or mean absolute percentage error
+    Computes error. either mean absolute error or mean absolute percentage error
     """
     if type_ == "mae":
         return np.mean(np.abs(true - pred)).round(decimals=0)
@@ -111,7 +112,40 @@ def compute_frac_within_pi(lower, upper, results):
 
 def compute_mean_pi_length(lower, upper, pred):
     """
-    computes average relative length of prediction interval
+    Computes average relative length of prediction interval
     """
     # we add 1 since pred can be literally zero
     return np.mean((upper - lower) / (pred + 1)).round(decimals=2)
+
+
+def get_kfold_splits(data, n_splits=2):
+    """
+    Computes k-fold splits of given data, depending on the n_splits, for cross-validation,
+    returns a list of paired train and test indexes
+    """
+
+    if isinstance(data, pd.DataFrame) and data.empty:
+        raise ValueError("data cannot be empty")
+
+    if n_splits <= 0:
+        raise ValueError("n_splits cannot be equal to zero")
+
+    if n_splits == 1:
+        raise ValueError(
+            "k-fold cross-validation requires at least one train/test split by setting n_splits=2 or more, got n_splits=1."
+        )
+
+    splits = []
+    num_samples = len(data)
+    fold_size = num_samples // n_splits
+    remaining_samples = num_samples % n_splits
+    current_index = 0
+
+    for i in range(n_splits):
+        fold_length = fold_size + i if i < remaining_samples else fold_size
+        test_index = list(range(current_index, current_index + fold_length))
+        train_index = list(set(range(num_samples)) - set(test_index))
+        splits.append((train_index, test_index))
+        current_index += fold_length
+
+    return splits
