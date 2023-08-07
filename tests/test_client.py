@@ -19,7 +19,7 @@ model_parameters = {
     "beta": 3,
     "winsorize": False,
     "robust": True,
-    "lambda_": 0,
+    "lambda_": [],
 }
 handle_unreporting = "drop"
 
@@ -212,6 +212,7 @@ def test_check_input_parameters_beta(model_client, va_config):
             model_parameters,
             handle_unreporting,
         )
+    model_parameters["beta"] = 3
 
 
 def test_check_input_parameters_winsorize(model_client, va_config):
@@ -232,6 +233,7 @@ def test_check_input_parameters_winsorize(model_client, va_config):
             model_parameters,
             handle_unreporting,
         )
+    model_parameters["winsorize"] = "False"
 
 
 def test_check_input_parameters_robust(model_client, va_config):
@@ -252,12 +254,13 @@ def test_check_input_parameters_robust(model_client, va_config):
             model_parameters,
             handle_unreporting,
         )
+    model_parameters["robust"] = True
 
 
 def test_check_input_parameters_lambda_(model_client, va_config):
     election_id = "2017-11-07_VA_G"
     config_handler = ConfigHandler(election_id, config=va_config)
-    model_parameters["lambda_"] = -1
+    model_parameters["lambda_"] = [-1]
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
@@ -272,6 +275,7 @@ def test_check_input_parameters_lambda_(model_client, va_config):
             model_parameters,
             handle_unreporting,
         )
+    model_parameters["lambda_"] = []
 
 
 def test_check_input_parameters_handle_unreporting(model_client, va_config):
@@ -296,27 +300,28 @@ def test_check_input_parameters_handle_unreporting(model_client, va_config):
 def test_check_input_parameters_lambda_empty(model_client, va_config):
     election_id = "2017-11-07_VA_G"
     config_handler = ConfigHandler(election_id, config=va_config)
+    model_parameters["lambda_"] = []
 
-    assert model_client._check_input_parameters(
-        config_handler,
-        office,
-        estimands,
-        geographic_unit_type,
-        features,
-        aggregates,
-        fixed_effects,
-        pi_method,
-        beta,
-        winsorize,
-        robust,
-        [],
-        handle_unreporting,
-    )
+    with pytest.raises(ValueError):
+        model_client._check_input_parameters(
+            config_handler,
+            office,
+            estimands,
+            geographic_unit_type,
+            features,
+            aggregates,
+            fixed_effects,
+            pi_method,
+            model_parameters,
+            handle_unreporting,
+        )
+    model_parameters["lambda_"] = []
 
 
 def test_check_input_parameters_lambda_bad_values(model_client, va_config):
     election_id = "2017-11-07_VA_G"
     config_handler = ConfigHandler(election_id, config=va_config)
+    model_parameters["lambda_"] = ["bad_lambda"]
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
@@ -328,17 +333,16 @@ def test_check_input_parameters_lambda_bad_values(model_client, va_config):
             aggregates,
             fixed_effects,
             pi_method,
-            beta,
-            winsorize,
-            robust,
-            ["bad_lambda"],
+            model_parameters,
             handle_unreporting,
         )
+    model_parameters["lambda_"] = []
 
 
 def test_check_input_parameters_lambda_bad_type(model_client, va_config):
     election_id = "2017-11-07_VA_G"
     config_handler = ConfigHandler(election_id, config=va_config)
+    model_parameters["lambda_"] = "bad_lambda"
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
@@ -350,12 +354,10 @@ def test_check_input_parameters_lambda_bad_type(model_client, va_config):
             aggregates,
             fixed_effects,
             pi_method,
-            beta,
-            winsorize,
-            robust,
-            "bad_lambda",
+            model_parameters,
             handle_unreporting,
         )
+        model_parameters["lambda_"] = []
 
 
 def test_get_aggregate_list(model_client):
