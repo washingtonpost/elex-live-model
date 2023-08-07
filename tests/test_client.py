@@ -213,6 +213,8 @@ def test_check_input_parameters_beta(model_client, va_config):
             handle_unreporting,
         )
 
+    model_parameters["beta"] = 3
+
 
 def test_check_input_parameters_winsorize(model_client, va_config):
     election_id = "2017-11-07_VA_G"
@@ -233,6 +235,8 @@ def test_check_input_parameters_winsorize(model_client, va_config):
             handle_unreporting,
         )
 
+    model_parameters["winsorize"] = False
+
 
 def test_check_input_parameters_robust(model_client, va_config):
     election_id = "2017-11-07_VA_G"
@@ -248,10 +252,12 @@ def test_check_input_parameters_robust(model_client, va_config):
             features,
             aggregates,
             fixed_effects,
-            pi_method,
+            "nonparametric",
             model_parameters,
             handle_unreporting,
         )
+
+    model_parameters["robust"] = True
 
 
 def test_check_input_parameters_lambda_(model_client, va_config):
@@ -272,6 +278,7 @@ def test_check_input_parameters_lambda_(model_client, va_config):
             model_parameters,
             handle_unreporting,
         )
+    model_parameters["lambda_"] = 0
 
 
 def test_check_input_parameters_handle_unreporting(model_client, va_config):
