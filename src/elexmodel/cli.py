@@ -69,7 +69,7 @@ from elexmodel.utils.file_utils import TARGET_BUCKET  # noqa: E402
 @click.option(
     "--new_estimands",
     "new_estimands",
-    default="{}",
+    default={},
     type=dict,
     help="dict of key: desired estimand names and value: None or pre-written function",
 )
