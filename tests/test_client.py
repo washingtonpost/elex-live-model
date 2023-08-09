@@ -839,3 +839,39 @@ def test_winsorize_intervals(model_client, va_governor_county_data, va_config):
         winsorize_results.loc[:, "upper_0.9_turnout"].values[0]
         <= non_winsorize_results.loc[:, "upper_0.9_turnout"].values[0]
     )
+
+
+def test_estimandizer_input(model_client, va_governor_county_data, va_config):
+    election_id = "2017-11-07_VA_G"
+    office_id = "G"
+    geographic_unit_type = "county"
+    estimands = ["turnout"]
+    prediction_intervals = [0.9]
+    percent_reporting_threshold = 100
+
+    data_handler = MockLiveDataHandler(
+        election_id, office_id, geographic_unit_type, estimands, data=va_governor_county_data
+    )
+
+    data_handler.shuffle()
+    data = data_handler.get_percent_fully_reported(100)
+
+    preprocessed_data = va_governor_county_data.copy()
+    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
+
+    try:
+        model_client.get_estimates(
+            data,
+            election_id,
+            office_id,
+            estimands,
+            prediction_intervals,
+            percent_reporting_threshold,
+            geographic_unit_type,
+            raw_config=va_config,
+            preprocessed_data=preprocessed_data,
+            save_output=[],
+            new_estimands={"party_vote_share": None},
+        )
+    except ValueError:
+        pytest.raises("Error with clinet input for estimandizer")

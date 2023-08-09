@@ -66,6 +66,13 @@ from elexmodel.utils.file_utils import TARGET_BUCKET  # noqa: E402
     help="options: results, data, config",
 )
 @click.option("--handle_unreporting", "handle_unreporting", default="drop", type=click.Choice(["drop", "zero"]))
+@click.option(
+    "--new_estimands",
+    "new_estimands",
+    default="{}",
+    type=dict,
+    help="dict of key: desired estimand names and value: None or pre-written function",
+)
 def cli(
     election_id, estimands, office_id, prediction_intervals, percent_reporting_threshold, geographic_unit_type, **kwargs
 ):

@@ -4,7 +4,7 @@ from elexmodel.handlers.data.LiveData import MockLiveDataHandler
 from elexmodel.handlers.data.PreprocessedData import PreprocessedDataHandler
 
 
-def test_create_estimand_margin_preprocessed(va_governor_county_data):
+def test_share_preprocessed(va_governor_county_data):
     """
     Tests margin estimand generation (for preprocessed data only)
 
@@ -31,38 +31,17 @@ def test_create_estimand_margin_preprocessed(va_governor_county_data):
     preprocessed_data_handler = PreprocessedDataHandler(
         election_id, office, geographic_unit_type, estimands, estimand_baseline, data=va_data_copy
     )
-    new_estimands = ["margin"]
+    new_estimands = {
+        "party_vote_share": None,
+    }
 
-    estimandizer = Estimandizer(preprocessed_data_handler, new_estimands)
-    new_data_handler = estimandizer.generate_estimands("G")
+    estimandizer = Estimandizer(preprocessed_data_handler, "G", new_estimands)
+    new_data_handler = estimandizer.generate_estimands()
 
-    assert "margin" in new_data_handler.data
-
-
-def test_create_estimand_voter_turnout_rate(va_governor_county_data):
-    """
-    Tests voter turnout rate estimand generation on preprocessed data of the VA general
-    """
-    va_data_copy = va_governor_county_data.copy()
-    election_id = "2017-11-07_VA_G"
-    office = "G"
-    geographic_unit_type = "county"
-    estimands = []
-    estimand_baseline = {}
-
-    preprocessed_data_handler = PreprocessedDataHandler(
-        election_id, office, geographic_unit_type, estimands, estimand_baseline, data=va_data_copy
-    )
-
-    new_estimands = ["voter_turnout_rate"]
-
-    estimandizer = Estimandizer(preprocessed_data_handler, new_estimands)
-    new_data_handler = estimandizer.generate_estimands("G")
-
-    assert "voter_turnout_rate" in new_data_handler.data
+    assert "party_vote_share_dem" in new_data_handler.data.columns
 
 
-def test_create_estimand_age_combined(va_governor_county_data):
+def test_share_combined(va_governor_county_data):
     """
     Tests age bracket estimand generation on a combined data handler
     """
@@ -89,12 +68,14 @@ def test_create_estimand_age_combined(va_governor_county_data):
         handle_unreporting="drop",
     )
 
-    new_estimands = ["age_groups"]
+    new_estimands = {
+        "party_vote_share": None,
+    }
 
-    estimandizer = Estimandizer(combined_data_handler, new_estimands)
-    new_data_handler = estimandizer.generate_estimands("G")
+    estimandizer = Estimandizer(combined_data_handler, "G", new_estimands)
+    new_data_handler = estimandizer.generate_estimands()
 
-    assert "age_group_30_45" in new_data_handler.data
+    assert "party_vote_share_dem" in new_data_handler.data.columns
 
 
 def test_candidate(tx_primary_governor_config):
@@ -117,7 +98,7 @@ def test_candidate(tx_primary_governor_config):
     """
     tx_data_copy = tx_primary_governor_config.copy()
     election_id = "2018-03-06_TX_R"
-    office = "G"
+    office = "P"
     geographic_unit_type = "county"
     estimands = []
     estimand_baseline = {}
@@ -126,9 +107,11 @@ def test_candidate(tx_primary_governor_config):
         election_id, office, geographic_unit_type, estimands, estimand_baseline, data=tx_data_copy
     )
 
-    new_estimands = ["candidate"]
+    new_estimands = {
+        "candidate": None,
+    }
 
-    estimandizer = Estimandizer(preprocessed_data_handler, new_estimands)
-    new_data_handler = estimandizer.generate_estimands("P")
+    estimandizer = Estimandizer(preprocessed_data_handler, office, new_estimands)
+    new_data_handler = estimandizer.generate_estimands()
 
     assert "abbott_41404" in new_data_handler.data[new_data_handler.election_id][0]

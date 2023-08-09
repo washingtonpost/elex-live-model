@@ -6,6 +6,7 @@ import pandas as pd
 from elexmodel.handlers import s3
 from elexmodel.handlers.config import ConfigHandler
 from elexmodel.handlers.data.CombinedData import CombinedDataHandler
+from elexmodel.handlers.data.Estimandizer import Estimandizer
 from elexmodel.handlers.data.ModelResults import ModelResultsHandler
 from elexmodel.handlers.data.PreprocessedData import PreprocessedDataHandler
 from elexmodel.logging import initialize_logging
@@ -53,6 +54,7 @@ class ModelClient:
         robust,
         lambda_,
         handle_unreporting,
+        new_estimands={},
     ):
         offices = config_handler.get_offices()
         if office not in offices:
@@ -100,6 +102,8 @@ class ModelClient:
             raise ValueError("lambda is not valid. It has to be greater than zero.")
         if handle_unreporting not in {"drop", "zero"}:
             raise ValueError("handle_unreporting must be either `drop` or `zero`")
+        if not isinstance(new_estimands, dict):
+            raise ValueError("new_estimands must be a map of estimand names and corresponding functions (can be None)")
         return True
 
     def get_all_conformalization_data_unit(self):
@@ -167,6 +171,7 @@ class ModelClient:
         save_config = "config" in save_output
         save_conformalization = "conformalization" in save_output
         handle_unreporting = kwargs.get("handle_unreporting", "drop")
+        new_estimands = kwargs.get("new_estimands", {})
 
         model_settings = {
             "election_id": election_id,
@@ -199,6 +204,7 @@ class ModelClient:
             robust,
             lambda_,
             handle_unreporting,
+            new_estimands,
         )
         states_with_election = config_handler.get_states(office)
         estimand_baselines = config_handler.get_estimand_baselines(office, estimands)
@@ -228,6 +234,10 @@ class ModelClient:
             geographic_unit_type,
             handle_unreporting=handle_unreporting,
         )
+
+        if new_estimands:
+            est = Estimandizer(data, office, new_estimands)
+            data = est.generate_estimands()
 
         reporting_units = data.get_reporting_units(
             percent_reporting_threshold, features_to_normalize=features, add_intercept=True
