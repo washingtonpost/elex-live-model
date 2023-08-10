@@ -871,7 +871,7 @@ def test_estimandizer_input(model_client, va_governor_county_data, va_config):
             raw_config=va_config,
             preprocessed_data=preprocessed_data,
             save_output=[],
-            new_estimands={"party_vote_share": None},
+            estimand_fns={"party_vote_share": None},
         )
     except ValueError:
         pytest.raises("Error with clinet input for estimandizer")

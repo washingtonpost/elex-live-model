@@ -67,7 +67,7 @@ Parameters for the CLI tool:
 | robust               | flag    | flag for larger set of prediction intervals in the nonparametric case |
 | save_output          | list    | `results`, `data`, `config` |
 | unexpected_units     | int     | number of unexpected units to simulate; only used for testing and does not work with historical run |
-| unexpected_units     | dict     | mapping of estimand names to None or pre-built functions |
+| estimand_fns     | dict     | mapping of estimand names to None or pre-built functions |
 
 Note: When running the model with multiple fixed effects, make sure they are not linearly dependent. For example, `county_fips` and `county_classification` are linearly dependent when run together. That's because every county is in one county class, so all the fixed effect columns of the counties in the county class sum up to the fixed effect column of that county class.
 

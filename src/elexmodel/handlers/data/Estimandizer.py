@@ -3,10 +3,10 @@ class Estimandizer:
     Estimandizer. Generate estimands explicitly.
     """
 
-    def __init__(self, data_handler, office, estimands={}):
+    def __init__(self, data_handler, election_type, estimand_fns={}):
         self.data_handler = data_handler
-        self.office = office
-        self.estimands = estimands
+        self.election_type = election_type
+        self.estimand_fns = estimand_fns
         self.transformations = []
         self.transformation_map = {
             "party_vote_share": [self.calculate_party_vote_share],
@@ -26,9 +26,9 @@ class Estimandizer:
         Check that input columns contain all neccessary values for a calculation
         """
         missing_columns = []
-        if self.office == "G":
+        if self.election_type == "G":
             missing_columns = [col for col in columns if col not in self.data_handler.data.columns]
-        elif self.office == "P":
+        elif self.election_type == "P":
             missing_columns = [
                 col for col in columns if col not in self.data_handler.data[self.data_handler.election_id]
             ]
@@ -38,10 +38,12 @@ class Estimandizer:
         """
         Verify which estimands can be formed given a dataset and a list of estimands we would like to create
         """
+        # Check if estimand is a supported value
         if estimand not in self.transformation_map:
             raise ValueError(f"Estimand '{estimand}' is not supported.")
         self.transformations = self.transformation_map[estimand]
 
+        # Check if estimand function contains all the neccessary local variables to run
         if not self.check_input_columns(
             [col for transform in self.transformations for col in transform.__code__.co_varnames[1:]]
         ):
@@ -67,10 +69,10 @@ class Estimandizer:
         """
         Main function to generate estimands
         """
-        if self.office == "G":
+        if self.election_type == "G":
             self.pre_check_estimands()
 
-        for key, value in self.estimands.items():
+        for key, value in self.estimand_fns.items():
             if value is None:  # Option 1: Pass in a list of estimands we want to build from a pre-set list
                 self.verify_estimand(key)
                 self.create_estimand(key, None)

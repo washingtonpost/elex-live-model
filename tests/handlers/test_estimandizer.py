@@ -24,6 +24,7 @@ def test_share_preprocessed(va_governor_county_data):
     va_data_copy = va_governor_county_data.copy()
     election_id = "2017-11-07_VA_G"
     office = "G"
+    election_type = election_id[-1]
     geographic_unit_type = "county"
     estimands = []
     estimand_baseline = {}
@@ -31,11 +32,11 @@ def test_share_preprocessed(va_governor_county_data):
     preprocessed_data_handler = PreprocessedDataHandler(
         election_id, office, geographic_unit_type, estimands, estimand_baseline, data=va_data_copy
     )
-    new_estimands = {
+    estimand_fns = {
         "party_vote_share": None,
     }
 
-    estimandizer = Estimandizer(preprocessed_data_handler, "G", new_estimands)
+    estimandizer = Estimandizer(preprocessed_data_handler, election_type, estimand_fns)
     new_data_handler = estimandizer.generate_estimands()
 
     assert "party_vote_share_dem" in new_data_handler.data.columns
@@ -48,6 +49,7 @@ def test_share_combined(va_governor_county_data):
     va_data_copy = va_governor_county_data.copy()
     election_id = "2017-11-07_VA_G"
     office = "G"
+    election_type = election_id[-1]
     geographic_unit_type = "county"
     estimands = []
     estimand_baseline = {}
@@ -68,11 +70,11 @@ def test_share_combined(va_governor_county_data):
         handle_unreporting="drop",
     )
 
-    new_estimands = {
+    estimand_fns = {
         "party_vote_share": None,
     }
 
-    estimandizer = Estimandizer(combined_data_handler, "G", new_estimands)
+    estimandizer = Estimandizer(combined_data_handler, election_type, estimand_fns)
     new_data_handler = estimandizer.generate_estimands()
 
     assert "party_vote_share_dem" in new_data_handler.data.columns
@@ -99,6 +101,7 @@ def test_candidate(tx_primary_governor_config):
     tx_data_copy = tx_primary_governor_config.copy()
     election_id = "2018-03-06_TX_R"
     office = "P"
+    election_type = election_id[-1]
     geographic_unit_type = "county"
     estimands = []
     estimand_baseline = {}
@@ -107,11 +110,11 @@ def test_candidate(tx_primary_governor_config):
         election_id, office, geographic_unit_type, estimands, estimand_baseline, data=tx_data_copy
     )
 
-    new_estimands = {
+    estimand_fns = {
         "candidate": None,
     }
 
-    estimandizer = Estimandizer(preprocessed_data_handler, office, new_estimands)
+    estimandizer = Estimandizer(preprocessed_data_handler, election_type, estimand_fns)
     new_data_handler = estimandizer.generate_estimands()
 
     assert "abbott_41404" in new_data_handler.data[new_data_handler.election_id][0]

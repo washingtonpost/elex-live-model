@@ -67,8 +67,8 @@ from elexmodel.utils.file_utils import TARGET_BUCKET  # noqa: E402
 )
 @click.option("--handle_unreporting", "handle_unreporting", default="drop", type=click.Choice(["drop", "zero"]))
 @click.option(
-    "--new_estimands",
-    "new_estimands",
+    "--estimand_fns",
+    "estimand_fns",
     default={},
     type=dict,
     help="dict of key: desired estimand names and value: None or pre-written function",
