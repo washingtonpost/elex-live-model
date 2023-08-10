@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
+from scipy import stats
 
 from elexmodel.distributions.GaussianModel import GaussianModel
 from elexmodel.utils import math_utils
@@ -289,6 +290,106 @@ def test_fit_winsorized():
     assert math_utils.boot_sigma(b, conf=(3 + alpha) / 4, winsorize=model_settings["winsorize"]) == pytest.approx(
         g.sigma_lower_bound[1], RELAX_TOL
     )
+
+
+def test_winsorized_intervals():
+    """
+    We compare winsorized data to non winsorized data
+    """
+    random_number_generator = np.random.RandomState(42)
+
+    # generate test data
+    mean_lower = 5
+    mean_upper = 7
+    sd_lower = 2
+    sd_upper = 0.5
+    n = 100
+    lower = random_number_generator.normal(loc=mean_lower, scale=sd_lower, size=n)
+    upper = random_number_generator.normal(loc=mean_upper, scale=sd_upper, size=n)
+    weights = random_number_generator.randint(low=1, high=100, size=n)
+    alpha = 0.9
+    estimand = "turnout"
+    model_settings_winsorize = {
+        "election_id": "2017-11-07_VA_G",
+        "office": "G",
+        "geographic_unit_type": "county",
+        "save_conformalization": False,
+        "beta": 1,
+        "winsorize": True,
+    }
+
+    model_settings_non = {
+        "election_id": "2017-11-07_VA_G",
+        "office": "G",
+        "geographic_unit_type": "county",
+        "save_conformalization": False,
+        "beta": 1,
+        "winsorize": False,
+    }
+
+    gaussian_model_winsorize = GaussianModel(model_settings_winsorize)
+    gaussian_model_non = GaussianModel(model_settings_non)
+
+    df = pd.DataFrame({f"last_election_results_{estimand}": weights, "lower_bounds": lower, "upper_bounds": upper})
+
+    # all in the same group
+    g_winsorize = gaussian_model_winsorize._fit(df, estimand, [], alpha)
+    g_non = gaussian_model_non._fit(df, estimand, [], alpha)
+
+    # assumes that weighted median and standard deviation bootstrap works
+    # tests for that in test_utils
+    low_winsorize = float(
+        math_utils.boot_sigma(lower, conf=(3 + alpha) / 4, winsorize=model_settings_winsorize["winsorize"])
+    )
+    low_non = float(math_utils.boot_sigma(lower, conf=(3 + alpha) / 4, winsorize=model_settings_non["winsorize"]))
+    up_winsorize = float(
+        math_utils.boot_sigma(upper, conf=(3 + alpha) / 4, winsorize=model_settings_winsorize["winsorize"])
+    )
+    up_non = float(math_utils.boot_sigma(upper, conf=(3 + alpha) / 4, winsorize=model_settings_non["winsorize"]))
+
+    assert low_winsorize <= low_non
+    assert up_winsorize <= up_non
+
+    # gaussian model for single unit prediction intervals winsorized
+    quantile = (3 + alpha) / 4
+    lower_correction_w = stats.norm.ppf(
+        q=quantile,
+        loc=g_winsorize.mu_lower_bound,
+        scale=np.sqrt(g_winsorize.var_inflate + 1) * g_winsorize.sigma_lower_bound,
+    )
+
+    upper_correction_w = stats.norm.ppf(
+        q=quantile,
+        loc=g_winsorize.mu_upper_bound,
+        scale=np.sqrt(g_winsorize.var_inflate + 1) * g_winsorize.sigma_upper_bound,
+    )
+
+    # gaussian model for single unit prediction intervals
+    quantile = (3 + alpha) / 4
+    lower_correction_n = stats.norm.ppf(
+        q=quantile,
+        loc=g_non.mu_lower_bound,
+        scale=np.sqrt(g_non.var_inflate + 1) * g_non.sigma_lower_bound,
+    )
+
+    upper_correction_n = stats.norm.ppf(
+        q=quantile,
+        loc=g_non.mu_upper_bound,
+        scale=np.sqrt(g_non.var_inflate + 1) * g_non.sigma_upper_bound,
+    )
+
+    assert lower_correction_w[0] <= lower_correction_n[0]
+    assert upper_correction_w[0] <= upper_correction_n[0]
+
+    # apply correction
+    lower_w = lower - lower_correction_w[0]
+    upper_w = upper + upper_correction_w[0]
+    lower_n = lower - lower_correction_n[0]
+    upper_n = upper + upper_correction_n[0]
+
+    for i in range(len(lower_w)):
+        assert lower_w[i] >= lower_n[i]
+        assert upper_w[i] <= upper_n[i]
 
 
 def test_large_and_small_fit():
