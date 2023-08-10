@@ -197,7 +197,6 @@ def test_check_input_parameters_fixed_effect_dict(model_client, va_config):
 def test_check_input_parameters_beta(model_client, va_config):
     election_id = "2017-11-07_VA_G"
     config_handler = ConfigHandler(election_id, config=va_config)
-    model_parameters["beta"] = "bad_beta"
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
@@ -209,17 +208,19 @@ def test_check_input_parameters_beta(model_client, va_config):
             aggregates,
             fixed_effects,
             pi_method,
-            model_parameters,
+            {
+                "beta": "bad_beta",
+                "winsorize": False,
+                "robust": True,
+                "lambda_": 0,
+            },
             handle_unreporting,
         )
-
-    model_parameters["beta"] = 3
 
 
 def test_check_input_parameters_winsorize(model_client, va_config):
     election_id = "2017-11-07_VA_G"
     config_handler = ConfigHandler(election_id, config=va_config)
-    model_parameters["winsorize"] = "bad_winsorize"
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
@@ -231,17 +232,19 @@ def test_check_input_parameters_winsorize(model_client, va_config):
             aggregates,
             fixed_effects,
             pi_method,
-            model_parameters,
+            {
+                "beta": 3,
+                "winsorize": "bad_winsorize",
+                "robust": True,
+                "lambda_": 0,
+            },
             handle_unreporting,
         )
-
-    model_parameters["winsorize"] = False
 
 
 def test_check_input_parameters_robust(model_client, va_config):
     election_id = "2017-11-07_VA_G"
     config_handler = ConfigHandler(election_id, config=va_config)
-    model_parameters["robust"] = "bad_robust"
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
@@ -253,17 +256,19 @@ def test_check_input_parameters_robust(model_client, va_config):
             aggregates,
             fixed_effects,
             "nonparametric",
-            model_parameters,
+            {
+                "beta": 3,
+                "winsorize": False,
+                "robust": "bad_robust",
+                "lambda_": 0,
+            },
             handle_unreporting,
         )
-
-    model_parameters["robust"] = True
 
 
 def test_check_input_parameters_lambda_(model_client, va_config):
     election_id = "2017-11-07_VA_G"
     config_handler = ConfigHandler(election_id, config=va_config)
-    model_parameters["lambda_"] = -1
 
     with pytest.raises(ValueError):
         model_client._check_input_parameters(
@@ -275,10 +280,14 @@ def test_check_input_parameters_lambda_(model_client, va_config):
             aggregates,
             fixed_effects,
             pi_method,
-            model_parameters,
+            {
+                "beta": 3,
+                "winsorize": False,
+                "robust": True,
+                "lambda_": -1,
+            },
             handle_unreporting,
         )
-    model_parameters["lambda_"] = 0
 
 
 def test_check_input_parameters_handle_unreporting(model_client, va_config):
