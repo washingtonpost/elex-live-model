@@ -56,7 +56,7 @@ class Estimandizer:
         Create an estimand. You must give either a estimand name or a pre-written function.
         """
         if estimand is None and given_function is not None:
-            if type(given_function) == str:
+            if isinstance(given_function, str):
                 eval(f"{given_function}(self)")
             else:
                 given_function()
