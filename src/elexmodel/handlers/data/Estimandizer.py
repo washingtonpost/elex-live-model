@@ -56,14 +56,18 @@ class Estimandizer:
         Create an estimand. You must give either a estimand name or a pre-written function.
         """
         if estimand is None and given_function is not None:
-            given_function()
-        elif given_function is None and estimand is not None:
-            if estimand in self.transformation_map:
-                if self.transformation_map[estimand][0] in self.transformations:
-                    transformation_func = self.transformations[
-                        self.transformations.index(self.transformation_map[estimand][0])
-                    ]
-                    transformation_func()
+            if type(given_function) == str:
+                eval(f"{given_function}(self)")
+            else:
+                given_function()
+        else:
+            if given_function is None and estimand is not None:
+                if estimand in self.transformation_map:
+                    if self.transformation_map[estimand][0] in self.transformations:
+                        transformation_func = self.transformations[
+                            self.transformations.index(self.transformation_map[estimand][0])
+                        ]
+                        transformation_func()
 
     def generate_estimands(self):
         """
