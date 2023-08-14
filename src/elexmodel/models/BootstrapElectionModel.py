@@ -159,7 +159,7 @@ class BootstrapElectionModel(BaseElectionModel):
     def _estimate_model_errors(self, model, x, y, aggregate_indicator):
         y_pred = model.predict(x)
         residuals_y = model.residuals(y, y_pred, loo=True, center=True)
-        epsilon_y_hat = self._estimate_epsilon(residuals_y, aggregate_indicator, shrinkage=True)
+        epsilon_y_hat = self._estimate_epsilon(residuals_y, aggregate_indicator, shrinkage=False)
         delta_y_hat = self._estimate_delta(residuals_y, epsilon_y_hat, aggregate_indicator)
         return residuals_y, epsilon_y_hat, delta_y_hat       
 
@@ -394,8 +394,8 @@ class BootstrapElectionModel(BaseElectionModel):
         
         y_partial_reporting_lower, y_partial_reporting_upper = self._generate_nonreporting_bounds(nonreporting_units, 'normalized_margin')
         z_partial_reporting_lower, z_partial_reporting_upper = self._generate_nonreporting_bounds(nonreporting_units, 'turnout_factor')
-        optimal_lambda_y = 0.1 # self.cv_lambda(x_train, y_train, np.logspace(-3, 2, 20), weights=weights_train)
-        optimal_lambda_z = 0.1 # self.cv_lambda(x_train, z_train, np.logspace(-3, 2, 20), weights=weights_train)
+        optimal_lambda_y = self.cv_lambda(x_train, y_train, np.logspace(-3, 2, 20), weights=weights_train)
+        optimal_lambda_z = self.cv_lambda(x_train, z_train, np.logspace(-3, 2, 20), weights=weights_train)
         
         # nonreporting_units_to_keep = ((y_partial_reporting_upper - y_partial_reporting_lower) < 0.1).flatten()
         # x_all = np.concatenate([x_train, x_test[nonreporting_units_to_keep]], axis=0)
@@ -607,6 +607,7 @@ class BootstrapElectionModel(BaseElectionModel):
         ).T
         interval_upper = interval_upper.reshape(-1,1)
         interval_lower = interval_lower.reshape(-1,1)
+
         return PredictionIntervals(interval_lower, interval_upper) # removed round
 
     def get_all_conformalization_data_unit(self):
@@ -645,5 +646,6 @@ class BootstrapElectionModel(BaseElectionModel):
         ).T
 
         national_summary_estimates = {'margin': [aggregate_dem_vals_pred, interval_lower, interval_upper]}
+        print(national_summary_estimates)
 
         return national_summary_estimates
