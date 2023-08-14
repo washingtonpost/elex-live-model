@@ -1,3 +1,4 @@
+import ast
 import json
 
 import click
@@ -11,6 +12,12 @@ from elexmodel.handlers.data.LiveData import MockLiveDataHandler  # noqa: E402
 from elexmodel.utils.constants import VALID_AGGREGATES_MAPPING  # noqa: E402
 from elexmodel.utils.file_utils import TARGET_BUCKET  # noqa: E402
 
+class PythonLiteralOption(click.Option):
+    def type_cast_value(self, ctx, value):
+        try:
+            return ast.literal_eval(value)
+        except ValueError:
+            raise click.BadParameter(value)
 
 @click.command()
 @click.argument("election_id")
@@ -69,8 +76,8 @@ from elexmodel.utils.file_utils import TARGET_BUCKET  # noqa: E402
 @click.option(
     "--estimand_fns",
     "estimand_fns",
-    default={},
-    type=dict,
+    default="{}",
+    cls=PythonLiteralOption,
     help="dict of key: desired estimand names and value: None or pre-written function",
 )
 def cli(
