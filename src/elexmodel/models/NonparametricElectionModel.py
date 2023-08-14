@@ -119,7 +119,6 @@ class NonparametricElectionModel(BaseElectionModel):
         alpha,
         conformalization_data,
         estimand,
-        model_settings,
     ):
         """
         Get aggregate prediction intervals. In the non-parametric case prediction intervals just sum.

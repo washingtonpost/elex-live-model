@@ -25,10 +25,10 @@ def setup_logging():
 def get_fixture():
     def _get_fixture(filename, load=True, pandas=False):
         filepath = os.path.join(FIXTURE_DIR, filename)
-        fileobj = open(filepath)
+        fileobj = open(filepath, encoding="utf-8")
         if load:
             return json.load(fileobj)
-        elif pandas:
+        if pandas:
             return pd.read_csv(
                 filepath,
                 dtype={"geographic_unit_fips": str, "geographic_unit_type": str, "county_fips": str, "district": str},
@@ -49,7 +49,7 @@ def historical_model_client():
 
 
 @pytest.fixture(scope="session")
-def va_governor_config(get_fixture):
+def va_config(get_fixture):
     path = os.path.join("config", "2017-11-07_VA_G.json")
     return get_fixture(path, load=True, pandas=False)
 
@@ -75,6 +75,12 @@ def va_governor_county_data(get_fixture):
 @pytest.fixture(scope="session")
 def va_assembly_county_data(get_fixture):
     path = os.path.join("data", "2017-11-07_VA_G", "Y", "data_county-district.csv")
+    return get_fixture(path, load=False, pandas=True)
+
+
+@pytest.fixture(scope="session")
+def va_assembly_precinct_data(get_fixture):
+    path = os.path.join("data", "2017-11-07_VA_G", "Y", "data_precinct-district.csv")
     return get_fixture(path, load=False, pandas=True)
 
 

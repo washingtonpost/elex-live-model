@@ -3,6 +3,7 @@ import math
 
 import numpy as np
 from scipy.stats import bootstrap
+from scipy.stats.mstats import winsorize
 
 LOG = logging.getLogger()
 
@@ -20,6 +21,15 @@ def sample_std(x, axis):
     """
     # ddof=1 to get unbiased sample estimate.
     return np.std(x, ddof=1, axis=-1)
+
+
+def winsorize_std(x, axis):
+    """
+    Compute the winsorized standard deviation along the last axis. Limits
+    are used to trim 5% of the extreme values on both ends of the data.
+    """
+    x_win = winsorize(x, limits=(0.05, 0.05), axis=-1).data
+    return np.std(x_win, ddof=1, axis=-1)
 
 
 def weighted_median(x, weights):
@@ -44,8 +54,7 @@ def weighted_median(x, weights):
     if weights_cumulative[0] > 0.5:
         LOG.warning("Warning: smallest x-value is greater than or equal to half the weight")
         return x_sorted[0]
-    else:
-        median_index = np.where(weights_cumulative <= 0.5)[0][-1]
+    median_index = np.where(weights_cumulative <= 0.5)[0][-1]
 
     # if there is one element where weights are exactly 0.5, median is average
     # otherwise weighted median is the next largest element
@@ -53,17 +62,28 @@ def weighted_median(x, weights):
         lower = x_sorted[median_index]
         upper = x_sorted[median_index + 1]
         return (lower + upper) / 2
-    else:
-        return x_sorted[median_index + 1]
+    return x_sorted[median_index + 1]
 
 
-def boot_sigma(data, conf, num_iterations=10000):
+def robust_sample_std(x, axis):
+    """
+    Compute the robust sample standard deviation along the last axis by calling winsorize_std.
+    """
+    return winsorize_std(x, axis=-1)
+
+
+def boot_sigma(data, conf, num_iterations=10000, winsorize=False):
     """
     Bootstrap standard deviation.
     """
     # we use upper bound of confidence interval for more robustness
+    if winsorize:
+        std_func = robust_sample_std
+    else:
+        std_func = sample_std
+
     return bootstrap(
-        data.reshape(1, -1), sample_std, confidence_level=conf, method="basic", n_resamples=num_iterations
+        data.reshape(1, -1), std_func, confidence_level=conf, method="basic", n_resamples=num_iterations
     ).confidence_interval.high
 
 
@@ -73,7 +93,7 @@ def compute_error(true, pred, type_="mae"):
     """
     if type_ == "mae":
         return np.mean(np.abs(true - pred)).round(decimals=0)
-    elif type_ == "mape":
+    if type_ == "mape":
         mask = true != 0
         mape = np.mean((np.abs(true - pred) / true)[mask])
         # if all true values are zero, then race was uncontested and mape doesn't make sense to compute
