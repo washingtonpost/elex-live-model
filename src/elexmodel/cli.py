@@ -12,12 +12,14 @@ from elexmodel.handlers.data.LiveData import MockLiveDataHandler  # noqa: E402
 from elexmodel.utils.constants import VALID_AGGREGATES_MAPPING  # noqa: E402
 from elexmodel.utils.file_utils import TARGET_BUCKET  # noqa: E402
 
+
 class PythonLiteralOption(click.Option):
     def type_cast_value(self, ctx, value):
         try:
             return ast.literal_eval(value)
         except ValueError:
             raise click.BadParameter(value)
+
 
 @click.command()
 @click.argument("election_id")
