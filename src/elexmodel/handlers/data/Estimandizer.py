@@ -18,7 +18,8 @@ class Estimandizer:
 
     def pre_check_estimands(self):
         """
-        Ensure estimand isn't one of the pre-specified values that are already included
+        Check to see if the inputted estimand isn't one of the pre-specified values that should be already included.
+        If they are not included, then we will manually add them. This is dependent on if we set "dem" and/or "gop" as the inital estimand in order to have corresponding data columns.
         """
         standard = ["dem_votes", "gop_votes", "total_votes"]
         if not self.check_input_columns(standard):
@@ -26,14 +27,14 @@ class Estimandizer:
 
     def check_input_columns(self, columns):
         """
-        Check that input columns contain all neccessary values for a calculation
+        Function to check that input columns contain all neccessary values for a calculation.
         """
         missing_columns = [col for col in columns if col not in self.data_handler.data.columns]
         return len(missing_columns) == 0
 
     def verify_estimand(self, estimand):
         """
-        Verify which estimands can be formed given a dataset and a list of estimands we would like to create
+        Verify which pre-written estimands can be formed given a handler and a list of estimands we would like to create.
         """
         # Check if estimand is a supported value
         if estimand not in self.transformation_map:
@@ -50,14 +51,15 @@ class Estimandizer:
 
     def create_estimand(self, estimand=None, given_function=None):
         """
-        Create an estimand. You must give either a estimand name or a pre-written function.
+        Create an estimand given either a pre-written estimand name or a new function.
+        You must give either a estimand name or a pre-written function.
         """
-        if estimand is None and given_function is not None:
+        if estimand is None and given_function is not None:  # Builds an estimand given a function
             if isinstance(given_function, str):
                 eval(f"{given_function}(self)")
             else:
                 given_function()
-        else:
+        else:  # Builds a pre-written estimand
             if given_function is None and estimand is not None:
                 if estimand in self.transformation_map:
                     if self.transformation_map[estimand][0] in self.transformations:
@@ -68,7 +70,7 @@ class Estimandizer:
 
     def generate_estimands(self):
         """
-        Main function to generate estimands
+        Main function to call for this class in order to generate estimands
         """
         self.pre_check_estimands()
 
@@ -108,6 +110,9 @@ class Estimandizer:
                 self.data_handler.data["results_gop"] = None
 
     def calculate_party_vote_share(self):
+        """
+        Create all possible estimands related to party vote shares
+        """
         if "dem_votes" in self.data_handler.data.columns and "total_votes" in self.data_handler.data.columns:
             self.data_handler.data["party_vote_share_dem"] = (
                 self.data_handler.data["dem_votes"] / self.data_handler.data["total_votes"]
@@ -132,6 +137,9 @@ class Estimandizer:
             )
 
     def candidate(self):
+        """
+        Create estimands for a given candidate in a primary election
+        """
         # cands_old = re.findall(r'results_(\w+)_(\d+)', self.data_handler.data.columns)
         r = re.compile("results_*")
         cands = list(filter(r.match, self.data_handler.data.columns))
