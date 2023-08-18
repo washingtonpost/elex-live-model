@@ -51,7 +51,7 @@ def test_share_combined(va_governor_county_data):
     office = "G"
     election_type = election_id[-1]
     geographic_unit_type = "county"
-    estimands = []
+    estimands = ["dem"]
     estimand_baseline = {}
 
     preprocessed_data_handler = PreprocessedDataHandler(
@@ -80,34 +80,20 @@ def test_share_combined(va_governor_county_data):
     assert "party_vote_share_dem" in new_data_handler.data.columns
 
 
-def test_candidate(tx_primary_governor_config):
+def test_candidate(az_assembly_precinct_data):
     """
     Tests `{candidate_last_name}_{polID}` estimand generation on a preprocessed data handler for tx primaries
-
-    Structure of a "P" election:
-    {'2018-03-06_TX_R': [{
-        'office': 'G',
-        'states': ['TX'],
-        'geographic_unit_types': ['county'],
-        'baseline_results_year': 2014,
-        'historical_election': [],
-        'features': ['age_le_30', 'age_geq_30_le_45', 'age_geq_35_le_65', 'age_geq_65', 'ethnicity_east_and_south_asian', 'ethnicity_hispanic_and_portuguese', 'ethnicity_european', 'ethnicity_likely_african_american', 'ethnicity_other', 'ethnicity_unknown', 'median_household_income', 'percent_bachelor_or_higher'],
-        'aggregates': ['postal_code', 'county_classification'], 'fixed_effect': [],
-        'baseline_pointer': {'abbott_41404': 'abbott_41404', 'krueger_66077': 'abbott_41404', 'kilgore_57793': 'abbott_41404',
-        'turnout': 'turnout'}}]}
-
-    This function adds the combined values for each candidate (ex: all abbott_41404) to the main list under '2018-03-06_TX_R'
     """
-    tx_data_copy = tx_primary_governor_config.copy()
-    election_id = "2018-03-06_TX_R"
-    office = "P"
+    az_data_copy = az_assembly_precinct_data.copy()
+    election_id = "2020-08-04_AZ_R"
+    office = "S"
     election_type = election_id[-1]
-    geographic_unit_type = "county"
+    geographic_unit_type = "precinct"
     estimands = []
     estimand_baseline = {}
 
     preprocessed_data_handler = PreprocessedDataHandler(
-        election_id, office, geographic_unit_type, estimands, estimand_baseline, data=tx_data_copy
+        election_id, office, geographic_unit_type, estimands, estimand_baseline, data=az_data_copy
     )
 
     estimand_fns = {
@@ -117,4 +103,4 @@ def test_candidate(tx_primary_governor_config):
     estimandizer = Estimandizer(preprocessed_data_handler, election_type, estimand_fns)
     new_data_handler = estimandizer.generate_estimands()
 
-    assert "abbott_41404" in new_data_handler.data[new_data_handler.election_id][0]
+    assert "mccarthy_68879" in new_data_handler.data.columns

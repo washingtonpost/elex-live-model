@@ -85,5 +85,11 @@ def va_assembly_precinct_data(get_fixture):
 
 
 @pytest.fixture(scope="session")
+def az_assembly_precinct_data(get_fixture):
+    path = os.path.join("data", "2020-08-04_AZ_R", "S", "data_precinct.csv")
+    return get_fixture(path, load=False, pandas=True)
+
+
+@pytest.fixture(scope="session")
 def test_path():
     return _TEST_FOLDER

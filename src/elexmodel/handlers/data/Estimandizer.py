@@ -1,3 +1,6 @@
+import re
+
+
 class Estimandizer:
     """
     Estimandizer. Generate estimands explicitly.
@@ -25,13 +28,7 @@ class Estimandizer:
         """
         Check that input columns contain all neccessary values for a calculation
         """
-        missing_columns = []
-        if self.election_type == "G":
-            missing_columns = [col for col in columns if col not in self.data_handler.data.columns]
-        elif self.election_type == "P":
-            missing_columns = [
-                col for col in columns if col not in self.data_handler.data[self.data_handler.election_id]
-            ]
+        missing_columns = [col for col in columns if col not in self.data_handler.data.columns]
         return len(missing_columns) == 0
 
     def verify_estimand(self, estimand):
@@ -73,8 +70,7 @@ class Estimandizer:
         """
         Main function to generate estimands
         """
-        if self.election_type == "G":
-            self.pre_check_estimands()
+        self.pre_check_estimands()
 
         for key, value in self.estimand_fns.items():
             if value is None:  # Option 1: Pass in a list of estimands we want to build from a pre-set list
@@ -91,27 +87,55 @@ class Estimandizer:
         """
         Create/overwrite the standard estimands: ["dem_votes", "gop_votes", "total_votes"]
         """
-        if "results_dem" in self.data_handler.data.columns and "results_turnout" in self.data_handler.data.columns:
+        if "results_dem" in self.data_handler.data.columns:
             self.data_handler.data["dem_votes"] = self.data_handler.data["results_dem"]
+        if "results_gop" in self.data_handler.data.columns:
             self.data_handler.data["gop_votes"] = self.data_handler.data["results_gop"]
+        if "results_turnout" in self.data_handler.data.columns:
             self.data_handler.data["total_votes"] = self.data_handler.data["results_turnout"]
+        elif (
+            "results_turnout" not in self.data_handler.data.columns
+            and "results_dem" in self.data_handler.data.columns
+            and "results_gop" in self.data_handler.data.columns
+        ):
+            self.data_handler.data["total_votes"] = (
+                self.data_handler.data["results_dem"] + self.data_handler.data["results_gop"]
+            )
         else:
-            self.data_handler.data["dem_votes"] = None
-            self.data_handler.data["gop_votes"] = None
             self.data_handler.data["total_votes"] = None
+            if "results_dem" in self.data_handler.data.columns and "results_gop" in self.data_handler.data.columns:
+                self.data_handler.data["results_dem"] = None
+                self.data_handler.data["results_gop"] = None
 
     def calculate_party_vote_share(self):
-        self.data_handler.data["party_vote_share_dem"] = (
-            self.data_handler.data["dem_votes"] / self.data_handler.data["total_votes"]
-        )
-        self.data_handler.data["party_vote_share_gop"] = (
-            self.data_handler.data["gop_votes"] / self.data_handler.data["total_votes"]
-        )
+        if "dem_votes" in self.data_handler.data.columns and "total_votes" in self.data_handler.data.columns:
+            self.data_handler.data["party_vote_share_dem"] = (
+                self.data_handler.data["dem_votes"] / self.data_handler.data["total_votes"]
+            )
+        if "gop_votes" in self.data_handler.data.columns and "total_votes" in self.data_handler.data.columns:
+            self.data_handler.data["party_vote_share_gop"] = (
+                self.data_handler.data["gop_votes"] / self.data_handler.data["total_votes"]
+            )
+        if (
+            "baseline_dem_votes" in self.data_handler.data.columns
+            and "baseline_total_votes" in self.data_handler.data.columns
+        ):
+            self.data_handler.data["baseline_party_vote_share_dem"] = (
+                self.data_handler.data["baseline_dem_votes"] / self.data_handler.data["baseline_total_votes"]
+            )
+        if (
+            "baseline_gop_votes" in self.data_handler.data.columns
+            and "baseline_total_votes" in self.data_handler.data.columns
+        ):
+            self.data_handler.data["baseline_party_vote_share_gop"] = (
+                self.data_handler.data["baseline_gop_votes"] / self.data_handler.data["baseline_total_votes"]
+            )
 
     def candidate(self):
-        election_data = self.data_handler.data[self.data_handler.election_id][0]
-        candidate_data = election_data["baseline_pointer"]
+        # cands_old = re.findall(r'results_(\w+)_(\d+)', self.data_handler.data.columns)
+        r = re.compile("results_*")
+        cands = list(filter(r.match, self.data_handler.data.columns))
         # cand_set = set(candidate_data)
-        for cand_name in candidate_data:
-            if cand_name != "turnout":
-                election_data[cand_name] = candidate_data[cand_name]
+        for cand_name in cands:
+            new_name = cand_name[8:]
+            self.data_handler.data[new_name] = self.data_handler.data[cand_name]
