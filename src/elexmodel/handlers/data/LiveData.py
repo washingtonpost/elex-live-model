@@ -102,6 +102,7 @@ class MockLiveDataHandler:
             if f"results_{estimand}" not in results_column_names:
                 raise MockLiveDataHandlerException("This is missing results data for estimand: ", estimand)
             columns_to_return.append(f"results_{estimand}")
+        # we will eventually want to replace this stuff with the Estimandizer
         if 'margin' in estimands:
             data['results_margin'] = data.results_dem - data.results_gop
             # TODO: figure out what to do about the +1

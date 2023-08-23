@@ -95,10 +95,10 @@ class PreprocessedDataHandler:
             preprocessed_data['baseline_normalized_margin'] = (preprocessed_data.baseline_dem - preprocessed_data.baseline_gop) / preprocessed_data.weights
 
             # can't always guarantee that these results exist in preprocessed data but TODO: change preprocessed data generation code
-            preprocessed_data['normalized_margin'] = preprocessed_data.results_dem - preprocessed_data.results_gop
-            preprocessed_data['normalized_margin'] /= (preprocessed_data.results_dem + preprocessed_data.results_gop + 1) # preprocessed_data.weights
+            # preprocessed_data['normalized_margin'] = preprocessed_data.results_dem - preprocessed_data.results_gop
+            # preprocessed_data['normalized_margin'] /= (preprocessed_data.results_dem + preprocessed_data.results_gop + 1) # preprocessed_data.weights
 
-            preprocessed_data['results_margin'] = preprocessed_data.results_dem - preprocessed_data.results_gop
+            # preprocessed_data['results_margin'] = preprocessed_data.results_dem - preprocessed_data.results_gop
         for estimand, pointer in estimand_baselines.items():
             baseline_name = f"baseline_{pointer}"
             # Adding one to prevent zero divison
