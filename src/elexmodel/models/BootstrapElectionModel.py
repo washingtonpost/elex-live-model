@@ -493,7 +493,15 @@ class BootstrapElectionModel(BaseElectionModel):
         n = reporting_units.shape[0]
         m = nonreporting_units.shape[0]
 
-        aggregate_indicator = pd.get_dummies(pd.concat([reporting_units, nonreporting_units, unexpected_units], axis=0)[aggregate]).values
+        all_units = pd.concat([reporting_units, nonreporting_units, unexpected_units], axis=0)
+
+        if len(aggregate) > 1:
+            aggregate_temp_column_name = '-'.join(aggregate)
+            all_units[aggregate_temp_column_name] = all_units[aggregate].agg('_'.join, axis=1)
+            aggregate_indicator = pd.get_dummies(all_units[aggregate_temp_column_name]).values
+        else:
+            aggregate_indicator = pd.get_dummies(all_units.aggregate).values
+
         aggregate_indicator_expected = aggregate_indicator[:(n + m)]
 
         aggregate_indicator_unexpected = aggregate_indicator[(n + m):]
@@ -543,7 +551,14 @@ class BootstrapElectionModel(BaseElectionModel):
         n = reporting_units.shape[0]
         m = nonreporting_units.shape[0]
 
-        aggregate_indicator = pd.get_dummies(pd.concat([reporting_units, nonreporting_units, unexpected_units], axis=0)[aggregate]).values
+        all_units = pd.concat([reporting_units, nonreporting_units, unexpected_units], axis=0)
+
+        if len(aggregate) > 1:
+            aggregate_temp_column_name = '-'.join(aggregate)
+            all_units[aggregate_temp_column_name] = all_units[aggregate].agg('_'.join, axis=1)
+            aggregate_indicator = pd.get_dummies(all_units[aggregate_temp_column_name]).values
+        else:
+            aggregate_indicator = pd.get_dummies(all_units.aggregate).values
         aggregate_indicator_expected = aggregate_indicator[:(n + m)]
 
         aggregate_indicator_unexpected = aggregate_indicator[(n + m):]
@@ -576,8 +591,6 @@ class BootstrapElectionModel(BaseElectionModel):
         aggregate_error_B_2 = aggregate_yz_total_pred
         aggregate_error_B_3 = aggregate_z_total_B
         aggregate_error_B_4 = aggregate_z_total_pred
-
-
 
         aggregate_error_B = (aggregate_error_B_1 / aggregate_error_B_3) - (aggregate_error_B_2 / aggregate_error_B_4)
 
@@ -616,7 +629,7 @@ class BootstrapElectionModel(BaseElectionModel):
     def get_all_conformalization_data_agg(self):
         return None, None
 
-    def get_national_summary_estimates(self, nat_sum_data_dict, called_states):
+    def get_national_summary_estimates(self, nat_sum_data_dict, called_states, base_to_add=0):
         nat_sum_data_dict_sorted = sorted(nat_sum_data_dict.items())
         nat_sum_data_dict_sorted_vals = np.asarray([x[1] for x in nat_sum_data_dict_sorted]).reshape(-1, 1)
         # TODO: divide by states previous election raw margin instead of aggregate error B3/B4
@@ -645,7 +658,7 @@ class BootstrapElectionModel(BaseElectionModel):
             ).T
         ).T
 
-        national_summary_estimates = {'margin': [aggregate_dem_vals_pred, interval_lower, interval_upper]}
+        national_summary_estimates = {'margin': [aggregate_dem_vals_pred + base_to_add, interval_lower + base_to_add, interval_upper + base_to_add]}
         print(national_summary_estimates)
 
         return national_summary_estimates
