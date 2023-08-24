@@ -103,6 +103,7 @@ class BootstrapElectionModel(BaseElectionModel):
         self.B = model_settings.get("B", 2000)
         self.strata = model_settings.get("strata", ['county_classification']) # change this
         self.T = model_settings.get("T", 5000)
+        self.hard_threshold = model_settings.get("agg_model_hard_threshold", False)
         self.featurizer = Featurizer(self.features, self.fixed_effects)
         self.rng = np.random.default_rng(seed=self.seed)
         self.ran_bootstrap = False
@@ -488,6 +489,15 @@ class BootstrapElectionModel(BaseElectionModel):
             self.compute_bootstrap_errors(reporting_units, nonreporting_units, unexpected_units)
         return self.weighted_yz_test_pred
 
+    def _is_top_level_aggregate(self, aggregate):
+        # case 1:
+        # top level aggregate is postal code (ie. we are generating up to a state level -> ECV or Senate). We know this is the case
+        # because aggregate length is just 1 and postal code is the only aggregate
+        # case 2:
+        # top level aggregate is postal code and district (ie. we are generating up to a district level -> House or State Senate). 
+        # We know this is the case because aggregate length is 2 and postal code and district are the two aggregates.
+        return (len(aggregate) == 1 and 'postal_code' in aggregate) or (len(aggregate) == 2 and 'postal_code' in aggregate and 'district' in aggregate)
+
 
     def get_aggregate_predictions(self, reporting_units, nonreporting_units, unexpected_units, aggregate, estimand):
         n = reporting_units.shape[0]
@@ -501,6 +511,7 @@ class BootstrapElectionModel(BaseElectionModel):
             aggregate_indicator = pd.get_dummies(all_units[aggregate_temp_column_name]).values
         else:
             aggregate_indicator = pd.get_dummies(all_units[aggregate]).values
+            aggregate_temp_column_name = aggregate
 
         aggregate_indicator_expected = aggregate_indicator[:(n + m)]
 
@@ -520,6 +531,10 @@ class BootstrapElectionModel(BaseElectionModel):
         raw_margin_df = super().get_aggregate_predictions(reporting_units, nonreporting_units, unexpected_units, aggregate, estimand)
         raw_margin_df['pred_margin'] /= (aggregate_z_total.flatten() + 1)
         raw_margin_df['results_margin'] /= (aggregate_z_total.flatten() + 1) # avoid NaN
+
+        if self._is_top_level_aggregate(aggregate):
+            aggregate_sum = all_units.groupby(aggregate_temp_column_name).sum()
+            self.aggregate_baseline_margin = ((aggregate_sum.baseline_dem - aggregate_sum.baseline_gop) / (aggregate_sum.baseline_turnout + 1)).values
 
         return raw_margin_df
 
@@ -603,7 +618,8 @@ class BootstrapElectionModel(BaseElectionModel):
         aggregate_yz_total = aggregate_yz_unexpected + aggregate_yz_train + aggregate_indicator_test.T @ self.weighted_yz_test_pred
         aggregate_perc_margin_total = np.nan_to_num(aggregate_yz_total / aggregate_z_total)
         
-        if 'postal_code' in aggregate:
+        # saves the aggregate errors in case we want to generate somem form of super-aggregate statistic (like ECV or House seats)
+        if self._is_top_level_aggregate(aggregate):
             self.aggregate_error_B_1 = aggregate_error_B_1
             self.aggregate_error_B_2 = aggregate_error_B_2
             self.aggregate_error_B_3 = aggregate_error_B_3
@@ -629,20 +645,55 @@ class BootstrapElectionModel(BaseElectionModel):
     def get_all_conformalization_data_agg(self):
         return None, None
 
-    def get_national_summary_estimates(self, nat_sum_data_dict, called_states, base_to_add=0):
+    def get_national_summary_estimates(self, nat_sum_data_dict=None, called_states={}, base_to_add=0):
+        # if nat_sum_data_dict is None then we assign 1 for every contest (ie. Senate or House)
+        if nat_sum_data_dict is None:
+            # the order does not matter since all contests have the same weight, so we can use anything as the key when sorting
+            nat_sum_data_dict = {i: 1 for i in range(self.aggregate_error_B_1.shape[0])}
+        # sort in order to get in the same order as the contests, which have been sorted when getting dummies for aggregate indicators
+        # in get_aggregate_prediction_intervals
         nat_sum_data_dict_sorted = sorted(nat_sum_data_dict.items())
         nat_sum_data_dict_sorted_vals = np.asarray([x[1] for x in nat_sum_data_dict_sorted]).reshape(-1, 1)
-        # TODO: divide by states previous election raw margin instead of aggregate error B3/B4
-        # TODO: implement called_states
-        # TODO: we could get more conservative uncertainty from the hard threshold
-        aggregate_dem_prob_B_1 = expit(self.T * np.nan_to_num(self.aggregate_error_B_1 / self.aggregate_error_B_3))
-        aggregate_dem_prob_B_2 = expit(self.T * np.nan_to_num(self.aggregate_error_B_2 / self.aggregate_error_B_4))
+
+        called_states_sorted = sorted(called_states.items())
+        called_states_sorted_vals = np.asarray([x[1] for x in called_states_sorted]).reshape(-1, 1) * 1.0 # multiplying by 1.0 to turn into floats
+        # since we max/min the state called values with contest win probabilities, we don't want the uncalled states to have a number to max/min 
+        # in order for those states to keep their original computed win probability
+        called_states_sorted_vals[called_states_sorted_vals == -1] = np.nan 
+
+        divided_error_B_1 = np.nan_to_num(self.aggregate_error_B_1 / self.aggregate_baseline_margin.reshape(-1, 1))
+        # divided_error_B_1 = np.nan_to_num(self.aggregate_error_B_1 / self.aggregate_error_B_3)
+        divided_error_B_2 = np.nan_to_num(self.aggregate_error_B_2 / self.aggregate_baseline_margin.reshape(-1, 1))
+        # divided_error_B_2 = np.nan_to_num(self.aggregate_error_B_2 / self.aggregate_error_B_4)
+
+        if self.hard_threshold:
+            aggregate_dem_prob_B_1 = divided_error_B_1 > 0.5
+            aggregate_dem_prob_B_1 = divided_error_B_2 > 0.5
+        else:
+            aggregate_dem_prob_B_1 = expit(self.T * divided_error_B_1)
+            aggregate_dem_prob_B_2 = expit(self.T * divided_error_B_2)
         
-        aggregate_dem_vals_B_1 = nat_sum_data_dict_sorted_vals * aggregate_dem_prob_B_1
-        aggregate_dem_vals_B_2 = nat_sum_data_dict_sorted_vals * aggregate_dem_prob_B_2
+        # since called_states_sorted_vals has value 1 if the state is called for the LHS party, maxing the probabilities
+        # gives a probability of 1 for the LHS party
+        # and called_states_sorted_vals has value 0 if the state is called for the RHS party, so mining with probabilities
+        # gives a probability of 0 for the LHS party
+        # and called_states_sorted_vals has value np.nan if the state is uncalled, since we use fmax/fmin the actual number
+        # and not nan gets propagated, so we maintain the probability
+        aggregate_dem_prob_B_1_called = np.fmin(np.fmax(aggregate_dem_prob_B_1, called_states_sorted_vals), called_states_sorted_vals)
+        aggregate_dem_prob_B_2_called = np.fmin(np.fmax(aggregate_dem_prob_B_2, called_states_sorted_vals), called_states_sorted_vals)
+
+        aggregate_dem_vals_B_1 = nat_sum_data_dict_sorted_vals * aggregate_dem_prob_B_1_called
+        aggregate_dem_vals_B_2 = nat_sum_data_dict_sorted_vals * aggregate_dem_prob_B_2_called
         aggregate_dem_vals_B = np.sum(aggregate_dem_vals_B_1, axis=0) - np.sum(aggregate_dem_vals_B_2, axis=0)
 
-        aggregate_dem_vals_pred = np.sum(nat_sum_data_dict_sorted_vals * expit(self.T * self.aggregate_perc_margin_total))
+        if self.hard_threshold:
+            aggregate_dem_probs_total = self.aggregate_perc_margin_total > 0.5
+        else:
+            aggregate_dem_probs_total = expit(self.T * self.aggregate_perc_margin_total)
+
+        # same as for the intervals
+        aggregate_dem_probs_total_called = np.fmin(np.fmax(aggregate_dem_probs_total, called_states_sorted_vals), called_states_sorted_vals)
+        aggregate_dem_vals_pred = np.sum(nat_sum_data_dict_sorted_vals * aggregate_dem_probs_total_called)
         alpha = 0.9
         lower_alpha = (1 - alpha) / 2
         upper_alpha = 1 - lower_alpha
@@ -657,7 +708,7 @@ class BootstrapElectionModel(BaseElectionModel):
                 axis=-1
             ).T
         ).T
-
+        import IPython; IPython.embed()
         national_summary_estimates = {'margin': [aggregate_dem_vals_pred + base_to_add, interval_lower + base_to_add, interval_upper + base_to_add]}
         print(national_summary_estimates)
 
