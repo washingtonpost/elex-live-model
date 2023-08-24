@@ -500,7 +500,7 @@ class BootstrapElectionModel(BaseElectionModel):
             all_units[aggregate_temp_column_name] = all_units[aggregate].agg('_'.join, axis=1)
             aggregate_indicator = pd.get_dummies(all_units[aggregate_temp_column_name]).values
         else:
-            aggregate_indicator = pd.get_dummies(all_units.aggregate).values
+            aggregate_indicator = pd.get_dummies(all_units[aggregate]).values
 
         aggregate_indicator_expected = aggregate_indicator[:(n + m)]
 
@@ -558,7 +558,7 @@ class BootstrapElectionModel(BaseElectionModel):
             all_units[aggregate_temp_column_name] = all_units[aggregate].agg('_'.join, axis=1)
             aggregate_indicator = pd.get_dummies(all_units[aggregate_temp_column_name]).values
         else:
-            aggregate_indicator = pd.get_dummies(all_units.aggregate).values
+            aggregate_indicator = pd.get_dummies(all_units[aggregate]).values
         aggregate_indicator_expected = aggregate_indicator[:(n + m)]
 
         aggregate_indicator_unexpected = aggregate_indicator[(n + m):]
