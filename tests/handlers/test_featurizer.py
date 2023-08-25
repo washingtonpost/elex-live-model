@@ -91,7 +91,6 @@ def test_column_names():
             "expected": [True, True, True, True, False, False, False, False],
         }
     )
-
     df_new = featurizer.prepare_data(df, center_features=False, scale_features=False, add_intercept=True)
 
     df_fitting = featurizer.filter_to_active_features(df_new[:split_fitting_heldout])

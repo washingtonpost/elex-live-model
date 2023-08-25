@@ -93,7 +93,7 @@ class Featurizer:
                 if x.startswith(tuple([fixed_effect + "_" for fixed_effect in self.fixed_effect_cols]))
             ]
 
-            df_fitting = df[(df.reporting is True) & (df.expected is True)]
+            df_fitting = df[(df.reporting) & (df.expected)]
             # get the indices of all expanded fixed effects in the fitting data (active fixed effects + the fixed effect we will drop for multicolinearity)
             active_fixed_effect_boolean_df = df_fitting[all_expanded_fixed_effects].sum(axis=0) > 0
             # get the names of those fixed effects, since we we will want to know which fixed effect was dropped
