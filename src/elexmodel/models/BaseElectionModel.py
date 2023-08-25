@@ -24,7 +24,6 @@ class BaseElectionModel:
         self.fixed_effects = model_settings.get("fixed_effects", {})
         self.lambda_ = model_settings.get("lambda_", 0)
         self.features_to_coefficients = {}
-        self.featurizer = Featurizer(self.features, self.fixed_effects)
         self.add_intercept = True
         self.seed = 4191  # set arbitrarily
 
@@ -59,29 +58,21 @@ class BaseElectionModel:
         Produces unit level predictions. Fits quantile regression to reporting data, applies
         it to nonreporting data. The features are specified in model_settings.
         """
-        
-        # compute the means of both reporting_units and nonreporting_units for centering (part of featurizing)
-        # we want them both, since together they are the subunit population
-        # self.featurizer.compute_means_for_centering(reporting_units, nonreporting_units)
-        # reporting_units_features and nonreporting_units_features should have the same
-        # features. Specifically also the same fixed effect columns.
-        # reporting_units_features = self.featurizer.featurize_fitting_data(
-            # reporting_units, add_intercept=self.add_intercept
-        # )
-        # nonreporting_units_features = self.featurizer.featurize_heldout_data(nonreporting_units)
         n_train = reporting_units.shape[0]
         n_test = nonreporting_units.shape[0]
         all_units = pd.concat([reporting_units, nonreporting_units], axis=0)
-        x_all = self.featurizer.prepare_data(all_units, center_features=True, scale_features=False, add_intercept=self.add_intercept)
+        
+        featurizer = Featurizer(self.features, self.fixed_effects)
+        x_all = featurizer.prepare_data(all_units, center_features=True, scale_features=False, add_intercept=self.add_intercept)
 
-        reporting_units_features = self.featurizer.filter_to_active_features(x_all[:n_train])
-        nonreporting_units_features = self.featurizer.generate_holdout_data(x_all[n_train: (n_train + n_test)])
+        reporting_units_features = featurizer.filter_to_active_features(x_all[:n_train])
+        nonreporting_units_features = featurizer.generate_holdout_data(x_all[n_train: (n_train + n_test)])
 
         weights = reporting_units[f"last_election_results_{estimand}"]
         reporting_units_residuals = reporting_units[f"residuals_{estimand}"]
 
         self.fit_model(self.qr, reporting_units_features, reporting_units_residuals, 0.5, weights, True)
-        self.features_to_coefficients = dict(zip(self.featurizer.complete_features, self.qr.coefficients))
+        self.features_to_coefficients = dict(zip(featurizer.complete_features, self.qr.coefficients))
 
         preds = self.qr.predict(nonreporting_units_features)
 
@@ -264,7 +255,7 @@ class BaseElectionModel:
         # since nonreporting_units is the second dataframe in a_all, all units after n_reporting_units are nonreporting
         # note: the features used may be different fromt the median predictions, but this guarantees that the features
         # are the same accross train_data, conformalization_data and nonreporting_units
-        nonreporting_units_features = self.featurizer.generate_holdout_data(x_all[n_reporting_units:])
+        nonreporting_units_features = interval_featurizer.generate_holdout_data(x_all[n_reporting_units:])
         nonreporting_lower_bounds = lower_qr.predict(nonreporting_units_features)
         nonreporting_upper_bounds = upper_qr.predict(nonreporting_units_features)
 
@@ -282,3 +273,6 @@ class BaseElectionModel:
         These coefficients are for the point prediciton only, not for the lower or upper intervals models.
         """
         return self.features_to_coefficients
+
+    def get_national_summary_estimates(self, nat_sum_data_dict, called_states, base_to_add):
+        raise NotImplementedError()
