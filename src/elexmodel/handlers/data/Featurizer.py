@@ -43,6 +43,7 @@ class Featurizer:
         """
         Convert fixed effect columns into dummy variables.
         """
+        df = df.copy()
         # we want to keep the original fixed effect columns since we may need them later for aggregation (ie. county fixed effect)
         original_fixed_effect_columns = df[self.fixed_effect_cols]
         # set non-included values to 'other' as needed since we don't want their values to get a dummy variable
@@ -71,6 +72,7 @@ class Featurizer:
         if center_features:
             df[self.features] -= df[self.features].mean()
         if scale_features:
+            # this expects there to be some variation in the data, otherwise we are dividing by zero
             df[self.features] /= df[self.features].std()
         if add_intercept:
             self.complete_features += ['intercept']
@@ -137,6 +139,13 @@ class Featurizer:
         Generate fixed effects for the holdout data (ie. data that we will predict on)
         """
         df = df.copy()
+
+        # if a unit has an inactive fixed effect value for some fixed effect category we need
+        # to insert 1 / (number of fixed effect values) into each active fixed effect value for that unit
+        # if we were to leave them as zero, then the model would apply the dropped fixed effect
+        # value coefficient (since this is now what the intercept stands in for)
+        # instead we want to apply all active fixed effect coefficients equally
+
         # get inactive fixed effects (ie expanded fixed effects that are not active)
         # these are fixed effects that exist only in the holdout set (ie. we do not have a covariate for them)
         inactive_fixed_effects = [x for x in self.expanded_fixed_effects if x not in self.active_fixed_effects]
@@ -147,7 +156,9 @@ class Featurizer:
             fe_inactive_fixed_effects = self._get_categories_for_fe(inactive_fixed_effects, fe)
             # get rows that have an inactive fixed effect
             rows_w_inactive_fixed_effects = df[fe_inactive_fixed_effects].sum(axis=1) > 0
+
             # set the values for active fixed effect in rows that have inactive fixed effect to be 1 / (n + 1)
-            # WHY?
+            # rows that have an inactive fixed effect value need to receive the treat of the average fixed effects
+            # NOTE: aren't we now applying 1 * the dropped fixed effect and 1 / (n + 1) times the other fixed effects?
             df.loc[rows_w_inactive_fixed_effects, fe_active_fixed_effects] = 1 / (len(fe_active_fixed_effects) + 1)
         return self.filter_to_active_features(df)
