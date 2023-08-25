@@ -5,6 +5,7 @@ from collections import namedtuple
 
 import cvxpy
 import numpy as np
+import pandas as pd
 from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
 
 from elexmodel.handlers.data.Featurizer import Featurizer
@@ -58,15 +59,23 @@ class BaseElectionModel:
         Produces unit level predictions. Fits quantile regression to reporting data, applies
         it to nonreporting data. The features are specified in model_settings.
         """
+        
         # compute the means of both reporting_units and nonreporting_units for centering (part of featurizing)
         # we want them both, since together they are the subunit population
-        self.featurizer.compute_means_for_centering(reporting_units, nonreporting_units)
+        # self.featurizer.compute_means_for_centering(reporting_units, nonreporting_units)
         # reporting_units_features and nonreporting_units_features should have the same
         # features. Specifically also the same fixed effect columns.
-        reporting_units_features = self.featurizer.featurize_fitting_data(
-            reporting_units, add_intercept=self.add_intercept
-        )
-        nonreporting_units_features = self.featurizer.featurize_heldout_data(nonreporting_units)
+        # reporting_units_features = self.featurizer.featurize_fitting_data(
+            # reporting_units, add_intercept=self.add_intercept
+        # )
+        # nonreporting_units_features = self.featurizer.featurize_heldout_data(nonreporting_units)
+        n_train = reporting_units.shape[0]
+        n_test = nonreporting_units.shape[0]
+        all_units = pd.concat([reporting_units, nonreporting_units], axis=0)
+        x_all = self.featurizer.prepare_data(all_units, center_features=True, scale_features=False, add_intercept=self.add_intercept)
+
+        reporting_units_features = self.featurizer.filter_to_active_features(x_all[:n_train])
+        nonreporting_units_features = self.featurizer.generate_holdout_data(x_all[n_train: (n_train + n_test)])
 
         weights = reporting_units[f"last_election_results_{estimand}"]
         reporting_units_residuals = reporting_units[f"residuals_{estimand}"]
@@ -199,21 +208,27 @@ class BaseElectionModel:
         # seed is set during initialization, to make sure we always get the same
         # training/conformalization split for each alpha of one run
         reporting_units_shuffled = reporting_units.sample(frac=1, random_state=self.seed).reset_index(drop=True)
+        
+        n_reporting_units = reporting_units.shape[0]
 
         upper_bound = (1 + alpha) / 2
         lower_bound = (1 - alpha) / 2
 
         train_rows = math.floor(reporting_units.shape[0] * conf_frac)
-        train_data = reporting_units_shuffled[:train_rows].reset_index(drop=True)
+        train_data = reporting_units_shuffled[:train_rows]
 
-        # specifying self.features extracts the correct columns and makes sure they are in the correct
-        # order. Necessary when fitting and predicting on the model.
         # the fixed effects in train_data will be a subset of the fixed effect of reporting_units since all
-        # units from one fixed effect category might be in the conformalization data. Note that we are
-        # overwritting featurizer.expanded_fixed_effects by doing this (which is what we want), since we
-        # want the expanded_fixed_effects from train_data to be used by conformalization_data and nonreporting_data
-        # in this function.
-        train_data_features = self.featurizer.featurize_fitting_data(train_data, add_intercept=self.add_intercept)
+        # units from one fixed effect category might be in the conformalization data. 
+
+        # we need a new featurizer since otherwise we will continue to add intercepts to the features
+        interval_featurizer = Featurizer(self.features, self.fixed_effects)
+        # we need all units since we will apply the upper and lower models to the nonreporting_units also
+        # so we need to make sure that they have the correct fixed effects
+        all_units_shuffled = pd.concat([reporting_units_shuffled, nonreporting_units], axis=0)
+        x_all = interval_featurizer.prepare_data(all_units_shuffled, center_features=True, scale_features=False, add_intercept=self.add_intercept)
+        # x_all starts with the shuffled reporting units, so the first train_rows are the same as train_data
+        train_data_features = interval_featurizer.filter_to_active_features(x_all[:train_rows])
+
         train_data_residuals = train_data[f"residuals_{estimand}"]
         train_data_weights = train_data[f"last_election_results_{estimand}"]
 
@@ -226,9 +241,11 @@ class BaseElectionModel:
 
         # apply to conformalization data. Conformalization bounds will later tell us how much to adjust lower/upper
         # bounds for nonreporting data.
-        conformalization_data = reporting_units_shuffled[train_rows:].reset_index(drop=True)
-        # conformalization features will be the same as the features in train_data
-        conformalization_data_features = self.featurizer.featurize_heldout_data(conformalization_data)
+        conformalization_data = reporting_units_shuffled[train_rows:]
+
+        # all_data starts with reporting_units_shuffled, so the rows between train_rows and n_reporting_units are the
+        # conformalization set
+        conformalization_data_features = interval_featurizer.generate_holdout_data(x_all[train_rows:n_reporting_units])
 
         # we are interested in f(X) - r
         # since later conformity scores care about deviation of bounds from residuals
@@ -244,9 +261,10 @@ class BaseElectionModel:
         conformalization_data["lower_bounds"] = conformalization_lower_bounds
 
         # apply lower/upper models to nonreporting data
-        # now the features of the nonreporting_units will be the same as the train_data features
-        # they might differ slightly from the features used when fitting the median prediction
-        nonreporting_units_features = self.featurizer.featurize_heldout_data(nonreporting_units)
+        # since nonreporting_units is the second dataframe in a_all, all units after n_reporting_units are nonreporting
+        # note: the features used may be different fromt the median predictions, but this guarantees that the features
+        # are the same accross train_data, conformalization_data and nonreporting_units
+        nonreporting_units_features = self.featurizer.generate_holdout_data(x_all[n_reporting_units:])
         nonreporting_lower_bounds = lower_qr.predict(nonreporting_units_features)
         nonreporting_upper_bounds = upper_qr.predict(nonreporting_units_features)
 
