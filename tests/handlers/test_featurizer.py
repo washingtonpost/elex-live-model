@@ -331,12 +331,17 @@ def test_generate_fixed_effects(va_governor_county_data):
     nonreporting_data = combined_data_handler.get_nonreporting_units(99)
 
     featurizer = Featurizer([], {"county_classification": "all"})
-    featurizer.compute_means_for_centering(reporting_data, nonreporting_data)
 
-    reporting_data_features = featurizer.featurize_fitting_data(reporting_data)
-    nonreporting_data_features = featurizer.featurize_heldout_data(nonreporting_data)
+    n_train = reporting_data.shape[0]
+    n_test = nonreporting_data.shape[0]
+    all_units = pd.concat([reporting_data, nonreporting_data], axis=0)
 
-    assert combined_data_handler.data.shape == (133, 32)
+    x_all = featurizer.prepare_data(all_units, center_features=False, scale_features=False, add_intercept=True)
+
+    reporting_data_features = featurizer.filter_to_active_features(x_all[:n_train])
+    nonreporting_data_features = featurizer.generate_holdout_data(x_all[n_train:])
+
+    assert combined_data_handler.data.shape == (133, 34)
 
     n_expected_columns = 6  # (6 - 1) fixed effects + 1 intercept
     assert reporting_data_features.shape == (133, n_expected_columns)
@@ -347,6 +352,7 @@ def test_generate_fixed_effects(va_governor_county_data):
 
     assert "county_classification" in featurizer.fixed_effect_cols
     assert len(featurizer.expanded_fixed_effects) == 5  # 6 - 1
+    assert len(featurizer.active_fixed_effects) == 5
 
     combined_data_handler = CombinedDataHandler(
         va_governor_county_data,
@@ -357,15 +363,20 @@ def test_generate_fixed_effects(va_governor_county_data):
     )
 
     featurizer = Featurizer([], {"county_classification": ["all"], "county_fips": ["all"]})
-    featurizer.compute_means_for_centering(reporting_data, nonreporting_data)
 
     reporting_data = combined_data_handler.get_reporting_units(99)
     nonreporting_data = combined_data_handler.get_nonreporting_units(99)
 
-    reporting_data_features = featurizer.featurize_fitting_data(reporting_data)
-    nonreporting_data_features = featurizer.featurize_heldout_data(nonreporting_data)
+    n_train = reporting_data.shape[0]
+    n_test = nonreporting_data.shape[0]
+    all_units = pd.concat([reporting_data, nonreporting_data], axis=0)
 
-    assert combined_data_handler.data.shape == (133, 32)
+    x_all = featurizer.prepare_data(all_units, center_features=False, scale_features=False, add_intercept=True)
+
+    reporting_data_features = featurizer.filter_to_active_features(x_all[:n_train])
+    nonreporting_data_features = featurizer.generate_holdout_data(x_all[n_train:])
+
+    assert combined_data_handler.data.shape == (133, 34)
 
     n_expected_columns = 138  # (6 - 1) + (133 - 1) fixed effects + 1 intercept
     assert reporting_data_features.shape == (133, n_expected_columns)
@@ -414,12 +425,16 @@ def test_generate_fixed_effects_not_all_reporting(va_governor_county_data):
     nonreporting_data = combined_data_handler.get_nonreporting_units(99)
 
     featurizer = Featurizer([], {"county_fips": ["all"]})
-    featurizer.compute_means_for_centering(reporting_data, nonreporting_data)
+    n_train = reporting_data.shape[0]
+    n_test = nonreporting_data.shape[0]
+    all_units = pd.concat([reporting_data, nonreporting_data], axis=0)
 
-    reporting_data_features = featurizer.featurize_fitting_data(reporting_data)
-    nonreporting_data_features = featurizer.featurize_heldout_data(nonreporting_data)
+    x_all = featurizer.prepare_data(all_units, center_features=False, scale_features=False, add_intercept=True)
 
-    assert combined_data_handler.data.shape == (133, 32)
+    reporting_data_features = featurizer.filter_to_active_features(x_all[:n_train])
+    nonreporting_data_features = featurizer.generate_holdout_data(x_all[n_train:])
+
+    assert combined_data_handler.data.shape == (133, 34)
 
     n_expected_columns = (n - 1) + 1  # minus 1 for dropped fixed effect, plus 1 for intercept
     assert reporting_data_features.shape == (n, n_expected_columns)
@@ -437,9 +452,10 @@ def test_generate_fixed_effects_not_all_reporting(va_governor_county_data):
     assert (
         "county_fips_51790" not in nonreporting_data_features.columns
     )  # not in here because not in featurizer.complete_features
-
+    
     assert "county_fips" in featurizer.fixed_effect_cols
-    assert len(featurizer.expanded_fixed_effects) == n - 1
+    assert len(featurizer.expanded_fixed_effects) == 133 - 1
+    assert len(featurizer.active_fixed_effects) == n - 1
 
     assert not reporting_data_features["county_fips_51009"].isnull().any()
 
@@ -476,16 +492,21 @@ def test_generate_fixed_effects_mixed_reporting(va_governor_precinct_data):
     nonreporting_data = combined_data_handler.get_nonreporting_units(99)
 
     featurizer = Featurizer([], ["county_fips"])
-    featurizer.compute_means_for_centering(reporting_data, nonreporting_data)
 
-    reporting_data_features = featurizer.featurize_fitting_data(reporting_data)
-    nonreporting_data_features = featurizer.featurize_heldout_data(nonreporting_data)
+    n_train = reporting_data.shape[0]
+    n_test = nonreporting_data.shape[0]
+    all_units = pd.concat([reporting_data, nonreporting_data], axis=0)
 
-    assert combined_data_handler.data.shape == (2360, 32)
+    x_all = featurizer.prepare_data(all_units, center_features=False, scale_features=False, add_intercept=True)
+
+    reporting_data_features = featurizer.filter_to_active_features(x_all[:n_train])
+    nonreporting_data_features = featurizer.generate_holdout_data(x_all[n_train:])
+
+    assert combined_data_handler.data.shape == (2360, 34)
 
     n_expected_columns = 7  # when n = 100 we get to county 51013 (minus dropped fixed effect, plus intercept)
-    assert reporting_data_features.shape == (n, n_expected_columns)
-    assert nonreporting_data_features.shape == (2360 - n, n_expected_columns)
+    assert reporting_data_features.shape == (n_train, n_expected_columns) # use n_train since dropping columns
+    assert nonreporting_data_features.shape == (n_test, n_expected_columns)
 
     assert "county_fips_51001" not in reporting_data_features.columns  # dropped from get_dummies because first
     assert "county_fips_51001" not in nonreporting_data_features.columns  # therefore not added manually
@@ -506,4 +527,4 @@ def test_generate_fixed_effects_mixed_reporting(va_governor_precinct_data):
     )  # not in here because not in featurizer.complete_features
 
     assert "county_fips" in featurizer.fixed_effect_cols
-    assert len(featurizer.expanded_fixed_effects) == 7 - 1
+    assert len(featurizer.expanded_fixed_effects) == 133 - 1
