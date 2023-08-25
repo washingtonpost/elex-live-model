@@ -38,7 +38,12 @@ class CombinedDataHandler:
             data.update(data[result_cols].fillna(value=0))
             data.loc[indices_with_null_val, "percent_expected_vote"] = 0
 
-        data['turnout_factor'] = (data.results_dem + data.results_gop) / (data.weights)
+        # TODO: move to estimandizer
+        data['turnout_factor'] = data.results_turnout / data.weights
+        if 'margin' in estimands:
+            # overwrite to make two party comparison fair
+            data['turnout_factor'] = (data.results_dem + data.results_gop) / data.weights
+
         self.data = data
 
     def get_reporting_units(self, percent_reporting_threshold, features_to_normalize=[], add_intercept=True):

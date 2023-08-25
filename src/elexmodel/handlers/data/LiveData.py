@@ -85,11 +85,12 @@ class MockLiveDataHandler:
 
     def load_data(self, data, estimands, historical):
         columns_to_return = ["postal_code", "geographic_unit_fips"]
+        estimands_to_use = ['turnout'] # in any case we want the turnout in order to compute turnout_factor
         if 'margin' in estimands:
-            estimands_to_use = ['dem', 'gop']
+            estimands_to_use = estimands_to_use + ['dem', 'gop']
             columns_to_return.extend(["results_margin", "normalized_margin"])
         else:
-            estimands_to_use = estimands
+            estimands_to_use = list(set(estimands + estimands_to_use))
 
         for estimand in estimands_to_use:
             if historical:
@@ -102,7 +103,8 @@ class MockLiveDataHandler:
             if f"results_{estimand}" not in results_column_names:
                 raise MockLiveDataHandlerException("This is missing results data for estimand: ", estimand)
             columns_to_return.append(f"results_{estimand}")
-        # we will eventually want to replace this stuff with the Estimandizer
+            
+        # TODO: move to estimandizer
         if 'margin' in estimands:
             data['results_margin'] = data.results_dem - data.results_gop
             # TODO: figure out what to do about the +1
