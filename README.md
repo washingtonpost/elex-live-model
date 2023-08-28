@@ -8,7 +8,7 @@ The first iteration of this model is written in R in [this repo](https://github.
 
 ## How to Run the Model
 
-For dev work, skip this section and go on to the [Development](##Development) section below.
+For dev work, skip this section and go on to the [Development](#Development) section below.
 
 ### Installation
 
