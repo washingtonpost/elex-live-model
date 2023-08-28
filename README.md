@@ -14,6 +14,7 @@ For dev work, skip this section and go on to the [Development](#Development) sec
 
 * We recommend that you set up a virtualenv and activate it (IE ``mkvirtualenv elex-model`` via http://virtualenvwrapper.readthedocs.io/en/latest/).
 * Run ``pip install elex-model``
+  * If you get stuck with an error about `qdldl` (e.g. `RuntimeError: CMake must be installed to build qdldl`), you are missing `cmake`.  You can install it with Homebrew with `brew install cmake` or [compile it from source](https://cmake.org/download/).
 
 ### Usage
 
