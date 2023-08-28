@@ -6,12 +6,14 @@ Generally, the model works by comparing the current results to a historical base
 
 The first iteration of this model is written in R in [this repo](https://github.com/washingtonpost/2020-election-night-model).
 
-## Installation
+## How to Run the Model
+
+### Installation
 
 * We recommend that you set up a virtualenv and activate it (IE ``mkvirtualenv elex-model`` via http://virtualenvwrapper.readthedocs.io/en/latest/).
 * Run ``pip install elex-model``
 
-## Usage
+### Usage
 
 We can run the model with a CLI or with Python.
 
@@ -19,7 +21,7 @@ We can use the model to generate current estimates or for a historical evaluatio
 
 **See more information on how to pass data to the model in the [data README](https://github.com/washingtonpost/elex-live-model/blob/develop/README-data.md).**
 
-### CLI
+#### CLI
 
 The CLI is for local development and testing purposes only. We cannot run a live election through the CLI because it pulls vote counts from data files located either in S3 or locally. It does not retrieve current data from the Dynamo database of election results.
 
@@ -40,14 +42,14 @@ If you want to run a test with some nonreporting subunits, you can use the `--pe
 elexmodel 2017-11-07_VA_G --estimands=dem --office_id=G --geographic_unit_type=county --percent_reporting 40
 ```
 
-#### Historical election
+##### Historical election
 
 If you want to run a historical election, you can use the `--historical` flag. For this to succeed, the election must have historical data already prepared.
 ```
 elexmodel 2021-11-02_VA_G --estimands=dem --office_id=G --geographic_unit_type=county --percent_reporting 60 --historical
 ```
 
-### Parameters
+##### Parameters
 
 Parameters for the CLI tool:
 
@@ -70,7 +72,7 @@ Parameters for the CLI tool:
 
 Note: When running the model with multiple fixed effects, make sure they are not linearly dependent. For example, `county_fips` and `county_classification` are linearly dependent when run together. That's because every county is in one county class, so all the fixed effect columns of the counties in the county class sum up to the fixed effect column of that county class.
 
-### Python
+#### Python
 
 This is the class and function that invokes the general function to generate estimates. You can install `elex-model` as a Python package and use this code snippet in other projects.
 
