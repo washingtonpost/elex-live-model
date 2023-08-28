@@ -149,25 +149,25 @@ pre-commit run --all-files
 
 ### Release
 
-To release a new version manually: 
-- Decide what the next version will be per semantic versioning: `X.X.X`
-- Make a new branch from develop called `release/X.X.X`
-- Update the version in `setup.py`
-- Update the changelog with all the chnages that will be included in the release
-- Commit your updates and open a PR against main
-- Once the PR is merged, tag main (or develop for a beta release) with the version's release number (`git tag X.X.X`) and push that tag to github (`git push --tags`)
-- Merge main into develop
+To release a new version manually:
+1. Decide what the next version will be per semantic versioning: `X.X.X`
+2. Make a new branch from develop called `release/X.X.X`
+3. Update the version in `setup.py`
+4. Update the changelog with all the chnages that will be included in the release
+5. Commit your updates and open a PR against main
+6. Once the PR is merged, tag main (or develop for a beta release) with the version's release number (`git tag X.X.X`) and push that tag to github (`git push --tags`)
+7. Merge main into develop
 
-Then, we need to release this version to PyPi.This repository has a Github Action workflow that automatically builds and releases the latest version to TestPyPi and PyPi on pushes to `main`. However, to release to PyPi manually:
-- Generate a distribution archive:
-  - Make sure `requirements-dev.txt` is installed
-  - Run `python3 -m pip install --upgrade build` to install `build`
-  - Run `python3 -m build`. This should generate two files in the `dist/` directory.
-  - Check to make sure the correct version is installed in the `dist/` folder that should now exist at the base of the repo folder. If you've previously run these commands locally for an earlier version, you may need to delete the older files in `dist/` order to upload them correctly in the next step. You can just delete the entire `dist/` folder and run the above command again.
-- Upload the distribution archive:`
-  - Run `python3 -m pip install --upgrade twine`
-  - Upload to TestPyPi with `python3 -m twine upload --repository testpypi dist/*`
-  - Upload to PyPi `python3 -m twine upload dist/*`
+Then, we need to release this version to PyPi. This repository has a Github Action workflow that automatically builds and releases the latest version to TestPyPi and PyPi on pushes to `main`. However, to release to PyPi manually:
+1. Generate a distribution archive:
+  1. Make sure `requirements-dev.txt` is installed
+  2. Run `python3 -m pip install --upgrade build` to install `build`
+  3. Run `python3 -m build`. This should generate two files in the `dist/` directory.
+  4. Check to make sure the correct version is installed in the `dist/` folder that should now exist at the base of the repo folder. If you've previously run these commands locally for an earlier version, you may need to delete the older files in `dist/` order to upload them correctly in the next step. You can just delete the entire `dist/` folder and run the above command again.
+2. Upload the distribution archive:`
+  1. Run `python3 -m pip install --upgrade twine`
+  2. Upload to TestPyPi with `python3 -m twine upload --repository testpypi dist/*`
+  3. Upload to PyPi `python3 -m twine upload dist/*`
 
 
 ## Further Reading
