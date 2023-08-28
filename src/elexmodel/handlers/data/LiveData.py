@@ -107,8 +107,7 @@ class MockLiveDataHandler:
         # TODO: move to estimandizer
         if 'margin' in estimands:
             data['results_margin'] = data.results_dem - data.results_gop
-            # TODO: figure out what to do about the +1
-            data['normalized_margin'] = (data.results_dem - data.results_gop) / (data.results_dem + data.results_gop + 1)
+            data['normalized_margin'] = (data.results_dem - data.results_gop) / (data.results_dem + data.results_gop)
 
         self.shuffle_dataframe = data[self.shuffle_columns].copy()
 

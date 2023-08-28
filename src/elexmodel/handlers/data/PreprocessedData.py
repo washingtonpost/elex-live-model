@@ -88,12 +88,12 @@ class PreprocessedDataHandler:
             # so we don't care about the total voters or the baseline election.
             return preprocessed_data
 
-        preprocessed_data['weights'] = preprocessed_data.baseline_turnout + 1
+        preprocessed_data['weights'] = preprocessed_data.baseline_turnout
 
         # TODO: move to estimandizer
         if 'margin' in estimand_baselines:
             # if margin then we want to overwrite with two party turnout rather than actual turnout to make normalization below fair
-            preprocessed_data['weights'] = preprocessed_data.baseline_dem + preprocessed_data.baseline_gop + 1
+            preprocessed_data['weights'] = preprocessed_data.baseline_dem + preprocessed_data.baseline_gop
             preprocessed_data['baseline_margin'] = preprocessed_data.baseline_dem - preprocessed_data.baseline_gop
             preprocessed_data['baseline_normalized_margin'] = (preprocessed_data.baseline_dem - preprocessed_data.baseline_gop) / preprocessed_data.weights
 

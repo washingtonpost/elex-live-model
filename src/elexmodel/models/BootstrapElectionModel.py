@@ -645,7 +645,7 @@ class BootstrapElectionModel(BaseElectionModel):
     def get_all_conformalization_data_agg(self):
         return None, None
 
-    def get_national_summary_estimates(self, nat_sum_data_dict=None, called_states={}, base_to_add=0):
+    def get_national_summary_estimates(self, nat_sum_data_dict, called_states, base_to_add, alpha):
         # if nat_sum_data_dict is None then we assign 1 for every contest (ie. Senate or House)
         if nat_sum_data_dict is None:
             # the order does not matter since all contests have the same weight, so we can use anything as the key when sorting
@@ -694,7 +694,6 @@ class BootstrapElectionModel(BaseElectionModel):
         # same as for the intervals
         aggregate_dem_probs_total_called = np.fmin(np.fmax(aggregate_dem_probs_total, called_states_sorted_vals), called_states_sorted_vals)
         aggregate_dem_vals_pred = np.sum(nat_sum_data_dict_sorted_vals * aggregate_dem_probs_total_called)
-        alpha = 0.9
         lower_alpha = (1 - alpha) / 2
         upper_alpha = 1 - lower_alpha
         lower_q = np.floor(lower_alpha * (self.B + 1)) / self.B

@@ -28,6 +28,7 @@ class CombinedDataHandler:
         # this is necessary if units will not be returning results in this election,
         # but we didn't know that (ie. townships)
         result_cols = [f"results_{estimand}" for estimand in estimands]
+
         if handle_unreporting == "drop":
             # Drop the whole row if an estimand is not reporting
             data = data.dropna(axis=0, how="any", subset=result_cols)
@@ -39,6 +40,7 @@ class CombinedDataHandler:
             data.loc[indices_with_null_val, "percent_expected_vote"] = 0
 
         # TODO: move to estimandizer
+        # assumes that data.weights > 0, which means we cannot have units where turnout (or two party turnout) was zero
         data['turnout_factor'] = data.results_turnout / data.weights
         if 'margin' in estimands:
             # overwrite to make two party comparison fair
@@ -53,7 +55,7 @@ class CombinedDataHandler:
         reporting_units = self.data[self.data.percent_expected_vote >= percent_reporting_threshold].reset_index(
             drop=True
         )
-        # if turnout factor 0.2 assume AP made a mistake and don't treat those as reporting units
+        # if turnout factor less than 0.5 or greater than 1.5 assume AP made a mistake and don't treat those as reporting units
         reporting_units = reporting_units[reporting_units.turnout_factor > 0.5]
         reporting_units = reporting_units[reporting_units.turnout_factor < 1.5]
 

@@ -134,8 +134,8 @@ class ModelClient:
         raw_aggregate_list = base_aggregate + [aggregate]
         return sorted(list(set(raw_aggregate_list)), key=lambda x: AGGREGATE_ORDER.index(x))
 
-    def get_national_summary_votes_estimates(self, nat_sum_data_dict=None, called_states={}, base_to_add=0):
-        return self.model.get_national_summary_estimates(nat_sum_data_dict, called_states, base_to_add)
+    def get_national_summary_votes_estimates(self, nat_sum_data_dict=None, called_states={}, base_to_add=0, alpha=0.9):
+        return self.model.get_national_summary_estimates(nat_sum_data_dict, called_states, base_to_add, alpha=alpha)
 
     def get_estimates(
         self,
@@ -209,8 +209,6 @@ class ModelClient:
         '''
         states_with_election = config_handler.get_states(office)
         estimand_baselines = config_handler.get_estimand_baselines(office, estimands)
-        if 'margin' in estimands:
-            estimand_baselines['margin'] = 'margin'
 
         LOG.info("Getting preprocessed data: %s", election_id)
         preprocessed_data_handler = PreprocessedDataHandler(

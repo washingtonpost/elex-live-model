@@ -69,6 +69,8 @@ class ConfigHandler:
         Return dict of baseline pointers for requested estimands
         """
         baseline_pointers = {estimand: self.get_baseline_pointer(office).get(estimand) for estimand in estimands}
+        if 'margin' in estimands:
+            baseline_pointers['margin'] = 'margin'
         return baseline_pointers
 
     def get_estimands(self, office):
