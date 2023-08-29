@@ -5,8 +5,12 @@ from scipy.optimize import linprog
 from scipy.special import expit
 import math
 
+import logging
 from elexmodel.models.BaseElectionModel import BaseElectionModel, PredictionIntervals
 from elexmodel.handlers.data.Featurizer import Featurizer
+
+LOG = logging.getLogger(__name__)
+
 
 class OLSRegression(object):
     def __init__(self):
@@ -14,14 +18,17 @@ class OLSRegression(object):
         self.hat_matrix = None
         self.beta_hat = None
 
-    def _compute_normal_equations(self, x, L, lambda_):
+    def _compute_normal_equations(self, x, L, lambda_, n_feat_ignore_reg):
         Q, R = np.linalg.qr(L @ x)
         lambda_I = lambda_ * np.eye(R.shape[1])
-        lambda_I[0, 0] = 0
-        lambda_I[1, 1] = 0
+        # we don't want to regularize the coefficient for intercept and some features
+        # so set regularization constant to zero for those features
+        # this assumes that these are the first features
+        for i in range(n_feat_ignore_reg):
+            lambda_I[i, i] = 0
         return np.linalg.inv(R.T @ R + lambda_I) @ R.T @ Q.T
 
-    def fit(self, x, y, weights=None, lambda_=0, normal_eqs=None):
+    def fit(self, x, y, weights=None, lambda_=0, normal_eqs=None, n_feat_ignore_reg=2):
         if weights is None:
             weights = np.ones((y.shape[0], ))
         # normalize + sqrt
@@ -29,7 +36,7 @@ class OLSRegression(object):
         if normal_eqs is not None:
             self.normal_eqs = normal_eqs
         else:
-            self.normal_eqs = self._compute_normal_equations(x, L, lambda_)
+            self.normal_eqs = self._compute_normal_equations(x, L, lambda_, n_feat_ignore_reg)
         self.hat_vals = np.diag(x @ self.normal_eqs @ L)
         self.beta_hat = self.normal_eqs @ L @ y
         return self
@@ -44,7 +51,7 @@ class OLSRegression(object):
         if center:
             residuals -= np.mean(residuals, axis=0)
         return residuals
-
+    
 class QuantileRegression(object):
     def __init__(self):
         self.beta_hats = []
@@ -91,6 +98,9 @@ class QuantileRegression(object):
 
         return self.beta_hats
     
+class BootstrapElectionModelException(Exception):
+    pass
+
 class BootstrapElectionModel(BaseElectionModel):
     y_LB = -0.3
     y_UB = 0.3
@@ -110,6 +120,9 @@ class BootstrapElectionModel(BaseElectionModel):
         self.taus_lower = np.arange(0.01, 0.5, 0.01)
         self.taus_upper = np.arange(0.50, 1, 0.01)
         self.taus = np.concatenate([self.taus_lower, self.taus_upper])
+        if 'baseline_margin' not in self.features:
+            raise BootstrapElectionModelException("baseline_margin not included as feature. This is necessary for the model to work.")
+
     
     def cv_lambda(self, x, y, lambdas_, weights=None, k=5):
         if weights is None:
@@ -129,7 +142,7 @@ class BootstrapElectionModel(BaseElectionModel):
                 x_train = x_y_w_train[:,:-2]
                 y_train = x_y_w_train[:,-2]
                 w_train = x_y_w_train[:,-1]
-                ols_lambda = ols.fit(x_train, y_train, weights=w_train, lambda_=lambda_)
+                ols_lambda = ols.fit(x_train, y_train, weights=w_train, lambda_=lambda_, n_feat_ignore_reg=2)
                 y_hat_lambda = ols_lambda.predict(x_test)
                 errors[i] += np.sum(w_test * ols_lambda.residuals(y_test, y_hat_lambda, loo=False, center=False) ** 2) / np.sum(w_test)
         return lambdas_[np.argmin(errors)]
@@ -411,9 +424,10 @@ class BootstrapElectionModel(BaseElectionModel):
 
         # ols_y_all = OLSRegression().fit(x_all, y_all, weights=weights_all_y, lambda_=optimal_lambda_y)
         # ols_z_all = OLSRegression().fit(x_all, z_all, weights=weights_all_z, lambda_=optimal_lambda_z)
-
-        ols_y = OLSRegression().fit(x_train, y_train, weights=weights_train, lambda_=optimal_lambda_y)
-        ols_z = OLSRegression().fit(x_train, z_train, weights=weights_train, lambda_=optimal_lambda_z)
+        
+        # we don't regularize intercept and baseline_margin
+        ols_y = OLSRegression().fit(x_train, y_train, weights=weights_train, lambda_=optimal_lambda_y, n_feat_ignore_reg=2)
+        ols_z = OLSRegression().fit(x_train, z_train, weights=weights_train, lambda_=optimal_lambda_z, n_feat_ignore_reg=2)
 
         y_train_pred = ols_y.predict(x_train)
         z_train_pred = ols_z.predict(x_train)
@@ -432,8 +446,8 @@ class BootstrapElectionModel(BaseElectionModel):
         y_train_B = y_train_pred + (aggregate_indicator_train @ epsilon_y_B) + delta_y_B
         z_train_B = z_train_pred + (aggregate_indicator_train @ epsilon_z_B) + delta_z_B
         
-        ols_y_B = OLSRegression().fit(x_train, y_train_B, weights_train, normal_eqs=ols_y.normal_eqs)
-        ols_z_B = OLSRegression().fit(x_train, z_train_B, weights_train, normal_eqs=ols_z.normal_eqs)
+        ols_y_B = OLSRegression().fit(x_train, y_train_B, weights_train, normal_eqs=ols_y.normal_eqs, n_feat_ignore_reg=2)
+        ols_z_B = OLSRegression().fit(x_train, z_train_B, weights_train, normal_eqs=ols_z.normal_eqs, n_feat_ignore_reg=2)
 
         y_train_pred_B = ols_y_B.predict(x_train)
         z_train_pred_B = ols_z_B.predict(x_train)
@@ -707,7 +721,6 @@ class BootstrapElectionModel(BaseElectionModel):
                 axis=-1
             ).T
         ).T
-        import IPython; IPython.embed()
         national_summary_estimates = {'margin': [aggregate_dem_vals_pred + base_to_add, interval_lower + base_to_add, interval_upper + base_to_add]}
         print(national_summary_estimates)
 
