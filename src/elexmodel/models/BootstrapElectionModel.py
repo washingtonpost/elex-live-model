@@ -120,8 +120,8 @@ class BootstrapElectionModel(BaseElectionModel):
         self.taus_lower = np.arange(0.01, 0.5, 0.01)
         self.taus_upper = np.arange(0.50, 1, 0.01)
         self.taus = np.concatenate([self.taus_lower, self.taus_upper])
-        if 'baseline_margin' not in self.features:
-            raise BootstrapElectionModelException("baseline_margin not included as feature. This is necessary for the model to work.")
+        if 'baseline_normalized_margin' not in self.features:
+            raise BootstrapElectionModelException("baseline_normalized_margin not included as feature. This is necessary for the model to work.")
 
     
     def cv_lambda(self, x, y, lambdas_, weights=None, k=5):
@@ -545,7 +545,6 @@ class BootstrapElectionModel(BaseElectionModel):
         raw_margin_df = super().get_aggregate_predictions(reporting_units, nonreporting_units, unexpected_units, aggregate, estimand)
         raw_margin_df['pred_margin'] /= (aggregate_z_total.flatten() + 1)
         raw_margin_df['results_margin'] /= (aggregate_z_total.flatten() + 1) # avoid NaN
-
         if self._is_top_level_aggregate(aggregate):
             aggregate_sum = all_units.groupby(aggregate_temp_column_name).sum()
             self.aggregate_baseline_margin = ((aggregate_sum.baseline_dem - aggregate_sum.baseline_gop) / (aggregate_sum.baseline_turnout + 1)).values
