@@ -261,7 +261,7 @@ class BaseElectionModel:
 
         # apply lower/upper models to nonreporting data
         # since nonreporting_units is the second dataframe in a_all, all units after n_reporting_units are nonreporting
-        # note: the features used may be different fromt the median predictions, but this guarantees that the features
+        # note: the features used may be different from the median predictions, but this guarantees that the features
         # are the same accross train_data, conformalization_data and nonreporting_units
         nonreporting_units_features = interval_featurizer.generate_holdout_data(x_all[n_reporting_units:])
         nonreporting_lower_bounds = lower_qr.predict(nonreporting_units_features)
