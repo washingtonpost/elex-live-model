@@ -67,7 +67,12 @@ class Featurizer:
     ) -> pd.DataFrame:
         """
         Prepares features.
-        Adds dummy variables for fixed effects. Also includes centering, scaling continuous covariates and adding intercept.
+        Adds dummy variables for fixed effects, also determines which fixed effects are expanded and active.
+        if center_features is true we subtract the features by their average column value, which sets the average column value to zero
+            this allows us to interpret the intercept as the mean response given all other covariates at their average value
+        if scale_features is true we divide the features by their standard deviation, which gives them all the same scale
+            this can improve the convergence of optimization algorithms
+        if add_intercept is true an intercept column is added to the features and one fixed effect value is dropped
         """
         df = df.copy()  # create copy so we can do things to the values
         if center_features:
