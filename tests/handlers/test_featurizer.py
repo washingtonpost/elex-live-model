@@ -185,7 +185,7 @@ def test_generating_heldout_set():
     "fe_b_x" in df_heldout.columns
     "fe_b_z" not in df_heldout.columns  # inactive
 
-    assert df_heldout.loc[6, "fe_a_b"] == 1  # since row 7 has an inactive fixed effect
+    assert df_heldout.loc[6, "fe_a_b"] == 1  # since row 6 has an active fixed effect
     assert df_heldout.loc[7, "fe_a_b"] == 1 / 3  # since row 7 has an inactive fixed effect
     assert df_heldout.loc[7, "fe_a_c"] == 1 / 3  # since row 7 has an inactive fixed effect
 
