@@ -545,6 +545,7 @@ class BootstrapElectionModel(BaseElectionModel):
         raw_margin_df = super().get_aggregate_predictions(reporting_units, nonreporting_units, unexpected_units, aggregate, estimand)
         raw_margin_df['pred_margin'] /= (aggregate_z_total.flatten() + 1)
         raw_margin_df['results_margin'] /= (aggregate_z_total.flatten() + 1) # avoid NaN
+
         if self._is_top_level_aggregate(aggregate):
             aggregate_sum = all_units.groupby(aggregate_temp_column_name).sum()
             self.aggregate_baseline_margin = ((aggregate_sum.baseline_dem - aggregate_sum.baseline_gop) / (aggregate_sum.baseline_turnout + 1)).values
@@ -620,7 +621,10 @@ class BootstrapElectionModel(BaseElectionModel):
         aggregate_error_B_3 = aggregate_z_total_B
         aggregate_error_B_4 = aggregate_z_total_pred
 
-        aggregate_error_B = (aggregate_error_B_1 / aggregate_error_B_3) - (aggregate_error_B_2 / aggregate_error_B_4)
+        divided_error_B_1 = np.nan_to_num(aggregate_error_B_1 / aggregate_error_B_3)
+        divided_error_B_2 = np.nan_to_num(aggregate_error_B_2 / aggregate_error_B_4)
+
+        aggregate_error_B = divided_error_B_1 - divided_error_B_2
 
         lower_alpha = (1 - alpha) / 2
         upper_alpha = 1 - lower_alpha
@@ -721,6 +725,7 @@ class BootstrapElectionModel(BaseElectionModel):
             ).T
         ).T
         national_summary_estimates = {'margin': [aggregate_dem_vals_pred + base_to_add, interval_lower + base_to_add, interval_upper + base_to_add]}
+
         print(national_summary_estimates)
 
         return national_summary_estimates

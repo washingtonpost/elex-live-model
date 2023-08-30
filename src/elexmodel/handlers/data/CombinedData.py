@@ -24,16 +24,17 @@ class CombinedDataHandler:
         self.current_data = current_data
         self.geographic_unit_type = geographic_unit_type
         data = preprocessed_data.merge(current_data, how="left", on=["postal_code", "geographic_unit_fips"])
-        # if unreporting is 'drop' then drop units that are not reporting (ie. units where results are na)
-        # this is necessary if units will not be returning results in this election,
-        # but we didn't know that (ie. townships)
         result_cols = [f"results_{estimand}" for estimand in estimands]
-
+        # TODO: deal with this somewhere else
+        if 'margin' in estimands:
+            result_cols.extend(['normalized_margin'])
+        # if unreporting is 'drop' then drop units that are not passing results (ie. units where results are na)
+        # this is necessary if units will not be returning results in this election, but we didn't know that (ie. townships)
         if handle_unreporting == "drop":
             # Drop the whole row if an estimand is not reporting
             data = data.dropna(axis=0, how="any", subset=result_cols)
         # if unreporting is 'zero' then we set the votes for non-reporting units to zero
-        # this is necessary if we are worried that there is no zero state for units (ie. some precincts)
+        # this is necessary if we are worried that there is no zero state for units (ie. some precinct states)
         elif handle_unreporting == "zero":
             indices_with_null_val = data[result_cols].isna().any(axis=1)
             data.update(data[result_cols].fillna(value=0))
