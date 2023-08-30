@@ -1,6 +1,7 @@
 from elexmodel.handlers import s3
 from elexmodel.utils.file_utils import S3_FILE_PATH, TARGET_BUCKET, convert_df_to_csv
 
+import numpy as np
 
 class CombinedDataHandler:
     """
@@ -45,7 +46,7 @@ class CombinedDataHandler:
         data['turnout_factor'] = data.results_turnout / data.weights
         if 'margin' in estimands:
             # overwrite to make two party comparison fair
-            data['turnout_factor'] = (data.results_dem + data.results_gop) / data.weights
+            data['turnout_factor'] = np.nan_to_num((data.results_dem + data.results_gop) / data.weights)
 
         self.data = data
 
@@ -103,7 +104,7 @@ class CombinedDataHandler:
         """
         components = geographic_unit_fips.split("_")
         if "district" in self.geographic_unit_type:
-            return components[1]
+            return components[0] # CHANGE BACK
         return components[0]
 
     def _get_district_from_geographic_unit_fips(self, geographic_unit_fips):
@@ -111,7 +112,7 @@ class CombinedDataHandler:
         Get district from geographic unit fips
         """
         components = geographic_unit_fips.split("_")
-        return components[0]
+        return str(int(components[1])) # CHANGE BACK
 
     def get_unexpected_units(self, percent_reporting_threshold, aggregates):
         """

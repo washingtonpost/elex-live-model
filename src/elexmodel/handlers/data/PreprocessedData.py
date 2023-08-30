@@ -3,6 +3,7 @@ from io import StringIO
 from pathlib import Path
 
 import pandas as pd
+import numpy as np
 
 from elexmodel.utils.file_utils import create_directory, get_directory_path
 
@@ -95,7 +96,7 @@ class PreprocessedDataHandler:
             # if margin then we want to overwrite with two party turnout rather than actual turnout to make normalization below fair
             preprocessed_data['weights'] = preprocessed_data.baseline_dem + preprocessed_data.baseline_gop
             preprocessed_data['baseline_margin'] = preprocessed_data.baseline_dem - preprocessed_data.baseline_gop
-            preprocessed_data['baseline_normalized_margin'] = (preprocessed_data.baseline_dem - preprocessed_data.baseline_gop) / preprocessed_data.weights
+            preprocessed_data['baseline_normalized_margin'] = np.nan_to_num((preprocessed_data.baseline_dem - preprocessed_data.baseline_gop) / preprocessed_data.weights)
 
         for estimand, pointer in estimand_baselines.items():
             baseline_name = f"baseline_{pointer}"

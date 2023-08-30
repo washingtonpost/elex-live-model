@@ -545,7 +545,6 @@ class BootstrapElectionModel(BaseElectionModel):
         raw_margin_df = super().get_aggregate_predictions(reporting_units, nonreporting_units, unexpected_units, aggregate, estimand)
         raw_margin_df['pred_margin'] /= (aggregate_z_total.flatten() + 1)
         raw_margin_df['results_margin'] /= (aggregate_z_total.flatten() + 1) # avoid NaN
-
         if self._is_top_level_aggregate(aggregate):
             aggregate_sum = all_units.groupby(aggregate_temp_column_name).sum()
             self.aggregate_baseline_margin = ((aggregate_sum.baseline_dem - aggregate_sum.baseline_gop) / (aggregate_sum.baseline_turnout + 1)).values
@@ -667,6 +666,8 @@ class BootstrapElectionModel(BaseElectionModel):
         if nat_sum_data_dict is None:
             # the order does not matter since all contests have the same weight, so we can use anything as the key when sorting
             nat_sum_data_dict = {i: 1 for i in range(self.aggregate_error_B_1.shape[0])}
+        if called_states is None:
+            called_states = {i: -1 for i in range(self.aggregate_error_B_1.shape[0])}
         # sort in order to get in the same order as the contests, which have been sorted when getting dummies for aggregate indicators
         # in get_aggregate_prediction_intervals
         nat_sum_data_dict_sorted = sorted(nat_sum_data_dict.items())
@@ -678,10 +679,10 @@ class BootstrapElectionModel(BaseElectionModel):
         # in order for those states to keep their original computed win probability
         called_states_sorted_vals[called_states_sorted_vals == -1] = np.nan 
 
-        divided_error_B_1 = np.nan_to_num(self.aggregate_error_B_1 / self.aggregate_baseline_margin.reshape(-1, 1))
-        # divided_error_B_1 = np.nan_to_num(self.aggregate_error_B_1 / self.aggregate_error_B_3)
-        divided_error_B_2 = np.nan_to_num(self.aggregate_error_B_2 / self.aggregate_baseline_margin.reshape(-1, 1))
-        # divided_error_B_2 = np.nan_to_num(self.aggregate_error_B_2 / self.aggregate_error_B_4)
+        # divided_error_B_1 = np.nan_to_num(self.aggregate_error_B_1 / self.aggregate_baseline_margin.reshape(-1, 1))
+        divided_error_B_1 = np.nan_to_num(self.aggregate_error_B_1 / self.aggregate_error_B_3)
+        # divided_error_B_2 = np.nan_to_num(self.aggregate_error_B_2 / self.aggregate_baseline_margin.reshape(-1, 1))
+        divided_error_B_2 = np.nan_to_num(self.aggregate_error_B_2 / self.aggregate_error_B_4)
 
         if self.hard_threshold:
             aggregate_dem_prob_B_1 = divided_error_B_1 > 0.5
