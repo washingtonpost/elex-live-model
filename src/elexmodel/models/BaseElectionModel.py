@@ -58,7 +58,7 @@ class BaseElectionModel:
         Produces unit level predictions. Fits quantile regression to reporting data, applies
         it to nonreporting data. The features are specified in model_settings.
         """
-        n_train = reporting_units.shape[0]
+        self.n_train = reporting_units.shape[0]
         n_test = nonreporting_units.shape[0]
         all_units = pd.concat([reporting_units, nonreporting_units], axis=0)
 
@@ -67,8 +67,10 @@ class BaseElectionModel:
             all_units, center_features=True, scale_features=False, add_intercept=self.add_intercept
         )
 
-        reporting_units_features = featurizer.filter_to_active_features(x_all[:n_train])
-        nonreporting_units_features = featurizer.generate_holdout_data(x_all[n_train : n_train + n_test])  # noqa: E203
+        reporting_units_features = featurizer.filter_to_active_features(x_all[: self.n_train])
+        nonreporting_units_features = featurizer.generate_holdout_data(
+            x_all[self.n_train : self.n_train + n_test]  # noqa: E203
+        )
 
         weights = reporting_units[f"last_election_results_{estimand}"]
         reporting_units_residuals = reporting_units[f"residuals_{estimand}"]
@@ -207,7 +209,7 @@ class BaseElectionModel:
         upper_bound = (1 + alpha) / 2
         lower_bound = (1 - alpha) / 2
 
-        train_rows = math.floor(reporting_units.shape[0] * conf_frac)
+        train_rows = math.floor(self.n_train * conf_frac)
         train_data = reporting_units_shuffled[:train_rows]
 
         # the fixed effects in train_data will be a subset of the fixed effect of reporting_units since all
@@ -238,9 +240,11 @@ class BaseElectionModel:
         # bounds for nonreporting data.
         conformalization_data = reporting_units_shuffled[train_rows:]
 
-        # all_data starts with reporting_units_shuffled, so the rows between train_rows and n_reporting_units are the
+        # all_data starts with reporting_units_shuffled, so the rows between train_rows and n_train are the
         # conformalization set
-        conformalization_data_features = interval_featurizer.generate_holdout_data(x_all[train_rows:n_reporting_units])
+        conformalization_data_features = interval_featurizer.generate_holdout_data(
+            x_all[train_rows : self.n_train]  # noqa: E203
+        )
 
         # we are interested in f(X) - r
         # since later conformity scores care about deviation of bounds from residuals
