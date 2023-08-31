@@ -18,6 +18,12 @@ class BaseElectionModel:
         self.add_intercept = True
         self.seed = model_settings.get("seed", 4191)
 
+    def get_minimum_reporting_units(self, alpha: float) -> int:
+        """
+        Returns the minimum number of units necessary to run the model
+        """
+        return 10
+
     def get_unit_predictions(self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, estimand: str, *kwargs) -> np.ndarray:
         """
         Generates and returns unit level predictions

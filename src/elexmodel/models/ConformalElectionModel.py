@@ -19,14 +19,16 @@ LOG = logging.getLogger(__name__)
 
 class ConformalElectionModel(BaseElectionModel):
     def __init__(self, model_settings={}):
+        super(ConformalElectionModel, self).__init__(model_settings)
         self.qr = QuantileRegressionSolver(solver="ECOS")
-        self.features = model_settings.get("features", [])
-        self.fixed_effects = model_settings.get("fixed_effects", {})
-        self.lambda_ = model_settings.get("lambda_", 0)
-        self.features_to_coefficients = {}
         self.featurizer = Featurizer(self.features, self.fixed_effects)
-        self.add_intercept = True
-        self.seed = 4191  # set arbitrarily
+
+    def _compute_conf_frac(self) -> float:
+        """
+        Compute conformalization fraction for conformal models
+        """
+        pass
+
 
     def fit_model(self, model, df_X, df_y, tau, weights, normalize_weights):
         """
@@ -88,106 +90,6 @@ class ConformalElectionModel(BaseElectionModel):
 
         # round since we don't need the artificial precision
         return preds.round(decimals=0)
-
-    def _get_reporting_aggregate_votes(self, reporting_units, unexpected_units, aggregate, estimand):
-        """
-        Aggregate reporting votes by aggregate (ie. postal_code, county_fips etc.). This function
-        adds reporting data and reporting unexpected data by aggregate. Note that all unexpected units -
-        whether or not they are fully reporting - are included in this function.
-        """
-        reporting_units_known_votes = reporting_units.groupby(aggregate).sum().reset_index(drop=False)
-
-        # we cannot know the county classification of unexpected geographic units, so we can't add the votes back in
-        if "county_classification" in aggregate:
-            aggregate_votes = reporting_units_known_votes[aggregate + [f"results_{estimand}", "reporting"]]
-        else:
-            unexpected_units_known_votes = unexpected_units.groupby(aggregate).sum().reset_index(drop=False)
-
-            # outer join to ensure that if entire districts of county classes are unexpectedly present, we
-            # should still have them. Same reasoning to replace NA with zero
-            # NA means there was no such geographic unit, so they don't capture any votes
-            results_col = f"results_{estimand}"
-            reporting_col = "reporting"
-            aggregate_votes = (
-                reporting_units_known_votes.merge(
-                    unexpected_units_known_votes,
-                    how="outer",
-                    on=aggregate,
-                    suffixes=("_expected", "_unexpected"),
-                )
-                .fillna(
-                    {
-                        f"results_{estimand}_expected": 0,
-                        f"results_{estimand}_unexpected": 0,
-                        "reporting_expected": 0,
-                        "reporting_unexpected": 0,
-                    }
-                )
-                .assign(
-                    **{
-                        results_col: lambda x: x[f"results_{estimand}_expected"] + x[f"results_{estimand}_unexpected"],
-                        reporting_col: lambda x: x["reporting_expected"] + x["reporting_unexpected"],
-                    },
-                )[aggregate + [f"results_{estimand}", "reporting"]]
-            )
-
-        return aggregate_votes
-
-    def _get_nonreporting_aggregate_votes(self, nonreporting_units, aggregate):
-        """
-        Aggregate nonreporting votes by aggregate (ie. postal_code, county_fips etc.). Note that all unexpected
-        units - whether or not they are fully reporting - are handled in "_get_reporting_aggregate_votes" above
-        """
-        aggregate_nonreporting_units_known_votes = nonreporting_units.groupby(aggregate).sum().reset_index(drop=False)
-
-        return aggregate_nonreporting_units_known_votes
-
-    def get_aggregate_predictions(self, reporting_units, nonreporting_units, unexpected_units, aggregate, estimand):
-        """
-        Aggregate predictions and results by aggregate (ie. postal_code, county_fips etc.). Add results from reporting
-        and reporting unexpected units and then sum in the predictions from nonreporting units.
-        """
-        # these are subunits that are already counted
-        aggregate_votes = self._get_reporting_aggregate_votes(reporting_units, unexpected_units, aggregate, estimand)
-
-        # these are subunits that are not already counted
-        aggregate_preds = (
-            nonreporting_units.groupby(aggregate)
-            .sum()
-            .reset_index(drop=False)
-            .rename(
-                columns={
-                    f"pred_{estimand}": f"pred_only_{estimand}",
-                    f"results_{estimand}": f"results_only_{estimand}",
-                    "reporting": "reporting_only",
-                }
-            )
-        )
-        aggregate_data = (
-            aggregate_votes.merge(aggregate_preds, how="outer", on=aggregate)
-            .fillna(
-                {
-                    f"results_{estimand}": 0,
-                    f"pred_only_{estimand}": 0,
-                    f"results_only_{estimand}": 0,
-                    "reporting": 0,
-                    "reporting_only": 0,
-                }
-            )
-            .assign(
-                # don't need to sum results_only for predictions since those are superceded by pred_only
-                # preds can't be smaller than results, since we maxed between predictions and results in unit function.
-                **{
-                    f"pred_{estimand}": lambda x: x[f"results_{estimand}"] + x[f"pred_only_{estimand}"],
-                    f"results_{estimand}": lambda x: x[f"results_{estimand}"] + x[f"results_only_{estimand}"],
-                    "reporting": lambda x: x["reporting"] + x["reporting_only"],
-                },
-            )
-            .sort_values(aggregate)[aggregate + [f"pred_{estimand}", f"results_{estimand}", "reporting"]]
-            .reset_index(drop=True)
-        )
-
-        return aggregate_data
 
     def get_unit_prediction_interval_bounds(self, reporting_units, nonreporting_units, conf_frac, alpha, estimand):
         """

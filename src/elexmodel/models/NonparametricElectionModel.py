@@ -3,10 +3,10 @@ import math
 import numpy as np
 import pandas as pd
 
-from elexmodel.models.BaseElectionModel import BaseElectionModel, PredictionIntervals
+from elexmodel.models.ConformalElectionModel import ConformalElectionModel, PredictionIntervals
 
 
-class NonparametricElectionModel(BaseElectionModel):
+class NonparametricElectionModel(ConformalElectionModel):
     def __init__(self, model_settings={}):
         super().__init__(model_settings)
         self.robust = model_settings.get("robust", False)

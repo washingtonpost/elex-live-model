@@ -3,13 +3,12 @@ import pandas as pd
 from scipy import stats
 
 from elexmodel.distributions.GaussianModel import GaussianModel
-from elexmodel.models.BaseElectionModel import BaseElectionModel, PredictionIntervals
+from elexmodel.models.ConformalElectionModel import ConformalElectionModel, PredictionIntervals
 
 
-class GaussianElectionModel(BaseElectionModel):
+class GaussianElectionModel(ConformalElectionModel):
     def __init__(self, model_settings={}):
         super().__init__(model_settings)
-        self.model_settings = model_settings
         self.alpha_to_nonreporting_lower_bounds = {}
         self.alpha_to_nonreporting_upper_bounds = {}
         self.modeled_bounds_agg = None
