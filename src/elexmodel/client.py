@@ -165,10 +165,6 @@ class ModelClient:
         aggregates = kwargs.get("aggregates", DEFAULT_AGGREGATES[office])
         fixed_effects = kwargs.get("fixed_effects", {})
         pi_method = kwargs.get("pi_method", "nonparametric")
-        beta = model_parameters.get("beta", 1)
-        winsorize = model_parameters.get("winsorize", False)
-        robust = model_parameters.get("robust", False)
-        lambda_ = model_parameters.get("lambda_", 0)
         save_output = kwargs.get("save_output", ["results"])
         save_results = "results" in save_output
         save_data = "data" in save_output
@@ -185,14 +181,11 @@ class ModelClient:
             "office": office,
             "geographic_unit_type": geographic_unit_type,
             "district_election": district_election,
-            "beta": beta,
-            "winsorize": winsorize,
-            "robust": robust,
-            "lambda_": lambda_,
             "features": features,
             "fixed_effects": fixed_effects,
             "save_conformalization": save_conformalization,
         }
+        model_settings.update(model_parameters)
 
         LOG.info("Getting config: %s", election_id)
         config_handler = ConfigHandler(
