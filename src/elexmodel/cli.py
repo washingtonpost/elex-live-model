@@ -1,5 +1,5 @@
-import json
 import ast
+import json
 
 import click
 from dotenv import find_dotenv, load_dotenv
@@ -12,18 +12,13 @@ from elexmodel.handlers.data.LiveData import MockLiveDataHandler  # noqa: E402
 from elexmodel.utils.constants import VALID_AGGREGATES_MAPPING  # noqa: E402
 from elexmodel.utils.file_utils import TARGET_BUCKET  # noqa: E402
 
-class PythonLiteralOptionDict(click.Option):
-    def type_cast_value(self, ctx, d_str):
-        new_d = {}
-        d = ast.literal_eval(d_str)
-        for key, value in d.items():
-            try:
-                new_d[key] = ast.literal_eval(value)
-            except:
-                # string case
-                new_d[key] = value
-        return new_d
-    
+class PythonLiteralOption(click.Option):
+    def type_cast_value(self, ctx, value):
+        try:
+            return ast.literal_eval(value)
+        except ValueError:
+            raise click.BadParameter(value)
+
 @click.command()
 @click.argument("election_id")
 @click.option("--estimands", "estimands", default=["turnout"], multiple=True)
@@ -51,11 +46,11 @@ class PythonLiteralOptionDict(click.Option):
     type=click.Choice(["county", "precinct", "county-district", "precinct-district"]),
 )
 @click.option(
-    '--model_parameters',
-    'model_parameters',
+    "--model_parameters",
+    "model_parameters",
     default={},
-    cls=PythonLiteralOptionDict,
-    help="A dictionary of model parameters"
+    cls=PythonLiteralOption,
+    help="A dictionary of model parameters",
 )
 @click.option(
     "--percent_reporting",
@@ -99,7 +94,7 @@ def cli(
         kwargs["fixed_effects"] = json.loads(kwargs["fixed_effects"])
     except json.decoder.JSONDecodeError:
         kwargs["fixed_effects"] = {kwargs["fixed_effects"]: ["all"]}
-    
+
     prediction_intervals = list(prediction_intervals)
 
     # Read data
@@ -115,7 +110,7 @@ def cli(
 
     data_handler.shuffle()
     data = data_handler.get_percent_fully_reported(percent_reporting)
-
+    import pdb; pdb.set_trace()
     # Format arguments for get_estimates function
     if historical:
         model_client = HistoricalModelClient()
