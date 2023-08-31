@@ -4,7 +4,10 @@ import json
 import click
 from dotenv import find_dotenv, load_dotenv
 
-load_dotenv(find_dotenv())
+dotenv_path = find_dotenv()
+if len(dotenv_path.strip()) == 0:
+    dotenv_path = find_dotenv(usecwd=True)
+load_dotenv(dotenv_path)
 
 from elexmodel.client import HistoricalModelClient, ModelClient  # noqa: E402
 from elexmodel.handlers import s3  # noqa: E402

@@ -6,12 +6,17 @@ Generally, the model works by comparing the current results to a historical base
 
 The first iteration of this model is written in R in [this repo](https://github.com/washingtonpost/2020-election-night-model).
 
-## Installation
+## How to Run the Model
+
+For dev work, skip this section and go on to the [Development](#Development) section below.
+
+### Installation
 
 * We recommend that you set up a virtualenv and activate it (IE ``mkvirtualenv elex-model`` via http://virtualenvwrapper.readthedocs.io/en/latest/).
 * Run ``pip install elex-model``
+  * If you get stuck with an error about `qdldl` (e.g. `RuntimeError: CMake must be installed to build qdldl`), you are missing `cmake`.  You can install it with Homebrew with `brew install cmake` or [compile it from source](https://cmake.org/download/).
 
-## Usage
+### Usage
 
 We can run the model with a CLI or with Python.
 
@@ -19,7 +24,7 @@ We can use the model to generate current estimates or for a historical evaluatio
 
 **See more information on how to pass data to the model in the [data README](https://github.com/washingtonpost/elex-live-model/blob/develop/README-data.md).**
 
-### CLI
+#### CLI
 
 The CLI is for local development and testing purposes only. We cannot run a live election through the CLI because it pulls vote counts from data files located either in S3 or locally. It does not retrieve current data from the Dynamo database of election results.
 
@@ -40,14 +45,14 @@ If you want to run a test with some nonreporting subunits, you can use the `--pe
 elexmodel 2017-11-07_VA_G --estimands=dem --office_id=G --geographic_unit_type=county --percent_reporting 40
 ```
 
-#### Historical election
+##### Historical election
 
 If you want to run a historical election, you can use the `--historical` flag. For this to succeed, the election must have historical data already prepared.
 ```
 elexmodel 2021-11-02_VA_G --estimands=dem --office_id=G --geographic_unit_type=county --percent_reporting 60 --historical
 ```
 
-### Parameters
+##### Parameters
 
 Parameters for the CLI tool:
 
@@ -69,17 +74,19 @@ Parameters for the CLI tool:
 
 Note: When running the model with multiple fixed effects, make sure they are not linearly dependent. For example, `county_fips` and `county_classification` are linearly dependent when run together. That's because every county is in one county class, so all the fixed effect columns of the counties in the county class sum up to the fixed effect column of that county class.
 
-#### Model Parameters
+
+#### Python
+
+##### Model Parameters
+
 Some model types have specific model parameters that can be included.
 
-| Name      | Type    | Acceptable values           | model |
-|-----------|---------|-----------------------------|-------|
-| lambda    | numeric | 0-inf                       | all |
+| Name      | Type    | Acceptable values           | model           |
+|-----------|---------|-----------------------------|-----------------|
+| lambda    | numeric | 0-inf                       | all             |
 | robust    | boolean | larger prediction intervals | `nonparametric` |
-| beta      | numeric | variance inflation          | `gaussian` |
-| winsorize | boolean | winsorize std estimate      | `gaussian` |
-
-### Python
+| beta      | numeric | variance inflation          | `gaussian`      |
+| winsorize | boolean | winsorize std estimate      | `gaussian`      |
 
 This is the class and function that invokes the general function to generate estimates. You can install `elex-model` as a Python package and use this code snippet in other projects.
 
@@ -98,7 +105,7 @@ model_response = model_client.get_estimates(
 )
 ```
 
-#### Historical election
+##### Historical election
 
 This is the class and function that invokes a historical evaluation. You can install `elex-model` as a Python package and use this code snippet in other projects.
 ```
@@ -154,25 +161,25 @@ pre-commit run --all-files
 
 ### Release
 
-To release a new version manually: 
-- Decide what the next version will be per semantic versioning: `X.X.X`
-- Make a new branch from develop called `release/X.X.X`
-- Update the version in `setup.py`
-- Update the changelog with all the chnages that will be included in the release
-- Commit your updates and open a PR against main
-- Once the PR is merged, tag main (or develop for a beta release) with the version's release number (`git tag X.X.X`) and push that tag to github (`git push --tags`)
-- Merge main into develop
+To release a new version manually:
+1. Decide what the next version will be per semantic versioning: `X.X.X`
+2. Make a new branch from develop called `release/X.X.X`
+3. Update the version in `setup.py`
+4. Update the changelog with all the chnages that will be included in the release
+5. Commit your updates and open a PR against main
+6. Once the PR is merged, tag main (or develop for a beta release) with the version's release number (`git tag X.X.X`) and push that tag to github (`git push --tags`)
+7. Merge main into develop
 
-Then, we need to release this version to PyPi.This repository has a Github Action workflow that automatically builds and releases the latest version to TestPyPi and PyPi on pushes to `main`. However, to release to PyPi manually:
-- Generate a distribution archive:
-  - Make sure `requirements-dev.txt` is installed
-  - Run `python3 -m pip install --upgrade build` to install `build`
-  - Run `python3 -m build`. This should generate two files in the `dist/` directory.
-  - Check to make sure the correct version is installed in the `dist/` folder that should now exist at the base of the repo folder. If you've previously run these commands locally for an earlier version, you may need to delete the older files in `dist/` order to upload them correctly in the next step. You can just delete the entire `dist/` folder and run the above command again.
-- Upload the distribution archive:`
-  - Run `python3 -m pip install --upgrade twine`
-  - Upload to TestPyPi with `python3 -m twine upload --repository testpypi dist/*`
-  - Upload to PyPi `python3 -m twine upload dist/*`
+Then, we need to release this version to PyPi. This repository has a Github Action workflow that automatically builds and releases the latest version to TestPyPi and PyPi on pushes to `main`. However, to release to PyPi manually:
+1. Generate a distribution archive:
+    1. Make sure `requirements-dev.txt` is installed
+    2. Run `python3 -m pip install --upgrade build` to install `build`
+    3. Run `python3 -m build`. This should generate two files in the `dist/` directory.
+    4. Check to make sure the correct version is installed in the `dist/` folder that should now exist at the base of the repo folder. If you've previously run these commands locally for an earlier version, you may need to delete the older files in `dist/` order to upload them correctly in the next step. You can just delete the entire `dist/` folder and run the above command again.
+2. Upload the distribution archive:`
+    1. Run `python3 -m pip install --upgrade twine`
+    2. Upload to TestPyPi with `python3 -m twine upload --repository testpypi dist/*`
+    3. Upload to PyPi `python3 -m twine upload dist/*`
 
 
 ## Further Reading
