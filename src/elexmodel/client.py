@@ -176,10 +176,15 @@ class ModelClient:
         save_conformalization = "conformalization" in save_output
         handle_unreporting = kwargs.get("handle_unreporting", "drop")
 
+        district_election = False
+        if office in {'H', 'Y', 'Z'}:
+            district_election = True
+
         model_settings = {
             "election_id": election_id,
             "office": office,
             "geographic_unit_type": geographic_unit_type,
+            "district_election": district_election,
             "beta": beta,
             "winsorize": winsorize,
             "robust": robust,

@@ -114,6 +114,7 @@ class BootstrapElectionModel(BaseElectionModel):
         self.strata = model_settings.get("strata", ['county_classification']) # change this
         self.T = model_settings.get("T", 5000)
         self.hard_threshold = model_settings.get("agg_model_hard_threshold", False)
+        self.district_election = model_settings.get("district_election", False)
         self.featurizer = Featurizer(self.features, self.fixed_effects)
         self.rng = np.random.default_rng(seed=self.seed)
         self.ran_bootstrap = False
@@ -400,7 +401,13 @@ class BootstrapElectionModel(BaseElectionModel):
         # z_test = nonreporting_units['turnout_factor'].values.reshape(-1, 1)
         weights_test = nonreporting_units['weights'].values.reshape(-1, 1)
 
-        aggregate_indicator = pd.get_dummies(pd.concat([reporting_units, nonreporting_units, unexpected_units], axis=0)['postal_code']).values
+        all_units = pd.concat([reporting_units, nonreporting_units, unexpected_units], axis=0)
+        if self.district_election:
+            all_units['postal_code-district'] = all_units[['postal_code', 'district']].agg('_'.join, axis=1)
+            aggregate_indicator = pd.get_dummies(all_units['postal_code-district']).values
+        else:
+            aggregate_indicator = pd.get_dummies(all_units['postal_code']).values
+
         aggregate_indicator_expected = aggregate_indicator[:(n_train + n_test)]
         aggregate_indicator_unexpected = aggregate_indicator[(n_train + n_test):]
         aggregate_indicator_train = aggregate_indicator_expected[:n_train]
@@ -460,7 +467,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         y_test_pred_B = (ols_y_B.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat_B)).clip(min=y_partial_reporting_lower, max=y_partial_reporting_upper)
         z_test_pred_B = (ols_z_B.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat_B)).clip(min=z_partial_reporting_lower, max=z_partial_reporting_upper)
-        
+
         yz_test_pred_B = y_test_pred_B * z_test_pred_B
         
         y_test_pred = (ols_y.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat)).clip(min=y_partial_reporting_lower, max=y_partial_reporting_upper)
