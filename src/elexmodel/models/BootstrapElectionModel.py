@@ -102,11 +102,6 @@ class BootstrapElectionModelException(Exception):
     pass
 
 class BootstrapElectionModel(BaseElectionModel):
-    y_LB = -0.3
-    y_UB = 0.3
-    z_LB = -0.5
-    z_UB = 0.5
-
     def __init__(self, model_settings={}):
         super().__init__(model_settings)
         self.seed = model_settings.get("seed", 0)
@@ -115,6 +110,10 @@ class BootstrapElectionModel(BaseElectionModel):
         self.T = model_settings.get("T", 5000)
         self.hard_threshold = model_settings.get("agg_model_hard_threshold", False)
         self.district_election = model_settings.get("district_election", False)
+        self.y_LB = model_settings.get("y_LB", -0.3)
+        self.y_UB = model_settings.get("y_UB", 0.3)
+        self.z_LB = model_settings.get("z_LB", -0.5)
+        self.z_UB = model_settings.get("z_UB", 0.5)
         self.featurizer = Featurizer(self.features, self.fixed_effects)
         self.rng = np.random.default_rng(seed=self.seed)
         self.ran_bootstrap = False
