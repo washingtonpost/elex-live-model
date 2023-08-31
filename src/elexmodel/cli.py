@@ -1,3 +1,4 @@
+import ast
 import json
 
 import click
@@ -10,6 +11,14 @@ from elexmodel.handlers import s3  # noqa: E402
 from elexmodel.handlers.data.LiveData import MockLiveDataHandler  # noqa: E402
 from elexmodel.utils.constants import VALID_AGGREGATES_MAPPING  # noqa: E402
 from elexmodel.utils.file_utils import TARGET_BUCKET  # noqa: E402
+
+
+class PythonLiteralOption(click.Option):
+    def type_cast_value(self, ctx, value):
+        try:
+            return ast.literal_eval(value)
+        except ValueError:
+            raise click.BadParameter(value)
 
 
 @click.command()
@@ -38,10 +47,13 @@ from elexmodel.utils.file_utils import TARGET_BUCKET  # noqa: E402
     default="county",
     type=click.Choice(["county", "precinct", "county-district", "precinct-district"]),
 )
-@click.option("--beta", "beta", default=1, type=int, help="manually add variance to Gaussian model")
-@click.option("--winsorize", "winsorize", is_flag=True, help="reduce outliers in the Gaussian model")
-@click.option("--robust", "robust", is_flag=True, help="robust prediction intervals for nonparametric model")
-@click.option("--lambda", "lambda", default=0, type=float, help="regularization parameter")
+@click.option(
+    "--model_parameters",
+    "model_parameters",
+    default="{}",
+    cls=PythonLiteralOption,
+    help="A dictionary of model parameters",
+)
 @click.option(
     "--percent_reporting",
     "percent_reporting",
