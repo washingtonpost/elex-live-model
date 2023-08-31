@@ -50,7 +50,7 @@ class PythonLiteralOption(click.Option):
 @click.option(
     "--model_parameters",
     "model_parameters",
-    default={},
+    default="{}",
     cls=PythonLiteralOption,
     help="A dictionary of model parameters",
 )
@@ -112,9 +112,7 @@ def cli(
 
     data_handler.shuffle()
     data = data_handler.get_percent_fully_reported(percent_reporting)
-    import pdb
 
-    pdb.set_trace()
     # Format arguments for get_estimates function
     if historical:
         model_client = HistoricalModelClient()
