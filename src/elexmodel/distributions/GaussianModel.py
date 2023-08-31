@@ -108,13 +108,9 @@ class GaussianModel:
                             ).to_numpy(),
                         ),
                         "sigma_lower_bound": self.beta
-                        * math_utils.boot_sigma(
-                            x.lower_bounds.values, conf=(3 + alpha) / 4, winsorize=self.winsorize
-                        ),
+                        * math_utils.boot_sigma(x.lower_bounds.values, conf=(3 + alpha) / 4, winsorize=self.winsorize),
                         "sigma_upper_bound": self.beta
-                        * math_utils.boot_sigma(
-                            x.upper_bounds.values, conf=(3 + alpha) / 4, winsorize=self.winsorize
-                        ),
+                        * math_utils.boot_sigma(x.upper_bounds.values, conf=(3 + alpha) / 4, winsorize=self.winsorize),
                     }
                 )
             )
