@@ -173,7 +173,7 @@ class Featurizer:
             # This is correct because even rows with active fixed effects have an interept columns, so the coefficient
             # of the fixed effect value column is actually the *difference* between the dropped column (for which the intercept is
             # the stand in and the fixed effect column.
-            # Another way to think about this is that for a fixed effect value that is present the fixed effect estimate is: 
+            # Another way to think about this is that for a fixed effect value that is present the fixed effect estimate is:
             # if there are three fixed effects r, u and s where s is dropped.
             # beta_0 + beta_r * indic{r}
             # beta_0 + beta_u * indic{u}
