@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 
 from elexmodel.models import NonparametricElectionModel
+from elexmodel.models.ConformalElectionModel import PredictionIntervals
 
 TOL = 1e-5
 
@@ -38,7 +39,8 @@ def test_compute_conf_frac():
 
 
 def test_get_minimum_reporting_units():
-    model = NonparametricElectionModel.NonparametricElectionModel()
+    model_settings = {}
+    model = NonparametricElectionModel.NonparametricElectionModel(model_settings)
     n_min = model.get_minimum_reporting_units(0.7)
 
     assert n_min == 6
@@ -82,8 +84,9 @@ def test_aggregate_prediction_intervals_simple():
             f"upper_{alpha}_{estimand}": [9, 8, 7, 9, 5, 4],  # a: 17, c: 16, e: 9
         }
     )
-
-    intervals = model.get_aggregate_prediction_intervals(df1, df3, df2, ["c1"], alpha, None, estimand)
+    
+    prediction_intervals = PredictionIntervals([], [], [])
+    intervals = model.get_aggregate_prediction_intervals(df1, df3, df2, ["c1"], alpha, prediction_intervals, estimand)
 
     assert np.array_equal(np.asarray([12, 19, 8, 6, 3]), intervals.lower)
     assert np.array_equal(np.asarray([26, 19, 17, 6, 9]), intervals.upper)
@@ -113,10 +116,12 @@ def test_aggregate_prediction_intervals(va_governor_precinct_data):
     df3 = df[2000:].copy()
     df3["reporting"] = 1
 
-    intervals = model.get_aggregate_prediction_intervals(df1, df2, df3, ["postal_code"], alpha, None, estimand)
+    prediction_intervals = PredictionIntervals([], [], [])
+
+    intervals = model.get_aggregate_prediction_intervals(df1, df2, df3, ["postal_code"], alpha, prediction_intervals, estimand)
     assert 2535685.0 == intervals.lower[0]  # total based on summing csv
     assert 2535685.0 == intervals.upper[0]  # total based on summing csv
 
-    intervals = model.get_aggregate_prediction_intervals(df1, df2, df3, ["county_fips"], alpha, None, estimand)
+    intervals = model.get_aggregate_prediction_intervals(df1, df2, df3, ["county_fips"], alpha, prediction_intervals, estimand)
     assert 10664.0 == intervals.lower[0]  # first county based on summing csv
     assert 10664.0 == intervals.upper[0]  # first county based on summing csv
