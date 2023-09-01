@@ -169,6 +169,15 @@ class Featurizer:
 
             # set the values for active fixed effect in rows that have inactive fixed effect to be 1 / (n + 1)
             # rows that have an inactive fixed effect value need to receive the treat of the average fixed effects
-            # NOTE: aren't we now applying 1 * the dropped fixed effect and 1 / (n + 1) times the other fixed effects?
             df.loc[rows_w_inactive_fixed_effects, fe_active_fixed_effects] = 1 / (len(fe_active_fixed_effects) + 1)
+            # This is correct because even rows with active fixed effects have an interept columns, so the coefficient
+            # of the fixed effect value column is actually the *difference* between the dropped column (for which the intercept is
+            # the stand in and the fixed effect column.
+            # Another way to think about this is that for a fixed effect value that is present the fixed effect estimate is: 
+            # if there are three fixed effects r, u and s where s is dropped.
+            # beta_0 + beta_r * indic{r}
+            # beta_0 + beta_u * indic{u}
+            # and the fixed effect estimate for the dropped value is beta_0, so the average is:
+            # beta_0 + (beta_r / 3) + (beta_u / 3)
+
         return self.filter_to_active_features(df)
