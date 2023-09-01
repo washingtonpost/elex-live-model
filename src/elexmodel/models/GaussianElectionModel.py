@@ -7,7 +7,7 @@ from elexmodel.models.ConformalElectionModel import ConformalElectionModel, Pred
 
 
 class GaussianElectionModel(ConformalElectionModel):
-    def __init__(self, model_settings={}):
+    def __init__(self, model_settings: dict):
         super().__init__(model_settings)
         self.alpha_to_nonreporting_lower_bounds = {}
         self.alpha_to_nonreporting_upper_bounds = {}
@@ -22,10 +22,10 @@ class GaussianElectionModel(ConformalElectionModel):
         """
         return 0.7
 
-    def get_minimum_reporting_units(self, alpha):
+    def get_minimum_reporting_units(self, alpha: float) -> float:
         return 10 * self._compute_conf_frac()
 
-    def get_unit_prediction_intervals(self, reporting_units, nonreporting_units, alpha, estimand):
+    def get_unit_prediction_intervals(self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, alpha: float, estimand: str) -> PredictionIntervals:
         """
         Get unit prediction intervals in Gaussian case. Adjust unit prediction intervals based on Gaussian model
         that is fit to conformalization data.
@@ -87,7 +87,7 @@ class GaussianElectionModel(ConformalElectionModel):
             lower.round(decimals=0), upper.round(decimals=0), prediction_intervals.conformalization
         )
 
-    def get_all_conformalization_data_unit(self):
+    def get_all_conformalization_data_unit(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         """
         Returns the paramaters of the gaussian distribution used to adjust the intervals
         and the conformalization data that was used to fit the distribution
@@ -95,7 +95,7 @@ class GaussianElectionModel(ConformalElectionModel):
         """
         return self.gaussian_bounds_unit, self.conformalization_data_unit
 
-    def get_all_conformalization_data_agg(self):
+    def get_all_conformalization_data_agg(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         """
         Returns the parameters of the gaussian distribution(s) used to adjust the intervals
         and the conformalization data that were used to fit the distribution(s)
@@ -105,14 +105,14 @@ class GaussianElectionModel(ConformalElectionModel):
 
     def get_aggregate_prediction_intervals(
         self,
-        reporting_units,
-        nonreporting_units,
-        unexpected_units,
-        aggregate,
-        alpha,
-        unit_prediction_intervals,
-        estimand,
-    ):
+        reporting_units: pd.DataFrame,
+        nonreporting_units: pd.DataFrame,
+        unexpected_units: pd.DataFrame,
+        aggregate: list,
+        alpha: float,
+        unit_prediction_intervals: PredictionIntervals,
+        estimand: str,
+    ) -> PredictionIntervals:
         """
         Get aggregate prediction intervals. Adjust aggregate prediction intervals based on Gaussian models
         that are fit to conformalization data per group.

@@ -5,6 +5,7 @@ from collections import namedtuple
 
 import cvxpy
 import numpy as np
+import pandas as pd
 from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
 
 from elexmodel.models import BaseElectionModel
@@ -18,7 +19,7 @@ LOG = logging.getLogger(__name__)
 
 
 class ConformalElectionModel(BaseElectionModel.BaseElectionModel):
-    def __init__(self, model_settings={}):
+    def __init__(self, model_settings: dict):
         super(ConformalElectionModel, self).__init__(model_settings)
         self.qr = QuantileRegressionSolver(solver="ECOS")
         self.featurizer = Featurizer(self.features, self.fixed_effects)
@@ -31,7 +32,7 @@ class ConformalElectionModel(BaseElectionModel.BaseElectionModel):
         pass
 
 
-    def fit_model(self, model, df_X, df_y, tau, weights, normalize_weights):
+    def fit_model(self, model: QuantileRegressionSolver, df_X: pd.DataFrame, df_y: pd.Series, tau: float, weights: pd.Series, normalize_weights: bool):
         """
         Fits the quantile regression for the model
         """
@@ -57,7 +58,7 @@ class ConformalElectionModel(BaseElectionModel.BaseElectionModel):
             LOG.warning("Warning: solution was inaccurate or solver broke. Re-running with normalize_weights=False.")
             model.fit(X, y, tau_value=tau, weights=weights, lambda_=self.lambda_, normalize_weights=False)
 
-    def get_unit_predictions(self, reporting_units, nonreporting_units, estimand):
+    def get_unit_predictions(self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, estimand: str) -> pd.Series:
         """
         Produces unit level predictions. Fits quantile regression to reporting data, applies
         it to nonreporting data. The features are specified in model_settings.
@@ -92,7 +93,7 @@ class ConformalElectionModel(BaseElectionModel.BaseElectionModel):
         # round since we don't need the artificial precision
         return preds.round(decimals=0)
 
-    def get_unit_prediction_interval_bounds(self, reporting_units, nonreporting_units, conf_frac, alpha, estimand):
+    def get_unit_prediction_interval_bounds(self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, conf_frac: float, alpha: float, estimand: str) -> PredictionIntervals:
         """
         Get unadjusted unit prediction intervals. Splits reporting data into training data and conformalization data,
         fits lower and upper quantile regression using training data and apply to both conformalization data

@@ -141,7 +141,7 @@ class BaseElectionModel:
         """
         pass
 
-    def get_coefficients(self):
+    def get_coefficients(self) -> dict:
         """
         Returns a dictionary of feature/fixed effect names to the coefficients
         These coefficients are for the point prediciton only.
