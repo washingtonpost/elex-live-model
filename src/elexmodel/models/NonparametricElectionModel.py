@@ -103,11 +103,16 @@ class NonparametricElectionModel(ConformalElectionModel):
             lower.round(decimals=0), upper.round(decimals=0), prediction_intervals.conformalization
         )
 
-    # At the unit level, conformalization data is adjustment from estimated % change from baseline
     def get_all_conformalization_data_unit(self):
+        """
+        Returns the conformalization data for the unit adjustments
+        """
         return None, self.conformalization_data_unit
 
     def get_all_conformalization_data_agg(self):
+        """
+        Returns the conformalization data for the aggregate adjustments
+        """
         return None, self.conformalization_data_agg
 
     def get_aggregate_prediction_intervals(
@@ -117,7 +122,7 @@ class NonparametricElectionModel(ConformalElectionModel):
         unexpected_units,
         aggregate,
         alpha,
-        conformalization_data,
+        unit_prediction_intervals,
         estimand,
     ):
         """
@@ -125,6 +130,9 @@ class NonparametricElectionModel(ConformalElectionModel):
         Compute results from reporting data and nonreporting data and then sum in the lower and upper prediction
         intervals from nonreporting data.
         """
+        # get conformalization data out of unit prediction intervals
+        conformalization_data = unit_prediction_intervals.conformalization
+        
         # we're doing the same work as in get_aggregate_predictions here, can we just do this work once?
         aggregate_votes = self._get_reporting_aggregate_votes(reporting_units, unexpected_units, aggregate, estimand)
 

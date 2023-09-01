@@ -17,11 +17,12 @@ PredictionIntervals = namedtuple("PredictionIntervals", ["lower", "upper", "conf
 LOG = logging.getLogger(__name__)
 
 
-class ConformalElectionModel(BaseElectionModel):
+class ConformalElectionModel(BaseElectionModel.BaseElectionModel):
     def __init__(self, model_settings={}):
         super(ConformalElectionModel, self).__init__(model_settings)
         self.qr = QuantileRegressionSolver(solver="ECOS")
         self.featurizer = Featurizer(self.features, self.fixed_effects)
+        self.lambda_ = model_settings.get("lambda_", 0)
 
     def _compute_conf_frac(self) -> float:
         """
@@ -155,10 +156,17 @@ class ConformalElectionModel(BaseElectionModel):
 
         return PredictionIntervals(nonreporting_lower_bounds, nonreporting_upper_bounds, conformalization_data)
 
-    def get_unit_prediction_intervals(self):
+    def get_all_conformalization_data_unit(self):
+        """
+        Returns conformalization data at the unit level
+        Conformalization data is adjustment from estimated % change from baseline
+        """
         pass
 
-    def get_aggregate_prediction_intervals(self):
+    def get_all_conformalization_data_agg(self):
+        """
+        Returns conformalization data at the aggregate level
+        """
         pass
 
     def get_coefficients(self):
