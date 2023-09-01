@@ -24,6 +24,7 @@ def test_fit_model():
     assert all(np.abs(qr.predict(df_X) - [8, 8, 8, 15]) <= TOL)
     assert all(np.abs(qr.coefficients - [1, 7]) <= TOL)
 
+
 def test_get_unit_predictions():
     model_settings = {"lambda_": 1, "features": ["b"]}
     model = ConformalElectionModel.ConformalElectionModel(model_settings)

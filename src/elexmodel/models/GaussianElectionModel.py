@@ -25,7 +25,9 @@ class GaussianElectionModel(ConformalElectionModel):
     def get_minimum_reporting_units(self, alpha: float) -> float:
         return 10 * self._compute_conf_frac()
 
-    def get_unit_prediction_intervals(self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, alpha: float, estimand: str) -> PredictionIntervals:
+    def get_unit_prediction_intervals(
+        self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, alpha: float, estimand: str
+    ) -> PredictionIntervals:
         """
         Get unit prediction intervals in Gaussian case. Adjust unit prediction intervals based on Gaussian model
         that is fit to conformalization data.
@@ -119,7 +121,7 @@ class GaussianElectionModel(ConformalElectionModel):
         """
         # get conformalization data out of unit prediction intervals
         conformalization_data = unit_prediction_intervals.conformalization
-        
+
         # get reporting votes by aggregate
         aggregate_votes = self._get_reporting_aggregate_votes(reporting_units, unexpected_units, aggregate, estimand)
 

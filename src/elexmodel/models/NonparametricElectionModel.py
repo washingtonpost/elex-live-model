@@ -23,7 +23,9 @@ class NonparametricElectionModel(ConformalElectionModel):
     def get_minimum_reporting_units(self, alpha: float) -> int:
         return math.ceil(-1 * (alpha + 1) / (alpha - 1))
 
-    def _compute_population_correction(self, conformalization_data: pd.DataFrame, scores: pd.Series, correction_quantile: float, estimand: str) -> float:
+    def _compute_population_correction(
+        self, conformalization_data: pd.DataFrame, scores: pd.Series, correction_quantile: float, estimand: str
+    ) -> float:
         """
         Compute population corrected conforalization correction.
         We care about larger units more than smaller units when computing aggregate prediction intervals.
@@ -44,7 +46,9 @@ class NonparametricElectionModel(ConformalElectionModel):
         population_correction = np.min(population_correction.scores)
         return population_correction
 
-    def get_unit_prediction_intervals(self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, alpha: float, estimand: str) -> PredictionIntervals:
+    def get_unit_prediction_intervals(
+        self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, alpha: float, estimand: str
+    ) -> PredictionIntervals:
         """
         Get unit prediction intervals for non-parametric model. Adjust nonreporting unit prediction intervals based
         on conformalization.
@@ -132,7 +136,7 @@ class NonparametricElectionModel(ConformalElectionModel):
         """
         # get conformalization data out of unit prediction intervals
         conformalization_data = unit_prediction_intervals.conformalization
-        
+
         # we're doing the same work as in get_aggregate_predictions here, can we just do this work once?
         aggregate_votes = self._get_reporting_aggregate_votes(reporting_units, unexpected_units, aggregate, estimand)
 

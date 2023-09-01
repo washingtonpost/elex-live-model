@@ -1,8 +1,8 @@
 import logging
 from collections import namedtuple
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 LOG = logging.getLogger(__name__)
 
@@ -24,14 +24,17 @@ class BaseElectionModel:
         """
         return 10
 
-    def get_unit_predictions(self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, estimand: str, *kwargs) -> np.ndarray:
+    def get_unit_predictions(
+        self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, estimand: str, *kwargs
+    ) -> np.ndarray:
         """
         Generates and returns unit level predictions
         """
         pass
 
-    
-    def _get_reporting_aggregate_votes(self, reporting_units: pd.DataFrame, unexpected_units: pd.DataFrame, aggregate: list, estimand: str, *kwargs) -> pd.DataFrame:
+    def _get_reporting_aggregate_votes(
+        self, reporting_units: pd.DataFrame, unexpected_units: pd.DataFrame, aggregate: list, estimand: str, *kwargs
+    ) -> pd.DataFrame:
         """
         Aggregate reporting votes by aggregate (ie. postal_code, county_fips etc.). This function
         adds reporting data and reporting unexpected data by aggregate. Note that all unexpected units -
@@ -75,7 +78,9 @@ class BaseElectionModel:
 
         return aggregate_votes
 
-    def _get_nonreporting_aggregate_votes(self, nonreporting_units: pd.DataFrame, aggregate: list, *kwargs) -> pd.DataFrame:
+    def _get_nonreporting_aggregate_votes(
+        self, nonreporting_units: pd.DataFrame, aggregate: list, *kwargs
+    ) -> pd.DataFrame:
         """
         Aggregate nonreporting votes by aggregate (ie. postal_code, county_fips etc.). Note that all unexpected
         units - whether or not they are fully reporting - are handled in "_get_reporting_aggregate_votes" above
@@ -84,7 +89,15 @@ class BaseElectionModel:
 
         return aggregate_nonreporting_units_known_votes
 
-    def get_aggregate_predictions(self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, unexpected_units: pd.DataFrame, aggregate: list, estimand: str, *kwargs) -> pd.DataFrame:
+    def get_aggregate_predictions(
+        self,
+        reporting_units: pd.DataFrame,
+        nonreporting_units: pd.DataFrame,
+        unexpected_units: pd.DataFrame,
+        aggregate: list,
+        estimand: str,
+        *kwargs,
+    ) -> pd.DataFrame:
         """
         Aggregate predictions and results by aggregate (ie. postal_code, county_fips etc.). Add results from reporting
         and reporting unexpected units and then sum in the predictions from nonreporting units.
@@ -93,15 +106,12 @@ class BaseElectionModel:
         aggregate_votes = self._get_reporting_aggregate_votes(reporting_units, unexpected_units, aggregate, estimand)
 
         # these are subunits that are not already counted
-        aggregate_preds = (
-            self._get_nonreporting_aggregate_votes(nonreporting_units, aggregate)
-            .rename(
-                columns={
-                    f"pred_{estimand}": f"pred_only_{estimand}",
-                    f"results_{estimand}": f"results_only_{estimand}",
-                    "reporting": "reporting_only",
-                }
-            )
+        aggregate_preds = self._get_nonreporting_aggregate_votes(nonreporting_units, aggregate).rename(
+            columns={
+                f"pred_{estimand}": f"pred_only_{estimand}",
+                f"results_{estimand}": f"results_only_{estimand}",
+                "reporting": "reporting_only",
+            }
         )
         aggregate_data = (
             aggregate_votes.merge(aggregate_preds, how="outer", on=aggregate)
@@ -128,14 +138,24 @@ class BaseElectionModel:
         )
 
         return aggregate_data
-    
-    def get_unit_prediction_intervals(self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, alpha: float, estimand: str) -> PredictionIntervals:
+
+    def get_unit_prediction_intervals(
+        self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, alpha: float, estimand: str
+    ) -> PredictionIntervals:
         """
         Generates and returns unit level prediction intervals
         """
         pass
 
-    def get_aggregate_prediction_intervals(self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, unexpected_units: pd.DataFrame, aggregate: list, alpha: float, *kwargs) -> PredictionIntervals:
+    def get_aggregate_prediction_intervals(
+        self,
+        reporting_units: pd.DataFrame,
+        nonreporting_units: pd.DataFrame,
+        unexpected_units: pd.DataFrame,
+        aggregate: list,
+        alpha: float,
+        *kwargs,
+    ) -> PredictionIntervals:
         """
         Generates and returns aggregate prediction intervals for arbitrary aggregates
         """

@@ -84,7 +84,7 @@ def test_aggregate_prediction_intervals_simple():
             f"upper_{alpha}_{estimand}": [9, 8, 7, 9, 5, 4],  # a: 17, c: 16, e: 9
         }
     )
-    
+
     prediction_intervals = PredictionIntervals([], [], [])
     intervals = model.get_aggregate_prediction_intervals(df1, df3, df2, ["c1"], alpha, prediction_intervals, estimand)
 
@@ -118,10 +118,14 @@ def test_aggregate_prediction_intervals(va_governor_precinct_data):
 
     prediction_intervals = PredictionIntervals([], [], [])
 
-    intervals = model.get_aggregate_prediction_intervals(df1, df2, df3, ["postal_code"], alpha, prediction_intervals, estimand)
+    intervals = model.get_aggregate_prediction_intervals(
+        df1, df2, df3, ["postal_code"], alpha, prediction_intervals, estimand
+    )
     assert 2535685.0 == intervals.lower[0]  # total based on summing csv
     assert 2535685.0 == intervals.upper[0]  # total based on summing csv
 
-    intervals = model.get_aggregate_prediction_intervals(df1, df2, df3, ["county_fips"], alpha, prediction_intervals, estimand)
+    intervals = model.get_aggregate_prediction_intervals(
+        df1, df2, df3, ["county_fips"], alpha, prediction_intervals, estimand
+    )
     assert 10664.0 == intervals.lower[0]  # first county based on summing csv
     assert 10664.0 == intervals.upper[0]  # first county based on summing csv

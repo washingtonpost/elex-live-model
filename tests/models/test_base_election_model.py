@@ -1,6 +1,4 @@
-import numpy as np
 import pandas as pd
-from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
 
 from elexmodel.models import BaseElectionModel
 
