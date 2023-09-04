@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
@@ -13,88 +15,136 @@ LOG = logging.getLogger(__name__)
 
 
 class OLSRegression(object):
+    """
+    A class for Ordinary Least Squares Regression.
+    We have our own implementation because this allows us to save the normal equations for re-use, which 
+    saves times during the bootstrap
+    """
+
+    # OLS setup: 
+    #       X \beta = y
+    # since X might not be square, we multiply the above equation on both sides by X^T to generate X^T X, which is guaranteed
+    # to be square
+    #       X^T X \beta = X^T y
+    # Since X^T X is square we can invert it
+    #       \beta = (X^T X)^{-1} X^T y
+    # Since our version of the model bootstraps y, but keeps X constant we can 
+    # pre-compute (X^T X)^{-1} X^T and then re-use it to compute \beta_b for every bootstrap sample
+    
     def __init__(self):
         self.normal_eqs = None
         self.hat_matrix = None
         self.beta_hat = None
 
-    def _compute_normal_equations(self, x, L, lambda_, n_feat_ignore_reg):
+    def _compute_normal_equations(self, x: np.ndarray, L: np.ndarray, lambda_: float, n_feat_ignore_reg: int) -> np.ndarray:
+        """
+        Computes the Normal Equations for OLS: (X^T X)^{-1} X^T
+        """
+        # Inverting X^T X directly is computationally expensive and mathematically unstable, so we use QR factorization
+        # which factors x into the sum of an orthogonal matrix Q and a upper tringular matrix R
+        # L is a diagonal matrix of weights
         Q, R = np.linalg.qr(L @ x)
+        # lambda_I is the matrix for regularization, which need to be the same shape as R and
+        # have the regularization constant lambda_ along the diagonal
         lambda_I = lambda_ * np.eye(R.shape[1])
         # we don't want to regularize the coefficient for intercept and some features
         # so set regularization constant to zero for those features
         # this assumes that these are the first features
         for i in range(n_feat_ignore_reg):
             lambda_I[i, i] = 0
+        # substitute X = QR into the normal equations to get
+        #       R^T Q^T Q R \beta = R^T Q^T y
+        #       R^T R \beta = R^T Q^T y
+        #       \beta = (R^T R)^{-1} R^T Q^T y
+        # since R is upper triangular it is eqsier to invert
+        # lambda_I is the regularization matrix
         return np.linalg.inv(R.T @ R + lambda_I) @ R.T @ Q.T
 
-    def fit(self, x, y, weights=None, lambda_=0, normal_eqs=None, n_feat_ignore_reg=2):
+    def fit(self, x: np.ndarray, y: np.ndarray, weights: np.ndarray | None =None, lambda_: float=0.0, normal_eqs: np.ndarray | None = None, n_feat_ignore_reg: int=2) -> OLSRegression:
+        """
+        Fits the OLS model. 
+        Computes weights, computes normal equations and then computes 
+        """
+        # if weights is none, assume that that all weights should be 1
         if weights is None:
             weights = np.ones((y.shape[0], ))
-        # normalize + sqrt
+        # normalize weights and turn into diagional matrix
+        # square root because will be squared when R^T R happens later
         L = np.diag(np.sqrt(weights.flatten() / weights.sum()))
+        # if normal equations are provided then use those, otherwise compute them
         if normal_eqs is not None:
             self.normal_eqs = normal_eqs
         else:
             self.normal_eqs = self._compute_normal_equations(x, L, lambda_, n_feat_ignore_reg)
+        # compute hat matrix: X (X^T X)^{-1} X^T
         self.hat_vals = np.diag(x @ self.normal_eqs @ L)
+        # compute beta_hat: (X^T X)^{-1} X^T y
         self.beta_hat = self.normal_eqs @ L @ y
         return self
 
-    def predict(self, x):
+    def predict(self, x: np.ndarray) -> np.ndarray:
+        """
+        Uses beta_hat to predict on new x matrix
+        """
         return x @ self.beta_hat
     
-    def residuals(self, y, y_hat, loo=True, center=True):
+    def residuals(self, y: np.ndarray, y_hat: np.ndarray, loo: bool = True, center: bool = True) -> np.ndarray:
+        """
+        Computes residuals for the model
+        """
+        # compute standard residuals
         residuals = (y - y_hat)
+        # if leave one out is True, inflate by (1 - P)
+        # in OLS setting inflating by (1 - P) is the same as computing the leave one out residuals
+        # the un-inflated training residuals are too small, since training covariates were observed during fitting
         if loo:
             residuals /= (1 - self.hat_vals).reshape(-1, 1)
+        # centering removes the column mean
         if center:
             residuals -= np.mean(residuals, axis=0)
         return residuals
     
 class QuantileRegression(object):
+    """
+    A new version of quantile regression that uses the dual to solve faster 
+    """
     def __init__(self):
         self.beta_hats = []
 
-    def _fit(self, S, Phi, zeros, N, weights, tau, constraints):
-        if constraints is None:
-            bounds = weights.reshape(-1, 1) * np.asarray([(tau - 1, tau)] * N)
-            res = linprog(-1 * S, A_eq=Phi.T, b_eq=zeros, bounds=bounds, 
-                method='highs', options={'presolve': False})
-        else:
-            S_aug = np.concatenate([S, [constraints[0] - S[-1]], [S[-1] - constraints[1]]])
-            Phi_aug = np.concatenate([Phi, np.zeros((2, Phi.shape[1]))], axis=0)
-            zeros_aug = np.zeros((Phi_aug.shape[1], ))
-            weights_aug = np.concatenate([weights, [1], [1]])
-            bounds_aug = weights_aug.reshape(-1, 1) * np.asarray([(tau - 1, tau)] * (N + 2))
-            bounds_aug[-3] = np.asarray([None, None])
-            bounds_aug[-2] = np.asarray([0, None])
-            bounds_aug[-1] = np.asarray([0, None])
-            b_ub = np.asarray([tau, 1 - tau])
-            A_ub = np.zeros((2, weights_aug.shape[0]))
-            A_ub[0,-2] = weights_aug[-3]
-            A_ub[0,-1] = -1 * weights_aug[-3]
-            A_ub[1,-2] = -1 * weights_aug[-3]
-            A_ub[1,-1] = -1 * weights_aug[-3]
-            res = linprog(-1 * S_aug, A_eq=Phi_aug.T, b_eq=zeros_aug, bounds=bounds_aug, A_ub=A_ub, b_ub=b_ub,
-                method='highs', options={'presolve': False})
+    def _fit(self, S: np.ndarray, Phi: np.ndarray, zeros: np.ndarray, N: int, weights: np.ndarray, tau: float) -> np.ndarray:
+        """
+        Fits the dual problem of a quantile regression, for more information see appendix 6 here: https://arxiv.org/pdf/2305.12616.pdf
+        """
+        bounds = weights.reshape(-1, 1) * np.asarray([(tau - 1, tau)] * N)
+        # A_eq are the equality constraint matrix
+        # b_eq is the equality constraint vector (ie. A_eq @ x = b_eq)
+        # bounds are the (min, max) possible values of every element of x
+        res = linprog(-1 * S, A_eq=Phi.T, b_eq=zeros, bounds=bounds, 
+            method='highs', options={'presolve': False})
+        # marginal are the dual values, since we are solving the dual this is equivalent to the primal
         return -1 * res.eqlin.marginals
             
-    def fit(self, x, y, taus=0.5, weights=None, constraints=None):
-        if weights is None:
+    def fit(self, x: np.ndarray, y: np.ndarray, taus: list | float =0.5, weights: np.ndarray | None = None) -> np.ndarray:
+        """
+        Fits the quantile regression
+        """
+        # if weights is none, assume that that all weights should be 1
+        if weights is None: 
             weights = np.ones((y.shape[0], ))
 
         S = y
         Phi = x
         zeros = np.zeros((Phi.shape[1],))
         N = y.shape[0]
+        # normalize weights
         weights /= np.sum(weights)
 
+        # _fit assumes that taus is list, so if we want to do one value of tau then turn into a list
         if isinstance(taus, float):
             taus = [taus]
         
         for tau in taus:
-            self.beta_hats.append(self._fit(S, Phi, zeros, N, weights, tau, constraints))
+            self.beta_hats.append(self._fit(S, Phi, zeros, N, weights, tau))
 
         return self.beta_hats
     
