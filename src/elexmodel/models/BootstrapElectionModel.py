@@ -152,6 +152,30 @@ class BootstrapElectionModelException(Exception):
     pass
 
 class BootstrapElectionModel(BaseElectionModel):
+    """
+    The bootstrap election model. 
+    This approach to live election modeling uses ordinary least squares regression for point predictions and the bootstrap to generate prediction intervals.
+    Also, in this model we are modeling the two party margin as estimand only.
+
+    We have found that decomposing the normalized margin into two quantities that we model separetely works better:
+        y = (D^{Y} - R^{Y}) / (D^{Y} + D^{Y})
+        z = (D^{Y} + R^{Y}) / (D^{Y'} + R^{Y'})
+    where Y is the year we are modeling and Y' is the previous election year.
+    if we define weights to be the to total two party turnout in a previous election: w = (D^{Y'} + R^{Y'})
+    then we get that: wyz = (D^{Y} - R^{Y}) 
+    We cannot model y directly since we also need a model for turnout in order to sum our unit level predictions to aggregate predictions
+    y is the normalized two party margin and z is the turnout factor between this election and a previous election. We have found that
+    modeling those two quantities is relatively easy given the county level information that we have.
+    
+    We define our model as:
+        y_i = f_y(x) + \epsilon_y(x)
+        z_i = f_z(x) + \epsilon_z(x)
+    where f_y(x) and f_z(x) are ordinary least squares regressions and the epsilons are contest (state/district) level random effects.
+    
+    Our model also assumes that we have a baseline normalized margin (D^{Y'} - R^{Y'}) / (D^{Y'} + R^{Y'}) is one of the covariates
+    since we have found that predicts y and z very well.
+    """
+
     def __init__(self, model_settings={}):
         super().__init__(model_settings)
         self.seed = model_settings.get("seed", 0)
@@ -174,18 +198,29 @@ class BootstrapElectionModel(BaseElectionModel):
             raise BootstrapElectionModelException("baseline_normalized_margin not included as feature. This is necessary for the model to work.")
 
     
-    def cv_lambda(self, x, y, lambdas_, weights=None, k=5):
+    def cv_lambda(self, x: np.ndarray, y: np.ndarray, lambdas_: np.ndarray, weights: np.ndarray | None = None, k: int=5) -> float:
+        """
+        This function does k-fold cross validation for a OLS regression model given x, y and a set of lambdas to try out
+        This function returns the lambda that minimizes the k-fold cross validation loss
+        """
+        # if weights are none assume that all samples have equal weights
         if weights is None:
             weights = np.ones((y.shape[0], 1))
+        # concatenate since we need to keep x, y, weight samples together
         x_y_w = np.concatenate([x, y, weights], axis=1)
         self.rng.shuffle(x_y_w)
+        # generate k chunks
         chunks = np.array_split(x_y_w, k, axis=0)
         ols = OLSRegression()
         errors = np.zeros((len(lambdas_), ))
+        # for each possible lambda value perform k-fold cross validation
+        # ie. train model on k-1 chunks and evaluate on one chunk (for all possible k combinations of heldout chunk)
         for i, lambda_ in enumerate(lambdas_):
             for test_chunk in range(k):
                 x_y_w_test = chunks[test_chunk]
+                # extract all chunks except for the current test chunk
                 x_y_w_train = np.concatenate(chunks[:test_chunk] + chunks[test_chunk + 1:], axis=0)
+                # undo the concatenation above
                 x_test = x_y_w_test[:,:-2]
                 y_test = x_y_w_test[:,-2]
                 w_test = x_y_w_test[:,-1]
@@ -194,16 +229,25 @@ class BootstrapElectionModel(BaseElectionModel):
                 w_train = x_y_w_train[:,-1]
                 ols_lambda = ols.fit(x_train, y_train, weights=w_train, lambda_=lambda_, n_feat_ignore_reg=2)
                 y_hat_lambda = ols_lambda.predict(x_test)
+                # error is the weighted sum of squares of the residual between the actual heldout y and the predicted y on the heldout set
                 errors[i] += np.sum(w_test * ols_lambda.residuals(y_test, y_hat_lambda, loo=False, center=False) ** 2) / np.sum(w_test)
+        # return lambda that minimizes the k-fold error
+        # np.argmin returns the first occurence if multiple minimum values
         return lambdas_[np.argmin(errors)]
 
-    def get_minimum_reporting_units(self, alpha):
+    def get_minimum_reporting_units(self, alpha: float) -> int:
         return 10
         #return math.ceil(-1 * (alpha + 1) / (alpha - 1))
 
-    def _estimate_epsilon(self, residuals, aggregate_indicator, shrinkage=False):
+    def _estimate_epsilon(self, residuals: np.ndarray, aggregate_indicator: np.ndarray, shrinkage: bool =False) -> np.ndarray:
+        """
+        This function estimates the epsilon (contest level random effects)
+        """
+        # the estimate for epsilon is the average of the residuals in each contest
         epsilon_hat = (aggregate_indicator.T @ residuals) / aggregate_indicator.sum(axis=0).reshape(-1, 1)
-        epsilon_hat[aggregate_indicator.sum(axis=0) < 2] = 0 # can't estimate state random effect if we only have 1 unit
+        # we can't estimate a contest level effect if only have 1 unit in that contest (since our residual can just)
+        # be made equal to zero by setting the random effect to that value
+        epsilon_hat[aggregate_indicator.sum(axis=0) < 2] = 0 
 
         if shrinkage:
             # shrinkage code
@@ -216,28 +260,61 @@ class BootstrapElectionModel(BaseElectionModel):
             return shrinkage_factor * epsilon_hat
         return epsilon_hat
 
-    def _estimate_delta(self, residuals, epsilon_hat, aggregate_indicator):
+    def _estimate_delta(self, residuals: np.ndarray, epsilon_hat: np.ndarray, aggregate_indicator: np.ndarray) -> np.ndarray:
+        """
+        This function estimates delta (the model residuals)
+        """
+        # our estimate for delta is the difference between the residual and 
+        # what can be explained by the contest level random effect
         return (residuals - (aggregate_indicator @ epsilon_hat)).flatten()
 
-    # estimates epsilon and delta
-    def _estimate_model_errors(self, model, x, y, aggregate_indicator):
+    def _estimate_model_errors(self, model: OLSRegression, x: np.ndarray, y: np.ndarray, aggregate_indicator: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """
+        This function estimates all components of the error in our bootstrap model
+        residual: the centered leave one out residual, ie the difference between our prediction and our actual training values
+        epsilon_hat: our estimate for the contest level effect in our model (ie. how much did each state contribute)
+        deta_hat: the difference between the residual and what our random effect can explain
+        """
+        # get unit level predictions for our model
         y_pred = model.predict(x)
+        # compute residuals
         residuals_y = model.residuals(y, y_pred, loo=True, center=True)
+        # estimate epsilon
         epsilon_y_hat = self._estimate_epsilon(residuals_y, aggregate_indicator, shrinkage=False)
+        # compute delta
         delta_y_hat = self._estimate_delta(residuals_y, epsilon_y_hat, aggregate_indicator)
         return residuals_y, epsilon_y_hat, delta_y_hat       
 
-    def _estimate_strata_dist(self, x_train, x_train_strata, x_test, x_test_strata, delta_hat, lb, ub):
+    def _estimate_strata_dist(self, x_train: np.ndarray, x_train_strata: np.ndarray, x_test: np.ndarray, x_test_strata: np.ndarray, delta_hat: np.ndarray, lb: float, ub: float) -> Tuple[dict, dict]:
+        """
+        This function generates the distribution (ie. ppf/cdf) for the strata in which we want to exchange
+        bootstrap errors in this model.
+        """
         stratum_ppfs_delta = {}
         stratum_cdfs_delta = {}
 
-        def ppf_creator(betas, taus, lb, ub):
+        def ppf_creator(betas: np.ndarray, taus: np.ndarray, lb: float, ub: float) -> float:
+            """
+            Creates a probability point function (inverse of a cumulative distribution function -- CDF)
+            Provides the value of a given percentile of the data
+            """
+            # because we want a smooth ppf, we want to interpolate
             return lambda p: np.interp(p, taus, betas, lb, ub)
         
-        def cdf_creator(betas, taus):
+        def cdf_creator(betas: np.ndarray, taus: np.ndarray) -> float:
+            """
+            Creates a cumulative distribution function
+            Provides the probability that a value is at most x
+            """
             return lambda x: np.interp(x, betas, taus, right=1)
         
+        # we need the unique strata that exist in both the training and in the holdout data
         x_strata = np.unique(np.concatenate([x_train_strata, x_test_strata], axis=0), axis=0).astype(int)
+        # for each stratum we want to add a worst case lower bound (for the taus between 0-0.49)
+        # and upper bound (for the taus between 0.5-1) in case we see a value that is smaller/larger
+        # than anything we have observed in the training data. This lower/upper bound is set 
+        # manually, note that if we observe a value that is more extreme than the lower/upper bound
+        # we are fine, since the quantile regression will use that instead
         for x_stratum in x_strata:
             x_train_aug = np.concatenate([x_train_strata, x_stratum.reshape(1, -1)], axis=0)
             delta_aug_lb = np.concatenate([delta_hat, [lb]])
@@ -249,20 +326,30 @@ class BootstrapElectionModel(BaseElectionModel):
 
             betas_stratum = betas[:,np.where(x_stratum == 1)[0]].sum(axis=1)
 
+            # for this stratum value create ppf
             stratum_ppfs_delta[tuple(x_stratum)] = ppf_creator(betas_stratum, self.taus, lb, ub)
 
+            # for this stratum value create cdf
             stratum_cdfs_delta[tuple(x_stratum)] = cdf_creator(betas_stratum, self.taus)
 
         return stratum_ppfs_delta, stratum_cdfs_delta
 
-    def _generate_nonreporting_bounds(self, nonreporting_units, bootstrap_estimand, n_bins=10):
+    def _generate_nonreporting_bounds(self, nonreporting_units: pd.DataFrame, bootstrap_estimand: str, n_bins: int=10) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        This function creates upper and lower bounds for y and z based on the expected vote
+        that we have for each unit. This is used to clip our predictions
+        """
         # TODO: figure out how to better estimate margin_upper/lower_bound
         # TODO: pass in the magic numbers
+        
+        # turn expected for nonreporting units into decimal (also clip at 100)
         nonreporting_expected_vote_frac = nonreporting_units.percent_expected_vote.values.clip(max=100) / 100
         if bootstrap_estimand == 'normalized_margin':
             unobserved_upper_bound = 1
             unobserved_lower_bound = -1
+            # the upper bound for LHS party is if all the outstanding vote go in their favour
             upper_bound = nonreporting_expected_vote_frac * nonreporting_units[bootstrap_estimand] + (1 - nonreporting_expected_vote_frac) * unobserved_upper_bound
+            # the lower bound for the LHS party is if all the outstanding vote go against them
             lower_bound = nonreporting_expected_vote_frac * nonreporting_units[bootstrap_estimand] + (1 - nonreporting_expected_vote_frac) * unobserved_lower_bound
         elif bootstrap_estimand == 'turnout_factor':
             percent_expected_vote_error_bound = 0.25
@@ -289,8 +376,10 @@ class BootstrapElectionModel(BaseElectionModel):
         # nonreporting_units[f'{bootstrap_estimand}_lower'] = lower_bins
         # return np.unique(nonreporting_units[[f'{bootstrap_estimand}_lower', f'{bootstrap_estimand}_upper']].values, axis=0)
 
-    # probability integral transform for each stratum (lol)
     def _strata_pit(self, x_train_strata, x_train_strata_unique, delta_hat, stratum_cdfs_delta):
+        """
+        Apply the probability integral transform for each strata
+        """
         unifs = []
         for strata_dummies in x_train_strata_unique:
             delta_strata = delta_hat[np.where((strata_dummies == x_train_strata).all(axis=1))[0]]
