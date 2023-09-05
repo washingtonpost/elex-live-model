@@ -81,12 +81,16 @@ Note: When running the model with multiple fixed effects, make sure they are not
 
 Some model types have specific model parameters that can be included.
 
-| Name      | Type    | Acceptable values           | model           |
-|-----------|---------|-----------------------------|-----------------|
-| lambda    | numeric | 0-inf                       | all             |
-| robust    | boolean | larger prediction intervals | `nonparametric` |
-| beta      | numeric | variance inflation          | `gaussian`      |
-| winsorize | boolean | winsorize std estimate      | `gaussian`      |
+| Name                 | Type    | Acceptable values                | model           |
+|----------------------|---------|----------------------------------|-----------------|
+| lambda               | numeric | regularization constant          | all             |
+| turnout_factor_lower | numeric | drop units with < turnout factor | all             |
+| turnout_factor_upper | numeric | drop units with < turnout factor | all             |
+| robust               | boolean | larger prediction intervals      | `nonparametric` |
+| beta                 | numeric | variance inflation               | `gaussian`      |
+| winsorize            | boolean | winsorize std estimate           | `gaussian`      |
+| B                    | numeric | bootstrap samples                | `bootstrap`     |
+| T                    | numeric | temperature for aggregate        | `bootstrap`     |
 
 This is the class and function that invokes the general function to generate estimates. You can install `elex-model` as a Python package and use this code snippet in other projects.
 

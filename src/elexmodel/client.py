@@ -52,6 +52,8 @@ class ModelClient:
         aggregates,
         fixed_effects,
         pi_method,
+        turnout_factor_lower,
+        turnout_factor_upper,
         model_parameters,
         handle_unreporting,
     ):
@@ -84,7 +86,7 @@ class ModelClient:
             ]
         if len(invalid_fixed_effects) > 0:
             raise ValueError(f"Fixed effect(s): {invalid_fixed_effects} not valid. Please check config")
-        if pi_method not in {"gaussian", "nonparametric"}:
+        if pi_method not in {"gaussian", "nonparametric", "bootstrap"}:
             raise ValueError(
                 f"Prediction interval method: {pi_method} is not valid. \
                     pi_method has to be either `gaussian` or `nonparametric`."
@@ -96,6 +98,10 @@ class ModelClient:
                 not isinstance(model_parameters["lambda_"], (float, int)) or model_parameters["lambda_"] < 0
             ):
                 raise ValueError("lambda is not valid. It has to be numeric and greater than zero.")
+            if 'turnout_factor_lower' in model_parameters and not isinstance(model_parameters["turnout_factor_lower"], float):
+                raise ValueError("turnout_factor_lower is not valid. Has to be a float.")
+            if 'turnout_factor_upper' in model_parameters and not isinstance(model_parameters["turnout_factor_upper"], float):
+                raise ValueError("turnout_factor_upper is not valid. Has to be a float.")
             if pi_method == "gaussian":
                 if "beta" in model_parameters and not isinstance(model_parameters["beta"], (int, float)):
                     raise ValueError("beta is not valid. Has to be either an integer or a float.")
@@ -104,6 +110,33 @@ class ModelClient:
             elif pi_method == "nonparametric":
                 if "robust" in model_parameters and not isinstance(model_parameters["robust"], bool):
                     raise ValueError("robust is not valid. Has to be a boolean.")
+            elif pi_method == 'bootstrap':
+                if "B" in model_parameters and not isinstance(model_parameters["B"], int)):
+                    raise ValueError("B is not valid. Has to be either an integer.")
+                if "T" in model_parameters and not isinstance(model_parameters["T"], (int, float)):
+                    raise ValueError("T is not valid. Has to be either an integer or a float.")
+                if "strata" in model_parameters and not isinstance(model_parameters["strata"], list):
+                    raise ValueError("strata is not valid. Has to be a list.")
+                if "agg_model_hard_threshold" in model_parameters and not isinstance(model_parameters["agg_model_hard_threshold"], bool):
+                    raise ValueError("agg_model_hard_threshold is not valid. Has to be a boolean.")
+                if "y_LB" in model_parameters and not isinstance(model_parameters["y_LB"], float):
+                    raise ValueError("y_LB is not valid. Has to be a float.")
+                if "y_UB" in model_parameters and not isinstance(model_parameters["y_UB"], float):
+                    raise ValueError("y_UB is not valid. Has to be a float.")
+                if "z_LB" in model_parameters and not isinstance(model_parameters["z_LB"], float):
+                    raise ValueError("z_LB is not valid. Has to be a float.")
+                if "z_UB" in model_parameters and not isinstance(model_parameters["z_UB"], float):
+                    raise ValueError("z_UB is not valid. Has to be a float.")
+                if "y_unobserved_upper_bound" in model_parameters and not isinstance(model_parameters["y_unobserved_upper_bound"], float):
+                    raise ValueError("y_unobserved_upper_bound is not valid. Has to be a float.")
+                if "y_unobserved_lower_bound" in model_parameters and not isinstance(model_parameters["y_unobserved_lower_bound"], float):
+                    raise ValueError("y_unobserved_lower_bound is not valid. Has to be a float.")
+                if "percent_expected_vote_error_bound" in model_parameters and not isinstance(model_parameters["percent_expected_vote_error_bound"], float):
+                    raise ValueError("z_UB is not valid. Has to be a float.")
+                if "z_unobserved_upper_bound" in model_parameters and not isinstance(model_parameters["z_unobserved_upper_bound"], float):
+                    raise ValueError("z_unobserved_upper_bound is not valid. Has to be a float.")
+                if "z_unobserved_lower_bound" in model_parameters and not isinstance(model_parameters["z_unobserved_lower_bound"], float):
+                    raise ValueError("z_unobserved_lower_bound is not valid. Has to be a float.")
         if handle_unreporting not in {"drop", "zero"}:
             raise ValueError("handle_unreporting must be either `drop` or `zero`")
         return True
@@ -172,7 +205,7 @@ class ModelClient:
         config_handler = ConfigHandler(
             election_id, config=raw_config, s3_client=s3.S3JsonUtil(TARGET_BUCKET), save=save_config
         )
-        '''
+        
         self._check_input_parameters(
             config_handler,
             office,
@@ -185,7 +218,7 @@ class ModelClient:
             model_parameters,
             handle_unreporting,
         )
-        '''
+        
         states_with_election = config_handler.get_states(office)
         estimand_baselines = config_handler.get_estimand_baselines(office, estimands)
 
@@ -215,11 +248,14 @@ class ModelClient:
             handle_unreporting=handle_unreporting,
         )
 
+        turnout_factor_lower = model_parameters.get("turnout_factor_lower", 0.5)
+        turnout_factor_upper = model_parameters.get("turnout_factor_upper", 1.5)
+
         reporting_units = data.get_reporting_units(
-            percent_reporting_threshold, features_to_normalize=features, add_intercept=True
+            percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper, features_to_normalize=features, add_intercept=True
         )
         nonreporting_units = data.get_nonreporting_units(
-            percent_reporting_threshold, features_to_normalize=features, add_intercept=True
+            percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper, features_to_normalize=features, add_intercept=True
         )
         unexpected_units = data.get_unexpected_units(percent_reporting_threshold, aggregates)
 

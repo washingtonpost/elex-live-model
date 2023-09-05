@@ -188,6 +188,11 @@ class BootstrapElectionModel(BaseElectionModel):
         self.y_UB = model_settings.get("y_UB", 0.3)
         self.z_LB = model_settings.get("z_LB", -0.5)
         self.z_UB = model_settings.get("z_UB", 0.5)
+        self.y_unobserved_upper_bound = model_settings.get("y_unobserved_upper_bound", 1.0)
+        self.y_unobserved_lower_bound = model_settings.get("y_unobserved_lower_bound", -1.0)
+        self.percent_expected_vote_error_bound = model_settings.get("percent_expected_vote_error_bound", 0.5)
+        self.z_unobserved_upper_bound = model_settings.get("z_unobserved_upper_bound", 1.5)
+        self.z_unobserved_lower_bound = model_settings.get("z_unobserved_lower_bound", 0.5)
         self.featurizer = Featurizer(self.features, self.fixed_effects)
         self.rng = np.random.default_rng(seed=self.seed)
         self.ran_bootstrap = False
@@ -197,7 +202,7 @@ class BootstrapElectionModel(BaseElectionModel):
         if 'baseline_normalized_margin' not in self.features:
             raise BootstrapElectionModelException("baseline_normalized_margin not included as feature. This is necessary for the model to work.")
 
-    
+
     def cv_lambda(self, x: np.ndarray, y: np.ndarray, lambdas_: np.ndarray, weights: np.ndarray | None = None, k: int=5) -> float:
         """
         This function does k-fold cross validation for a OLS regression model given x, y and a set of lambdas to try out
@@ -345,16 +350,16 @@ class BootstrapElectionModel(BaseElectionModel):
         # turn expected for nonreporting units into decimal (also clip at 100)
         nonreporting_expected_vote_frac = nonreporting_units.percent_expected_vote.values.clip(max=100) / 100
         if bootstrap_estimand == 'normalized_margin':
-            unobserved_upper_bound = 1
-            unobserved_lower_bound = -1
+            unobserved_upper_bound = self.y_unobserved_upper_bound
+            unobserved_lower_bound = self.y_unobserved_lower_bound
             # the upper bound for LHS party is if all the outstanding vote go in their favour
             upper_bound = nonreporting_expected_vote_frac * nonreporting_units[bootstrap_estimand] + (1 - nonreporting_expected_vote_frac) * unobserved_upper_bound
             # the lower bound for the LHS party is if all the outstanding vote go against them
             lower_bound = nonreporting_expected_vote_frac * nonreporting_units[bootstrap_estimand] + (1 - nonreporting_expected_vote_frac) * unobserved_lower_bound
         elif bootstrap_estimand == 'turnout_factor':
-            percent_expected_vote_error_bound = 0.25
-            unobserved_upper_bound = 1.5
-            unobserved_lower_bound = 0.5
+            percent_expected_vote_error_bound = self.percent_expected_vote_error_bound
+            unobserved_upper_bound = self.z_unobserved_upper_bound
+            unobserved_lower_bound = self.z_unobserved_lower_bound
             lower_bound = nonreporting_units[bootstrap_estimand] / (nonreporting_expected_vote_frac + percent_expected_vote_error_bound)
             upper_bound = nonreporting_units[bootstrap_estimand] / (nonreporting_expected_vote_frac - percent_expected_vote_error_bound).clip(min=0.01)
             upper_bound[np.isclose(upper_bound, 0)] = unobserved_upper_bound # turnout is at m

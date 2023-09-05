@@ -50,7 +50,7 @@ class CombinedDataHandler:
 
         self.data = data
 
-    def get_reporting_units(self, percent_reporting_threshold, features_to_normalize=[], add_intercept=True):
+    def get_reporting_units(self, percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper, features_to_normalize=[], add_intercept=True):
         """
         Get reporting data. These are units where the expected vote is greater than the percent reporting threshold.
         """
@@ -58,8 +58,8 @@ class CombinedDataHandler:
             drop=True
         )
         # if turnout factor less than 0.5 or greater than 1.5 assume AP made a mistake and don't treat those as reporting units
-        reporting_units = reporting_units[reporting_units.turnout_factor > 0.5]
-        reporting_units = reporting_units[reporting_units.turnout_factor < 1.5]
+        reporting_units = reporting_units[reporting_units.turnout_factor > turnout_factor_lower]
+        reporting_units = reporting_units[reporting_units.turnout_factor < turnout_factor_upper]
 
 
         # residualize + normalize
@@ -73,13 +73,13 @@ class CombinedDataHandler:
 
         return reporting_units
 
-    def get_nonreporting_units(self, percent_reporting_threshold, features_to_normalize=[], add_intercept=True):
+    def get_nonreporting_units(self, percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper, features_to_normalize=[], add_intercept=True):
         """
         Get nonreporting data. These are units where expected vote is less than the percent reporting threshold
         """
         # if turnout factor <= 0.2 assume the AP made a mistake and treat them as non-reporting units
         nonreporting_units = self.data.query(
-            "(percent_expected_vote < @percent_reporting_threshold) | (turnout_factor <= 0.5) | (turnout_factor >= 1.5)" #
+            "(percent_expected_vote < @percent_reporting_threshold) | (turnout_factor <= @turnout_factor_upper) | (turnout_factor >= @turnout_factor_lower)" #
         ).reset_index(  # not checking if results.isnull() anymore across multiple estimands
             drop=True
         )
