@@ -773,7 +773,7 @@ def test_winsorize_intervals(model_client, va_governor_county_data, va_config):
         election_id, office_id, geographic_unit_type, estimands, data=va_governor_county_data
     )
 
-    data_handler.shuffle()
+    data_handler.shuffle(seed=1024)
     data = data_handler.get_percent_fully_reported(70)
 
     preprocessed_data = va_governor_county_data.copy()
