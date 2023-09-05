@@ -1,7 +1,7 @@
-from abc import ABC
 import logging
 import math
 import warnings
+from abc import ABC
 from collections import namedtuple
 
 import cvxpy
@@ -189,7 +189,6 @@ class ConformalElectionModel(BaseElectionModel.BaseElectionModel, ABC):
         Returns conformalization data at the aggregate level
         """
         raise NotImplementedError
-
 
     def get_coefficients(self):
         """

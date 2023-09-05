@@ -164,7 +164,7 @@ class BaseElectionModel(ABC):
         Generates and returns aggregate prediction intervals for arbitrary aggregates
         """
         raise NotImplementedError
-    
+
     def get_coefficients(self) -> dict:
         """
         Returns a dictionary of feature/fixed effect names to the coefficients
