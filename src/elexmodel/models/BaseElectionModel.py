@@ -32,7 +32,7 @@ class BaseElectionModel(ABC):
         """
         Generates and returns unit level predictions
         """
-        return NotImplemented
+        raise NotImplementedError
 
     def _get_reporting_aggregate_votes(
         self, reporting_units: pd.DataFrame, unexpected_units: pd.DataFrame, aggregate: list, estimand: str, *kwargs
@@ -148,7 +148,7 @@ class BaseElectionModel(ABC):
         """
         Generates and returns unit level prediction intervals
         """
-        return NotImplemented
+        raise NotImplementedError
 
     @classmethod
     def get_aggregate_prediction_intervals(
@@ -163,8 +163,8 @@ class BaseElectionModel(ABC):
         """
         Generates and returns aggregate prediction intervals for arbitrary aggregates
         """
-        return NotImplemented
-
+        raise NotImplementedError
+    
     def get_coefficients(self) -> dict:
         """
         Returns a dictionary of feature/fixed effect names to the coefficients
