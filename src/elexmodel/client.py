@@ -52,8 +52,6 @@ class ModelClient:
         aggregates,
         fixed_effects,
         pi_method,
-        turnout_factor_lower,
-        turnout_factor_upper,
         model_parameters,
         handle_unreporting,
     ):

@@ -96,8 +96,8 @@ class ConfigHandler:
 
     def get_features(self, office):
         features = self._get_office_subconfig(office).get("features", [])
-        features += ["baseline_margin"] # would otherwise need to add baseline_margin to every single config
-        return 
+        features += ["baseline_normalized_margin"] # would otherwise need to add baseline_margin to every single config
+        return features
 
     def get_aggregates(self, office):
         return self._get_office_subconfig(office).get("aggregates", [])
