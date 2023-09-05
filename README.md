@@ -81,16 +81,27 @@ Note: When running the model with multiple fixed effects, make sure they are not
 
 Some model types have specific model parameters that can be included.
 
-| Name                 | Type    | Acceptable values                | model           |
-|----------------------|---------|----------------------------------|-----------------|
-| lambda               | numeric | regularization constant          | all             |
-| turnout_factor_lower | numeric | drop units with < turnout factor | all             |
-| turnout_factor_upper | numeric | drop units with < turnout factor | all             |
-| robust               | boolean | larger prediction intervals      | `nonparametric` |
-| beta                 | numeric | variance inflation               | `gaussian`      |
-| winsorize            | boolean | winsorize std estimate           | `gaussian`      |
-| B                    | numeric | bootstrap samples                | `bootstrap`     |
-| T                    | numeric | temperature for aggregate        | `bootstrap`     |
+| Name                              | Type    | Acceptable values                | model           |
+|-----------------------------------|---------|----------------------------------|-----------------|
+| lambda                            | numeric | regularization constant          | all             |
+| turnout_factor_lower              | numeric | drop units with < turnout factor | all             |
+| turnout_factor_upper              | numeric | drop units with < turnout factor | all             |
+| robust                            | boolean | larger prediction intervals      | `nonparametric` |
+| beta                              | numeric | variance inflation               | `gaussian`      |
+| winsorize                         | boolean | winsorize std estimate           | `gaussian`      |
+| B                                 | numeric | bootstrap samples                | `bootstrap`     |
+| T                                 | numeric | temperature for aggregate        | `bootstrap`     |
+| strata                            | list    | groups to stratify bootstrap by  | `bootstrap`     |
+| agg_model_hard_threshold          | bool    | hard threshold aggregate model   | `bootstrap`     |
+| y_LB                              | numeric | lower bound norm. margin dist    | `bootstrap`     |
+| y_UB                              | numeric | upper bound norm. margin dist    | `bootstrap`     |
+| z_LB                              | numeric | lower bound turnout fact dist    | `bootstrap`     |
+| z_UB                              | numeric | lower bound turnout fact dist    | `bootstrap`     |
+| y_unobserved_lower_bound          | numeric | lower bound for norm. margin     | `bootstrap`     |
+| y_unobserved_upper_bound          | numeric | upper bound for norm. margin     | `bootstrap`     |
+| percent_expected_vote_error_bound | numeric | error tolerance on expected vote | `bootstrap`     |
+| z_unobserved_lower_bound          | numeric | lower bound for turnout factor   | `bootstrap`     |
+| z_unobserved_upper_bound          | numeric | upper bound for turnout factor   | `bootstrap`     |
 
 This is the class and function that invokes the general function to generate estimates. You can install `elex-model` as a Python package and use this code snippet in other projects.
 

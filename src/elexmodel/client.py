@@ -111,7 +111,7 @@ class ModelClient:
                 if "robust" in model_parameters and not isinstance(model_parameters["robust"], bool):
                     raise ValueError("robust is not valid. Has to be a boolean.")
             elif pi_method == 'bootstrap':
-                if "B" in model_parameters and not isinstance(model_parameters["B"], int)):
+                if "B" in model_parameters and not isinstance(model_parameters["B"], int):
                     raise ValueError("B is not valid. Has to be either an integer.")
                 if "T" in model_parameters and not isinstance(model_parameters["T"], (int, float)):
                     raise ValueError("T is not valid. Has to be either an integer or a float.")
@@ -345,7 +345,7 @@ class ModelClient:
                         alpha_to_unit_prediction_intervals[alpha],
                         estimand,
                     )
-                    if isinstance(model, ConformalElectionModel):
+                    if isinstance(self.model, ConformalElectionModel):
                         self.all_conformalization_data_agg_dict[alpha][
                             estimand
                         ] = self.model.get_all_conformalization_data_agg()

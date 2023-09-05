@@ -273,7 +273,7 @@ class BootstrapElectionModel(BaseElectionModel):
         # what can be explained by the contest level random effect
         return (residuals - (aggregate_indicator @ epsilon_hat)).flatten()
 
-    def _estimate_model_errors(self, model: OLSRegression, x: np.ndarray, y: np.ndarray, aggregate_indicator: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def _estimate_model_errors(self, model: OLSRegression, x: np.ndarray, y: np.ndarray, aggregate_indicator: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         This function estimates all components of the error in our bootstrap model
         residual: the centered leave one out residual, ie the difference between our prediction and our actual training values
@@ -290,7 +290,7 @@ class BootstrapElectionModel(BaseElectionModel):
         delta_y_hat = self._estimate_delta(residuals_y, epsilon_y_hat, aggregate_indicator)
         return residuals_y, epsilon_y_hat, delta_y_hat       
 
-    def _estimate_strata_dist(self, x_train: np.ndarray, x_train_strata: np.ndarray, x_test: np.ndarray, x_test_strata: np.ndarray, delta_hat: np.ndarray, lb: float, ub: float) -> Tuple[dict, dict]:
+    def _estimate_strata_dist(self, x_train: np.ndarray, x_train_strata: np.ndarray, x_test: np.ndarray, x_test_strata: np.ndarray, delta_hat: np.ndarray, lb: float, ub: float) -> tuple[dict, dict]:
         """
         This function generates the distribution (ie. ppf/cdf) for the strata in which we want to exchange
         bootstrap errors in this model.
@@ -339,7 +339,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         return stratum_ppfs_delta, stratum_cdfs_delta
 
-    def _generate_nonreporting_bounds(self, nonreporting_units: pd.DataFrame, bootstrap_estimand: str, n_bins: int=10) -> Tuple[np.ndarray, np.ndarray]:
+    def _generate_nonreporting_bounds(self, nonreporting_units: pd.DataFrame, bootstrap_estimand: str, n_bins: int=10) -> tuple[np.ndarray, np.ndarray]:
         """
         This function creates upper and lower bounds for y and z based on the expected vote
         that we have for each unit. This is used to clip our predictions
