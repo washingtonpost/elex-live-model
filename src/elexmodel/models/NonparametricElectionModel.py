@@ -3,27 +3,29 @@ import math
 import numpy as np
 import pandas as pd
 
-from elexmodel.models.BaseElectionModel import BaseElectionModel, PredictionIntervals
+from elexmodel.models.ConformalElectionModel import ConformalElectionModel, PredictionIntervals
 
 
-class NonparametricElectionModel(BaseElectionModel):
-    def __init__(self, model_settings={}):
+class NonparametricElectionModel(ConformalElectionModel):
+    def __init__(self, model_settings: dict):
         super().__init__(model_settings)
         self.robust = model_settings.get("robust", False)
         self.conformalization_data_agg = None
         self.conformalization_data_unit = None
 
-    def _compute_conf_frac(self, n_reporting_units, alpha):
+    def _compute_conf_frac(self, n_reporting_units: int, alpha: float) -> float:
         """
         Returns fraction of reporting units to be part of conformalization set
         """
         # what happens if this is negative, which it is alpha 0.95 and n_reporting_units is 38
         return round(min(1 + (alpha + 1) / (n_reporting_units * (alpha - 1)), 0.9), 2)
 
-    def get_minimum_reporting_units(self, alpha):
+    def get_minimum_reporting_units(self, alpha: float) -> int:
         return math.ceil(-1 * (alpha + 1) / (alpha - 1))
 
-    def _compute_population_correction(self, conformalization_data, scores, correction_quantile, estimand):
+    def _compute_population_correction(
+        self, conformalization_data: pd.DataFrame, scores: pd.Series, correction_quantile: float, estimand: str
+    ) -> float:
         """
         Compute population corrected conforalization correction.
         We care about larger units more than smaller units when computing aggregate prediction intervals.
@@ -44,7 +46,9 @@ class NonparametricElectionModel(BaseElectionModel):
         population_correction = np.min(population_correction.scores)
         return population_correction
 
-    def get_unit_prediction_intervals(self, reporting_units, nonreporting_units, alpha, estimand):
+    def get_unit_prediction_intervals(
+        self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, alpha: float, estimand: str
+    ) -> PredictionIntervals:
         """
         Get unit prediction intervals for non-parametric model. Adjust nonreporting unit prediction intervals based
         on conformalization.
@@ -103,28 +107,36 @@ class NonparametricElectionModel(BaseElectionModel):
             lower.round(decimals=0), upper.round(decimals=0), prediction_intervals.conformalization
         )
 
-    # At the unit level, conformalization data is adjustment from estimated % change from baseline
-    def get_all_conformalization_data_unit(self):
+    def get_all_conformalization_data_unit(self) -> tuple[None, pd.DataFrame]:
+        """
+        Returns the conformalization data for the unit adjustments
+        """
         return None, self.conformalization_data_unit
 
-    def get_all_conformalization_data_agg(self):
+    def get_all_conformalization_data_agg(self) -> tuple[None, pd.DataFrame]:
+        """
+        Returns the conformalization data for the aggregate adjustments
+        """
         return None, self.conformalization_data_agg
 
     def get_aggregate_prediction_intervals(
         self,
-        reporting_units,
-        nonreporting_units,
-        unexpected_units,
-        aggregate,
-        alpha,
-        conformalization_data,
-        estimand,
-    ):
+        reporting_units: pd.DataFrame,
+        nonreporting_units: pd.DataFrame,
+        unexpected_units: pd.DataFrame,
+        aggregate: list,
+        alpha: float,
+        unit_prediction_intervals: PredictionIntervals,
+        estimand: str,
+    ) -> PredictionIntervals:
         """
         Get aggregate prediction intervals. In the non-parametric case prediction intervals just sum.
         Compute results from reporting data and nonreporting data and then sum in the lower and upper prediction
         intervals from nonreporting data.
         """
+        # get conformalization data out of unit prediction intervals
+        conformalization_data = unit_prediction_intervals.conformalization
+
         # we're doing the same work as in get_aggregate_predictions here, can we just do this work once?
         aggregate_votes = self._get_reporting_aggregate_votes(reporting_units, unexpected_units, aggregate, estimand)
 
