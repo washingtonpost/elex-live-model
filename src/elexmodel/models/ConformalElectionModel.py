@@ -189,10 +189,3 @@ class ConformalElectionModel(BaseElectionModel.BaseElectionModel, ABC):
         Returns conformalization data at the aggregate level
         """
         raise NotImplementedError
-
-    def get_coefficients(self):
-        """
-        Returns a dictionary of feature/fixed effect names to the quantile regression coefficients
-        These coefficients are for the point prediciton only, not for the lower or upper intervals models.
-        """
-        return self.features_to_coefficients
