@@ -1,3 +1,4 @@
+from abc import ABC
 import logging
 import math
 import warnings
@@ -18,18 +19,19 @@ PredictionIntervals = namedtuple("PredictionIntervals", ["lower", "upper", "conf
 LOG = logging.getLogger(__name__)
 
 
-class ConformalElectionModel(BaseElectionModel.BaseElectionModel):
+class ConformalElectionModel(BaseElectionModel.BaseElectionModel, ABC):
     def __init__(self, model_settings: dict):
         super(ConformalElectionModel, self).__init__(model_settings)
         self.qr = QuantileRegressionSolver(solver="ECOS")
         self.featurizer = Featurizer(self.features, self.fixed_effects)
         self.lambda_ = model_settings.get("lambda_", 0)
 
+    @classmethod
     def _compute_conf_frac(self) -> float:
         """
         Compute conformalization fraction for conformal models
         """
-        pass
+        raise NotImplementedError
 
     def fit_model(
         self,
@@ -173,18 +175,21 @@ class ConformalElectionModel(BaseElectionModel.BaseElectionModel):
 
         return PredictionIntervals(nonreporting_lower_bounds, nonreporting_upper_bounds, conformalization_data)
 
+    @classmethod
     def get_all_conformalization_data_unit(self):
         """
         Returns conformalization data at the unit level
         Conformalization data is adjustment from estimated % change from baseline
         """
-        pass
+        raise NotImplementedError
 
+    @classmethod
     def get_all_conformalization_data_agg(self):
         """
         Returns conformalization data at the aggregate level
         """
-        pass
+        raise NotImplementedError
+
 
     def get_coefficients(self):
         """
