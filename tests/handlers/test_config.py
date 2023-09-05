@@ -38,7 +38,7 @@ def test_get_baseline_pointer_general(va_config):
         "gop": "gop",
         "turnout": "turnout",
         "party_vote_share_dem": "party_vote_share_dem",
-        "party_vote_share_gop": "party_vote_share_gop"
+        "party_vote_share_gop": "party_vote_share_gop",
     }
     assert expected == baseline_pointer
 
@@ -83,13 +83,7 @@ def test_get_estimands_general(va_config):
 
     office = "G"
     estimands = config_handler.get_estimands(office)
-    expected = [
-        "dem",
-        "gop",
-        "turnout",
-        "party_vote_share_dem",
-        "party_vote_share_gop"
-    ]
+    expected = ["dem", "gop", "turnout", "party_vote_share_dem", "party_vote_share_gop"]
     assert expected == estimands
 
 
