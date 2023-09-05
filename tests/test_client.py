@@ -718,8 +718,8 @@ def test_conformalization_data(model_client, va_governor_county_data, va_config)
         save_output=[],
     )
 
-    conform_unit = model_client.get_all_conformalization_data_unit()
-    conform_agg = model_client.get_all_conformalization_data_agg()
+    conform_unit = model_client.all_conformalization_data_unit_dict
+    conform_agg = model_client.all_conformalization_data_agg_dict
 
     assert len(conform_unit) == 1
     assert len(conform_agg) == 1
@@ -746,8 +746,8 @@ def test_conformalization_data(model_client, va_governor_county_data, va_config)
         save_output=[],
     )
 
-    conform_unit = model_client.get_all_conformalization_data_unit()
-    conform_agg = model_client.get_all_conformalization_data_agg()
+    conform_unit = model_client.all_conformalization_data_unit_dict
+    conform_agg = model_client.all_conformalization_data_agg_dict
 
     assert len(conform_unit) == 1
     assert len(conform_agg) == 1

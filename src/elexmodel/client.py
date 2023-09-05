@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
@@ -10,6 +11,7 @@ from elexmodel.handlers.data.Estimandizer import Estimandizer
 from elexmodel.handlers.data.ModelResults import ModelResultsHandler
 from elexmodel.handlers.data.PreprocessedData import PreprocessedDataHandler
 from elexmodel.logging import initialize_logging
+from elexmodel.models.ConformalElectionModel import ConformalElectionModel
 from elexmodel.models.GaussianElectionModel import GaussianElectionModel
 from elexmodel.models.NonparametricElectionModel import NonparametricElectionModel
 from elexmodel.utils.constants import AGGREGATE_ORDER, DEFAULT_AGGREGATES, VALID_AGGREGATES_MAPPING
@@ -36,8 +38,8 @@ class ModelClient:
 
     def __init__(self):
         super().__init__()
-        self.conformalization_data_unit_dict = None
-        self.conformalization_data_agg_dict = None
+        self.all_conformalization_data_unit_dict = defaultdict(dict)
+        self.all_conformalization_data_agg_dict = defaultdict(dict)
 
     def _check_input_parameters(
         self,
@@ -108,28 +110,6 @@ class ModelClient:
             raise ValueError("estimand_fns must be a map of estimand names and corresponding functions (can be None)")
         return True
 
-    def get_all_conformalization_data_unit(self):
-        """
-        This function collects the conformalization data from a model run. It produces a dictionary
-        with two types of data (in the gaussian case): the conformalization points that a
-        distribution is fit to, and the parameters of the resulting guassian distribution.
-        In this unit-level function, the information for one distribution is returned
-        (all units combined). It returns None if get_estimates isn't called, as the
-        values they pull out are generated in that function.
-        """
-        return self.all_conformalization_data_unit_dict
-
-    def get_all_conformalization_data_agg(self):
-        """
-        This function collects the conformalization data from a model run. It produces a dictionary
-        with two types of data (in the gaussian case): the conformalization points that a distribution is
-        fit to, and the parameters of the resulting guassian distribution. In the agg case,
-        distributions for each state (in a multi-state model) are returned. This functions
-        return None if get_estimates isn't called, as the
-        values they pull out are generated in that function.
-        """
-        return self.all_conformalization_data_agg_dict
-
     def get_aggregate_list(self, office, aggregate):
         default_aggregate = DEFAULT_AGGREGATES[office]
         base_aggregate = default_aggregate[:-1]  # remove unit
@@ -164,14 +144,11 @@ class ModelClient:
         aggregates = kwargs.get("aggregates", DEFAULT_AGGREGATES[office])
         fixed_effects = kwargs.get("fixed_effects", {})
         pi_method = kwargs.get("pi_method", "nonparametric")
-        beta = model_parameters.get("beta", 1)
-        winsorize = model_parameters.get("winsorize", False)
-        robust = model_parameters.get("robust", False)
-        lambda_ = model_parameters.get("lambda_", 0)
         save_output = kwargs.get("save_output", ["results"])
         save_results = "results" in save_output
         save_data = "data" in save_output
         save_config = "config" in save_output
+        # saving conformalization data only makes sense if a ConformalElectionModel is used
         save_conformalization = "conformalization" in save_output
         handle_unreporting = kwargs.get("handle_unreporting", "drop")
         estimand_fns = kwargs.get("estimand_fns", {})
@@ -180,14 +157,11 @@ class ModelClient:
             "election_id": election_id,
             "office": office,
             "geographic_unit_type": geographic_unit_type,
-            "beta": beta,
-            "winsorize": winsorize,
-            "robust": robust,
-            "lambda_": lambda_,
             "features": features,
             "fixed_effects": fixed_effects,
             "save_conformalization": save_conformalization,
         }
+        model_settings.update(model_parameters)
 
         LOG.info("Getting config: %s", election_id)
         config_handler = ConfigHandler(
@@ -248,16 +222,12 @@ class ModelClient:
         unexpected_units = data.get_unexpected_units(percent_reporting_threshold, aggregates)
 
         LOG.info(
-            "Model parameters: \n geographic_unit_type: %s, prediction intervals: %s, \
-                percent reporting threshold: %s, features: %s, pi_method: %s, aggregates: %s, \
-                fixed effects: %s, model settings: %s",
-            geographic_unit_type,
+            "Model parameters: \n prediction intervals: %s, percent reporting threshold: %s, \
+                pi_method: %s, aggregates: %s, model settings: %s",
             prediction_intervals,
             percent_reporting_threshold,
-            features,
             pi_method,
             aggregates,
-            fixed_effects,
             model_settings,
         )
 
@@ -299,8 +269,6 @@ class ModelClient:
             aggregates, prediction_intervals, reporting_units, nonreporting_units, unexpected_units
         )
 
-        self.all_conformalization_data_unit_dict = {alpha: {} for alpha in prediction_intervals}
-        self.all_conformalization_data_agg_dict = {alpha: {} for alpha in prediction_intervals}
         for estimand in estimands:
             unit_predictions = model.get_unit_predictions(reporting_units, nonreporting_units, estimand)
             results_handler.add_unit_predictions(estimand, unit_predictions)
@@ -310,7 +278,10 @@ class ModelClient:
                 alpha_to_unit_prediction_intervals[alpha] = model.get_unit_prediction_intervals(
                     results_handler.reporting_units, results_handler.nonreporting_units, alpha, estimand
                 )
-                self.all_conformalization_data_unit_dict[alpha][estimand] = model.get_all_conformalization_data_unit()
+                if isinstance(model, ConformalElectionModel):
+                    self.all_conformalization_data_unit_dict[alpha][
+                        estimand
+                    ] = model.get_all_conformalization_data_unit()
 
             results_handler.add_unit_intervals(estimand, alpha_to_unit_prediction_intervals)
 
@@ -331,10 +302,13 @@ class ModelClient:
                         results_handler.unexpected_units,
                         aggregate_list,
                         alpha,
-                        alpha_to_unit_prediction_intervals[alpha].conformalization,
+                        alpha_to_unit_prediction_intervals[alpha],
                         estimand,
                     )
-                    self.all_conformalization_data_agg_dict[alpha][estimand] = model.get_all_conformalization_data_agg()
+                    if isinstance(model, ConformalElectionModel):
+                        self.all_conformalization_data_agg_dict[alpha][
+                            estimand
+                        ] = model.get_all_conformalization_data_agg()
 
                 # get all of the prediction intervals here
                 results_handler.add_agg_predictions(

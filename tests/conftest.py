@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 from elexmodel.client import HistoricalModelClient, ModelClient
+from elexmodel.models import BaseElectionModel, ConformalElectionModel
 
 _TEST_FOLDER = os.path.dirname(__file__)
 FIXTURE_DIR = os.path.join(_TEST_FOLDER, "fixtures")
@@ -46,6 +47,18 @@ def model_client():
 @pytest.fixture(scope="session")
 def historical_model_client():
     return HistoricalModelClient()
+
+
+@pytest.fixture(scope="session")
+def base_election_model():
+    model_settings = {}
+    return BaseElectionModel.BaseElectionModel(model_settings)
+
+
+@pytest.fixture(scope="session")
+def conformal_election_model():
+    model_settings = {}
+    return ConformalElectionModel.ConformalElectionModel(model_settings)
 
 
 @pytest.fixture(scope="session")

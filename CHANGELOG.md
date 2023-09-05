@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.11 (08/14/2023)
+- fix: upgrade to python 3.10 [#65] (https://github.com/washingtonpost/elex-live-model/pull/65)
+- feat: generalize parameter checks [#64] (https://github.com/washingtonpost/elex-live-model/pull/64)
+- fix: winsorization test error [#62] (https://github.com/washingtonpost/elex-live-model/pull/65)
+- feat: add winsorization option [#58] (https://github.com/washingtonpost/elex-live-model/pull/58)
+- fix: clean up tox errors [#57] (https://github.com/washingtonpost/elex-live-model/pull/57)
+- refactor: remove model settings [#54] (https://github.com/washingtonpost/elex-live-model/pull/54)
+- refactor: dynamically create default aggregates [#53] (https://github.com/washingtonpost/elex-live-model/pull/53)
+- feat: add better default aggregates [#52] (https://github.com/washingtonpost/elex-live-model/pull/52) 
+
 ## 1.0.10 (06/07/2023)
 - fix: fixing a fixed effect bug [#35](https://github.com/washingtonpost/elex-live-model/pull/35)
 - chore: updated boto3 version [#36](https://github.com/washingtonpost/elex-live-model/pull/36)
