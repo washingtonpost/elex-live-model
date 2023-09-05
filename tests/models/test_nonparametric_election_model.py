@@ -1,9 +1,9 @@
 import numpy as np
 import pandas as pd
+from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
 
 from elexmodel.models import NonparametricElectionModel
 from elexmodel.models.ConformalElectionModel import PredictionIntervals
-from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
 
 TOL = 1e-5
 
@@ -136,6 +136,7 @@ def test_aggregate_prediction_intervals(va_governor_precinct_data):
 # The functions that are tested below are implemented in BaseElectionModel
 # which is an abstract base class
 ####
+
 
 def test_aggregation_simple():
     """
@@ -394,10 +395,12 @@ def test_get_aggregate_predictions(va_governor_precinct_data):
         == df4[f"pred_{estimand}"].values[0]
     )
 
+
 ####
 # The functions that are tested below are implemented in ConformalElectionModel
 # which is an abstract base class
 ####
+
 
 def test_fit_model():
     """

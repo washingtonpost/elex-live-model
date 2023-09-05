@@ -43,19 +43,23 @@ def get_fixture():
 def model_client():
     return ModelClient()
 
+
 @pytest.fixture(scope="session")
 def historical_model_client():
     return HistoricalModelClient()
+
 
 @pytest.fixture(scope="session")
 def base_election_model():
     model_settings = {}
     return BaseElectionModel.BaseElectionModel(model_settings)
 
+
 @pytest.fixture(scope="session")
 def conformal_election_model():
     model_settings = {}
     return ConformalElectionModel.ConformalElectionModel(model_settings)
+
 
 @pytest.fixture(scope="session")
 def va_config(get_fixture):
