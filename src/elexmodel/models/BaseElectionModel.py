@@ -1,3 +1,5 @@
+from abc import ABC
+
 import logging
 from collections import namedtuple
 
@@ -9,7 +11,7 @@ LOG = logging.getLogger(__name__)
 PredictionIntervals = namedtuple("PredictionIntervals", ["lower", "upper"], defaults=(None,) * 2)
 
 
-class BaseElectionModel:
+class BaseElectionModel(ABC):
     def __init__(self, model_settings: dict):
         self.features = model_settings.get("features", [])
         self.fixed_effects = model_settings.get("fixed_effects", {})
@@ -24,13 +26,14 @@ class BaseElectionModel:
         """
         return 10
 
+    @classmethod
     def get_unit_predictions(
         self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, estimand: str, *kwargs
     ) -> np.ndarray:
         """
         Generates and returns unit level predictions
         """
-        pass
+        return NotImplemented
 
     def _get_reporting_aggregate_votes(
         self, reporting_units: pd.DataFrame, unexpected_units: pd.DataFrame, aggregate: list, estimand: str, *kwargs
@@ -139,14 +142,16 @@ class BaseElectionModel:
 
         return aggregate_data
 
+    @classmethod
     def get_unit_prediction_intervals(
         self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, alpha: float, estimand: str
     ) -> PredictionIntervals:
         """
         Generates and returns unit level prediction intervals
         """
-        pass
+        return NotImplemented
 
+    @classmethod
     def get_aggregate_prediction_intervals(
         self,
         reporting_units: pd.DataFrame,
@@ -159,7 +164,7 @@ class BaseElectionModel:
         """
         Generates and returns aggregate prediction intervals for arbitrary aggregates
         """
-        pass
+        return NotImplemented
 
     def get_coefficients(self) -> dict:
         """
