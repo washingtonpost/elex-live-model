@@ -122,7 +122,6 @@ def cli(
         s3_client=s3.S3CsvUtil(TARGET_BUCKET),
     )
 
-    print(data_handler.data)
     if estimand_fns:
         est = Estimandizer(data_handler, office_id, estimand_fns)
         data_handler = est.generate_estimands()
