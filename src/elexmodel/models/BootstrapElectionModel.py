@@ -563,8 +563,18 @@ class BootstrapElectionModel(BaseElectionModel):
 
         return (epsilon_y_B, epsilon_z_B), (delta_y_B, delta_z_B)
 
-    def _sample_test_delta(self, x_test_strata, stratum_ppfs_delta_y, stratum_ppfs_delta_z):
+    def _sample_test_delta(self, x_test_strata: pd.DataFrame, stratum_ppfs_delta_y: dict, stratum_ppfs_delta_z: dict) -> tuple[np.ndarray, np.ndarray]:
+        """
+        This function generates new test deltas (unit level errors)
+        """
+        # we previously estimated the distribution of the deltas per stratum
+        # we can now generate a new set of uniform random variables (percentiles)
+        # and then convert them to deltas using the deltas PPFs. We just need
+        # to make sure that we use the correct distribution defined by the strata
+
         n_test = x_test_strata.shape[0]
+        
+        # sample a new set of uniforms 
         test_unifs = self.rng.uniform(low=0, high=1, size=(n_test, self.B, 2))
 
         test_delta_y = np.zeros((n_test, self.B))
@@ -572,26 +582,40 @@ class BootstrapElectionModel(BaseElectionModel):
 
         x_test_strata_unique = np.unique(x_test_strata, axis=0).astype(int)
         for strata_dummies in x_test_strata_unique:
+            # get indices of the nonreporting data that are in strata strata_dummies
             strata_indices = np.where((strata_dummies == x_test_strata).all(axis=1))[0]
+            # get their corresponding newly sampled uniforms
             unifs_strata = test_unifs[strata_indices]
+            # use PPF to generate new deltas from the new uniforms
             test_delta_y[strata_indices] = stratum_ppfs_delta_y[tuple(strata_dummies)](unifs_strata[:,:,0])
             test_delta_z[strata_indices] = stratum_ppfs_delta_z[tuple(strata_dummies)](unifs_strata[:,:,1])
         
         return test_delta_y, test_delta_z
     
-    def _sample_test_epsilon(self, residuals_y, residuals_z, epsilon_y_hat, epsilon_z_hat, aggregate_indicator_train, aggregate_indicator_test):
-        # gives us indices of states for which we have no samples in the training set
-        states_not_in_reporting_units = np.where(np.all(aggregate_indicator_train == 0, axis=0))[0]
-        # gives us states for which there is at least one county not reporting
-        states_in_nonreporting_units = np.where(np.any(aggregate_indicator_test > 0, axis=0))[0]
-        states_that_need_random_effect = np.intersect1d(states_not_in_reporting_units, states_in_nonreporting_units)
+    def _sample_test_epsilon(self, residuals_y: np.ndarray, residuals_z: np.ndarray, epsilon_y_hat: np.ndarray, epsilon_z_hat: np.ndarray, aggregate_indicator_train: np.ndarray, aggregate_indicator_test: np.ndarray):
+        """
+        This function generates new test epsilons (contest level random effects)
+        """
+        # the contests that need a sampled contest level random effect are those that still have outstanding 
+        # units (since for the others, the contest level random effect is a known fixed quantity)
+        # gives us indices of contests for which we have no samples in the training set
+        contests_not_in_reporting_units = np.where(np.all(aggregate_indicator_train == 0, axis=0))[0]
+        # gives us contests for which there is at least one county not reporting
+        contests_in_nonreporting_units = np.where(np.any(aggregate_indicator_test > 0, axis=0))[0]
+        contests_that_need_random_effect = np.intersect1d(contests_not_in_reporting_units, contests_in_nonreporting_units)
         
-        # TODO: replace gaussian model with QR (??)
+        # TODO: replace gaussian model with quantile regression
+
+        # \epsilon ~ N(0, \Sigma)
+        mu_hat = [0, 0]
         sigma_hat = np.zeros((2, 2))
         sigma_hat_denominator = 0
+        # since epsilon is defined as the mean of the residuals the sample variance of epsilon is just
+        # the same variance of the residuals
         sample_var_epsilon_y = np.var(aggregate_indicator_train * residuals_y, axis=0)
         sample_var_epsilon_z = np.var(aggregate_indicator_train * residuals_z, axis=0)
 
+        # TODO: what
         for (epsilon_y_i, epsilon_z_i, sample_var_epsilon_y_i, sample_var_epsilon_z_i) in zip(epsilon_y_hat, epsilon_z_hat, sample_var_epsilon_y, sample_var_epsilon_z):
             epsilon_i = np.asarray([epsilon_y_i, epsilon_z_i])
             if np.isclose(epsilon_i.sum(), 0): continue
@@ -601,16 +625,22 @@ class BootstrapElectionModel(BaseElectionModel):
         sigma_hat[0, 1] = 0 # setting covariances to zero for now
         sigma_hat[1, 0] = 0
 
-        sigma_hat = 1e-5 * np.eye(2)
+        # TODO: come on lol what
+        sigma_hat = 1e-5 * np.eye(2) 
 
-        test_epsilon = self.rng.multivariate_normal([0, 0], sigma_hat, size=(len(states_that_need_random_effect), self.B))
+        # sample new test epsilons, but only for states that need tem
+        test_epsilon = self.rng.multivariate_normal(mu_hat, sigma_hat, size=(len(contests_that_need_random_effect), self.B))
         
-        test_epsilon_y = aggregate_indicator_test[:,states_that_need_random_effect] @ test_epsilon[:,:,0]
-        test_epsilon_z = aggregate_indicator_test[:,states_that_need_random_effect] @ test_epsilon[:,:,1]
+        test_epsilon_y = aggregate_indicator_test[:,contests_that_need_random_effect] @ test_epsilon[:,:,0]
+        test_epsilon_z = aggregate_indicator_test[:,contests_that_need_random_effect] @ test_epsilon[:,:,1]
 
         return test_epsilon_y, test_epsilon_z
 
-    def _sample_test_errors(self, residuals_y, residuals_z, epsilon_y_hat, epsilon_z_hat, x_test_strata, stratum_ppfs_delta_y, stratum_ppfs_delta_z, aggregate_indicator_train, aggregate_indicator_test):
+    def _sample_test_errors(self, residuals_y: np.ndarray, residuals_z: np.ndarray, epsilon_y_hat: np.ndarray, epsilon_z_hat: np.ndarray, x_test_strata: pd.DataFrame, stratum_ppfs_delta_y: dict, stratum_ppfs_delta_z: dict, aggregate_indicator_train: np.ndarray, aggregate_indicator_test: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """
+        This function samples new test errors for our model (ie. new test residuals)
+        """
+        # we generate new test residuals by generating new test epsilons and new test deltas and then adding them together
         test_epsilon_y, test_epsilon_z = self._sample_test_epsilon(residuals_y, residuals_z, epsilon_y_hat, epsilon_z_hat, aggregate_indicator_train, aggregate_indicator_test)
         test_delta_y, test_delta_z = self._sample_test_delta(x_test_strata, stratum_ppfs_delta_y, stratum_ppfs_delta_z)
         test_error_y = test_epsilon_y + test_delta_y
@@ -712,7 +742,6 @@ class BootstrapElectionModel(BaseElectionModel):
         We also need new "estimated" quantities (the equivalent of w_i * \hat{y_i} * \hat{z_i}), these are the outcome
             of the stratified residual bootstrap:
                 w_i * \hat{y_i} * \hat{z_i}    -->     w_i * \tilde{y_i}^{b} * \tilde{z_i}^{b}
-        TODO: WHY DID WE CALL THIS \TILDE AND NOT \HAT
 
         For completeness, we also generate estimates for the other two quantities:
                 w_i * z_i   ->      w_i * (\hat{z_i} + \epsilon_{z, i}^{b})
@@ -819,7 +848,7 @@ class BootstrapElectionModel(BaseElectionModel):
         x_train_strata, x_test_strata = self._get_strata(reporting_units, nonreporting_units)
 
         # we then compute the probability distribution (CDF/PPF) for the deltas given each strata, this will allow us to move from the residual space
-        # to the percentile space [0, 1] and back again after re-sampling
+        #   to the percentile space [0, 1] and back again after re-sampling
         stratum_ppfs_delta_y, stratum_cdfs_delta_y = self._estimate_strata_dist(x_train, x_train_strata, x_test, x_test_strata, delta_y_hat, self.y_LB, self.y_UB)
         stratum_ppfs_delta_z, stratum_cdfs_delta_z = self._estimate_strata_dist(x_train, x_train_strata, x_test, x_test_strata, delta_z_hat, self.z_LB, self.z_UB)
 
@@ -829,19 +858,21 @@ class BootstrapElectionModel(BaseElectionModel):
         epsilon_y_B, epsilon_z_B = epsilon_B
         delta_y_B, delta_z_B = delta_B
  
-        # step 4b) add the bootstrapped errors to our original fitted dependent variables
-        # this creates our bootstrapped dataset (residual bootstrap, where we add the bootstrapped residuals to our fitted predictions)
+        # step 4b) create our bootrapped dataset by adding the bootstrapped errors (epsilon + delta) to our fitted values
         y_train_B = y_train_pred + (aggregate_indicator_train @ epsilon_y_B) + delta_y_B
         z_train_B = z_train_pred + (aggregate_indicator_train @ epsilon_z_B) + delta_z_B
         
         # step 5) refit the model
-        # we are using the normal equations from the original model since x_train has stayed the same and the normal
-        # equations are only dependent on x_train. This saves compute.
+        #   we need to generate bootstrapped test predictions and to do that we need to fit a bootstrap model
+        #   we are using the normal equations from the original model since x_train has stayed the same and the normal
+        #       equations are only dependent on x_train. This saves compute.
         ols_y_B = OLSRegression().fit(x_train, y_train_B, weights_train, normal_eqs=ols_y.normal_eqs, n_feat_ignore_reg=2)
         ols_z_B = OLSRegression().fit(x_train, z_train_B, weights_train, normal_eqs=ols_z.normal_eqs, n_feat_ignore_reg=2)
 
-        # to generate test predictions we need contest level effect estimates. We use the bootstrapped data to do that
-        # we generate new bootstrapped predictions to compute new bootstraped residuals to compute bootstraped epsilon estimates
+        # we cannot just apply ols_y_B/old_z_B to the test units because that would be missing our contest level random effect
+        # so we need to compute an bootstrapped estimate of the contest level random effect (epsilon)
+        # to do that we first compute the bootstrapped leave-one-out training residuals and then use that to
+        # estimate bootstrapped epsilons
         y_train_pred_B = ols_y_B.predict(x_train)
         z_train_pred_B = ols_z_B.predict(x_train)
         residuals_y_B = ols_y_B.residuals(y_train_B, y_train_pred_B, loo=True, center=True)
@@ -849,24 +880,28 @@ class BootstrapElectionModel(BaseElectionModel):
         epsilon_y_hat_B = self._estimate_epsilon(residuals_y_B, aggregate_indicator_train)
         epsilon_z_hat_B = self._estimate_epsilon(residuals_z_B, aggregate_indicator_train)
 
+        # We can then use our bootstrapped ols_y_B/ols_z_B and our bootstrapped contest level effect (epsilon) to make bootstrapped predictions
+        # on our non-reporting units
         # This is \tilde{y_i}^{b} and \tilde{z_i}^{b} 
+        # NOTE: in this note adding n * epsilon where n is the number of tests in a contest
         y_test_pred_B = (ols_y_B.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat_B)).clip(min=y_partial_reporting_lower, max=y_partial_reporting_upper)
         z_test_pred_B = (ols_z_B.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat_B)).clip(min=z_partial_reporting_lower, max=z_partial_reporting_upper)
 
+        # \tilde{y_i}^{b} * \tilde{z_i}^{b} 
         yz_test_pred_B = y_test_pred_B * z_test_pred_B
         
+        # In order to generate our point prediction, we also need to apply our non-bootstrapped model to the testset
+        # this is \hat{y_i} and \hat{z_i}
         y_test_pred = (ols_y.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat)).clip(min=y_partial_reporting_lower, max=y_partial_reporting_upper)
         z_test_pred = (ols_z.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat)).clip(min=z_partial_reporting_lower, max=z_partial_reporting_upper)
         yz_test_pred = y_test_pred * z_test_pred
 
-        # replace y, z with y_hat, z_hat (no bootstrapping at all)
-        # take our model for the prediction errors: defined by stratum ppf/cdf and generate fresh prediction errors
-        # y_hat and z_hat is our best guess for the conditional mean of y, z | x
-        # we are not interested in y_hat * z_hat - mu_y * mu_z | x
-        # we are interested in y_hat * z_hat - y, z (which is mu_y + some irreducable error, mu_z + some irreducable error)
-        # we are going to a model of our irreducable error and sampling new versions of that
-        # y = x \beta + epsilon
-        # y_hat is our estimate for x \beta, so estimate y we need new epsilons (we cannot use the old ones)
+        # we now need to generate our bootstrapped "true" quantities (in order to subtract the bootstrap from these quantities to get an estimate for our error)
+        # In a normal bootstrap setting we would replace y and z with \hat{y} and \hat{z}
+        # however, we want to produce prediction intervals (rather than just confidence intervals) so we need to take into account the extra
+        # error generated by the prediction. To do that we need an estimate for our prediction error (ie. an estimate of the residuals = epsilon + delta)
+        # we cannot use our original residuals_y, residuals_z because those were already used to generate epsilon and the OLS coefficients and are 
+        # therefore too small. Therefore we need to generate new test residuals.
         test_residuals_y, test_residuals_z = self._sample_test_errors(
             residuals_y, 
             residuals_z, 
@@ -879,23 +914,31 @@ class BootstrapElectionModel(BaseElectionModel):
             aggregate_indicator_test
         )
         
+        # multiply by weights to turn into unnormalized margin
         self.errors_B_1 = yz_test_pred_B * weights_test
 
-        # x \hat{beta} + new errors
+        # This is (\hat{y_i} + \residuals_{y, i}^{b}) * (\hat{z_i} + \residuals_{z, i}^{b})
+        # we clip them based on bounds we generated earlier. These are defined by the estimates amount of
+        # outstanding vote from our election results provider
         errors_B_2 = (y_test_pred + test_residuals_y).clip(min=y_partial_reporting_lower, max=y_partial_reporting_upper)
         errors_B_2 *= (z_test_pred + test_residuals_z).clip(min=z_partial_reporting_lower, max=z_partial_reporting_upper)
 
-        # we also need errors for the denominator of the aggregate
+        # multiply by weights turn into unnormalized margin
         self.errors_B_2 = errors_B_2 * weights_test 
-
+        
+        # we also need errors for the denominator of the aggregate
+        # this is \tilde{z_i}^{b} 
         self.errors_B_3 = z_test_pred_B * weights_test # has already been clipped above
+        # this is (\hat{z_i} + \residuals_{z, i}^{b})
         self.errors_B_4 = (z_test_pred + test_residuals_z).clip(min=z_partial_reporting_lower, max=z_partial_reporting_upper) * weights_test 
 
         # y_test_pred_all = (ols_y_all.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat)).clip(min=y_partial_reporting_lower, max=y_partial_reporting_upper)
         # z_test_pred_all = (ols_z_all.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat)).clip(min=z_partial_reporting_lower, max=z_partial_reporting_upper)
         # import IPython; IPython.embed()
 
+        # this is for the unit point prediction. turn into unnormalized margin
         self.weighted_yz_test_pred = yz_test_pred * weights_test
+        # and turn into turnout estimate
         self.weighted_z_test_pred = z_test_pred * weights_test
         self.ran_bootstrap = True
 
@@ -1167,6 +1210,10 @@ class BootstrapElectionModel(BaseElectionModel):
         # in order for those states to keep their original computed win probability
         called_states_sorted_vals[called_states_sorted_vals == -1] = np.nan 
 
+        # technically we do not need to do this division, since the margin (ie. aggregate_error_B_1 and aggregate_error_B_2)
+        # are enough to know who has won a contest (we don't need the normalized margin)
+        # but we normalize so that the temperature we use to set aggressiveness of sigmoid is in the right scale
+
         # divided_error_B_1 = np.nan_to_num(self.aggregate_error_B_1 / self.aggregate_baseline_margin.reshape(-1, 1))
         divided_error_B_1 = np.nan_to_num(self.aggregate_error_B_1 / self.aggregate_error_B_3)
         # divided_error_B_2 = np.nan_to_num(self.aggregate_error_B_2 / self.aggregate_baseline_margin.reshape(-1, 1))
@@ -1188,10 +1235,14 @@ class BootstrapElectionModel(BaseElectionModel):
         aggregate_dem_prob_B_1_called = np.fmin(np.fmax(aggregate_dem_prob_B_1, called_states_sorted_vals), called_states_sorted_vals)
         aggregate_dem_prob_B_2_called = np.fmin(np.fmax(aggregate_dem_prob_B_2, called_states_sorted_vals), called_states_sorted_vals)
 
+        # multiply by weights of each contest
         aggregate_dem_vals_B_1 = nat_sum_data_dict_sorted_vals * aggregate_dem_prob_B_1_called
         aggregate_dem_vals_B_2 = nat_sum_data_dict_sorted_vals * aggregate_dem_prob_B_2_called
+
+        # calculate the error in our national aggregate prediction
         aggregate_dem_vals_B = np.sum(aggregate_dem_vals_B_1, axis=0) - np.sum(aggregate_dem_vals_B_2, axis=0)
 
+        # we also need a national aggregate point prediction
         if self.hard_threshold:
             aggregate_dem_probs_total = self.aggregate_perc_margin_total > 0.5
         else:
@@ -1200,6 +1251,7 @@ class BootstrapElectionModel(BaseElectionModel):
         # same as for the intervals
         aggregate_dem_probs_total_called = np.fmin(np.fmax(aggregate_dem_probs_total, called_states_sorted_vals), called_states_sorted_vals)
         aggregate_dem_vals_pred = np.sum(nat_sum_data_dict_sorted_vals * aggregate_dem_probs_total_called)
+        
         lower_alpha = (1 - alpha) / 2
         upper_alpha = 1 - lower_alpha
         lower_q = np.floor(lower_alpha * (self.B + 1)) / self.B
