@@ -1,95 +1,39 @@
-from elexmodel.handlers.data.CombinedData import CombinedDataHandler
 from elexmodel.handlers.data.Estimandizer import Estimandizer
-from elexmodel.handlers.data.LiveData import MockLiveDataHandler
-from elexmodel.handlers.data.PreprocessedData import PreprocessedDataHandler
 
 
-def test_share_preprocessed(va_governor_county_data):
+def test_check_and_create_estimands_not_historical(va_governor_county_data):
     """
-    Tests margin estimand generation (for preprocessed data only)
-
-    Structure of a "G" election:
-    (['postal_code', 'state_fips', 'county_fips', 'geographic_unit_name',
-       'geographic_unit_fips', 'geographic_unit_type', 'county_classification',
-       'results_turnout', 'results_dem', 'results_gop', 'baseline_turnout',
-       'baseline_dem', 'baseline_gop', 'age_le_30', 'age_geq_30_le_45',
-       'age_geq_45_le_65', 'age_geq_65', 'ethnicity_east_and_south_asian',
-       'ethnicity_european', 'ethnicity_hispanic_and_portuguese',
-       'ethnicity_likely_african_american', 'ethnicity_other',
-       'ethnicity_unknown', 'gender_f', 'gender_m', 'gender_unknown',
-       'median_household_income', 'percent_bachelor_or_higher',
-       'total_age_voters', 'total_eth_voters', 'total_gen_voters'],
-      dtype='object')
+    Tests the check_and_create_estimands() method.
     """
+
     va_data_copy = va_governor_county_data.copy()
-    election_id = "2017-11-07_VA_G"
-    office = "G"
-    election_type = election_id[-1]
-    geographic_unit_type = "county"
     estimands = ["party_vote_share_dem"]
-    estimand_baseline = {}
 
-    preprocessed_data_handler = PreprocessedDataHandler(
-        election_id, office, geographic_unit_type, estimands, estimand_baseline, data=va_data_copy
-    )
+    estimandizer = Estimandizer()
+    (output_df, result_columns) = estimandizer.check_and_create_estimands(va_data_copy, estimands, False)
 
-    estimandizer = Estimandizer(preprocessed_data_handler, election_type)
-    new_data_handler = estimandizer.generate_estimands()
-
-    assert "party_vote_share_dem" in new_data_handler.data.columns
+    assert "baseline_party_vote_share_dem" in output_df.columns
+    assert "results_party_vote_share_dem" in output_df.columns
+    assert result_columns == ["results_party_vote_share_dem"]
 
 
-def test_share_combined(va_governor_county_data):
+def test_check_and_create_estimands_historical(va_governor_county_data):
     """
-    Tests age bracket estimand generation on a combined data handler
+    Tests the check_and_create_estimands() method with historical elections.
     """
     va_data_copy = va_governor_county_data.copy()
-    election_id = "2017-11-07_VA_G"
-    office = "G"
-    election_type = election_id[-1]
-    geographic_unit_type = "county"
-    estimands = ["dem", "party_vote_share_dem"]
-    estimand_baseline = {}
+    estimands = ["party_vote_share_dem"]
 
-    preprocessed_data_handler = PreprocessedDataHandler(
-        election_id, office, geographic_unit_type, estimands, estimand_baseline, data=va_data_copy
-    )
+    estimandizer = Estimandizer()
+    (output_df, result_columns) = estimandizer.check_and_create_estimands(va_data_copy, estimands, True)
 
-    live_data_handler = MockLiveDataHandler(election_id, office, geographic_unit_type, estimands, data=va_data_copy)
-
-    current_data = live_data_handler.get_n_fully_reported(n=va_data_copy.shape[0])
-
-    combined_data_handler = CombinedDataHandler(
-        preprocessed_data_handler.data,
-        current_data,
-        estimands,
-        "county",
-        handle_unreporting="drop",
-    )
-
-    estimandizer = Estimandizer(combined_data_handler, election_type)
-    new_data_handler = estimandizer.generate_estimands()
-
-    assert "party_vote_share_dem" in new_data_handler.data.columns
+    assert "baseline_party_vote_share_dem" in output_df.columns
+    assert "results_party_vote_share_dem" in output_df.columns
+    assert result_columns == ["results_party_vote_share_dem"]
 
 
-def test_candidate(az_assembly_precinct_data):
-    """
-    Tests `{candidate_last_name}_{polID}` estimand generation on a preprocessed data handler for tx primaries
-    """
-    az_data_copy = az_assembly_precinct_data.copy()
-    election_id = "2020-08-04_AZ_R"
-    office = "S"
-    election_type = election_id[-1]
-    geographic_unit_type = "precinct"
-    estimands = ["candidates"]
-    estimand_baseline = {}
-
-    preprocessed_data_handler = PreprocessedDataHandler(
-        election_id, office, geographic_unit_type, estimands, estimand_baseline, data=az_data_copy
-    )
-
-    estimandizer = Estimandizer(preprocessed_data_handler, election_type)
-    new_data_handler = estimandizer.generate_estimands()
-
-    assert "mccarthy_68879" in new_data_handler.data.columns
+def test_add_estimand_baselines(va_governor_county_data):
+    estimand_baselines = {"turnout": "turnout", "party_vote_share_dem": "party_vote_share_dem"}
+    estimandizer = Estimandizer()
+    output_df = estimandizer.add_estimand_baselines(va_governor_county_data.copy(), estimand_baselines)
+    assert "baseline_party_vote_share_dem" in output_df.columns
