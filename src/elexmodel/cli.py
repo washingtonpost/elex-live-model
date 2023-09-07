@@ -11,7 +11,6 @@ load_dotenv(dotenv_path)
 
 from elexmodel.client import HistoricalModelClient, ModelClient  # noqa: E402
 from elexmodel.handlers import s3  # noqa: E402
-from elexmodel.handlers.data.Estimandizer import Estimandizer  # noqa: E402
 from elexmodel.handlers.data.LiveData import MockLiveDataHandler  # noqa: E402
 from elexmodel.utils.constants import VALID_AGGREGATES_MAPPING  # noqa: E402
 from elexmodel.utils.file_utils import TARGET_BUCKET  # noqa: E402
@@ -82,13 +81,6 @@ class PythonLiteralOption(click.Option):
     help="options: results, data, config",
 )
 @click.option("--handle_unreporting", "handle_unreporting", default="drop", type=click.Choice(["drop", "zero"]))
-@click.option(
-    "--estimand_fns",
-    "estimand_fns",
-    default="{}",
-    cls=PythonLiteralOption,
-    help="dict of key: desired estimand names and value: None or pre-written function",
-)
 def cli(
     election_id, estimands, office_id, prediction_intervals, percent_reporting_threshold, geographic_unit_type, **kwargs
 ):
@@ -100,7 +92,6 @@ def cli(
     historical = kwargs["historical"]
     percent_reporting = kwargs["percent_reporting"]
     unexpected_units = kwargs["unexpected_units"]
-    estimand_fns = kwargs["estimand_fns"]
 
     kwargs["features"] = list(kwargs["features"])
     kwargs["aggregates"] = list(kwargs["aggregates"])
@@ -121,10 +112,6 @@ def cli(
         unexpected_units=unexpected_units,
         s3_client=s3.S3CsvUtil(TARGET_BUCKET),
     )
-
-    if estimand_fns:
-        est = Estimandizer(data_handler, office_id, estimand_fns)
-        data_handler = est.generate_estimands()
 
     data_handler.shuffle()
     data = data_handler.get_percent_fully_reported(percent_reporting)

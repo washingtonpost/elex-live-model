@@ -26,17 +26,14 @@ def test_share_preprocessed(va_governor_county_data):
     office = "G"
     election_type = election_id[-1]
     geographic_unit_type = "county"
-    estimands = []
+    estimands = ["party_vote_share_dem"]
     estimand_baseline = {}
 
     preprocessed_data_handler = PreprocessedDataHandler(
         election_id, office, geographic_unit_type, estimands, estimand_baseline, data=va_data_copy
     )
-    estimand_fns = {
-        "party_vote_share": None,
-    }
 
-    estimandizer = Estimandizer(preprocessed_data_handler, election_type, estimand_fns)
+    estimandizer = Estimandizer(preprocessed_data_handler, election_type)
     new_data_handler = estimandizer.generate_estimands()
 
     assert "party_vote_share_dem" in new_data_handler.data.columns
@@ -51,7 +48,7 @@ def test_share_combined(va_governor_county_data):
     office = "G"
     election_type = election_id[-1]
     geographic_unit_type = "county"
-    estimands = ["dem"]
+    estimands = ["dem", "party_vote_share_dem"]
     estimand_baseline = {}
 
     preprocessed_data_handler = PreprocessedDataHandler(
@@ -70,11 +67,7 @@ def test_share_combined(va_governor_county_data):
         handle_unreporting="drop",
     )
 
-    estimand_fns = {
-        "party_vote_share": None,
-    }
-
-    estimandizer = Estimandizer(combined_data_handler, election_type, estimand_fns)
+    estimandizer = Estimandizer(combined_data_handler, election_type)
     new_data_handler = estimandizer.generate_estimands()
 
     assert "party_vote_share_dem" in new_data_handler.data.columns
@@ -89,18 +82,14 @@ def test_candidate(az_assembly_precinct_data):
     office = "S"
     election_type = election_id[-1]
     geographic_unit_type = "precinct"
-    estimands = []
+    estimands = ["candidates"]
     estimand_baseline = {}
 
     preprocessed_data_handler = PreprocessedDataHandler(
         election_id, office, geographic_unit_type, estimands, estimand_baseline, data=az_data_copy
     )
 
-    estimand_fns = {
-        "candidate": None,
-    }
-
-    estimandizer = Estimandizer(preprocessed_data_handler, election_type, estimand_fns)
+    estimandizer = Estimandizer(preprocessed_data_handler, election_type)
     new_data_handler = estimandizer.generate_estimands()
 
     assert "mccarthy_68879" in new_data_handler.data.columns

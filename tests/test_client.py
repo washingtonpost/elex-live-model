@@ -765,7 +765,7 @@ def test_estimandizer_input(model_client, va_governor_county_data, va_config):
     election_id = "2017-11-07_VA_G"
     office_id = "G"
     geographic_unit_type = "county"
-    estimands = ["turnout"]
+    estimands = ["turnout", "party_vote_share"]
     prediction_intervals = [0.9]
     percent_reporting_threshold = 100
 
@@ -791,7 +791,6 @@ def test_estimandizer_input(model_client, va_governor_county_data, va_config):
             raw_config=va_config,
             preprocessed_data=preprocessed_data,
             save_output=[],
-            estimand_fns={"party_vote_share": None},
         )
     except ValueError:
         pytest.raises("Error with clinet input for estimandizer")
