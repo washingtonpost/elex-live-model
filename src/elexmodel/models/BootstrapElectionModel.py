@@ -157,7 +157,7 @@ class BootstrapElectionModel(BaseElectionModel):
     This approach to live election modeling uses ordinary least squares regression for point predictions and the bootstrap to generate prediction intervals.
     Also, in this model we are modeling the two party margin as estimand only.
 
-    We have found that decomposing the normalized margin into two quantities that we model separetely works better:
+    We have found that decomposing the normalized margin into two quantities because the linear model assumption is much for plausible for each individually:
         y = (D^{Y} - R^{Y}) / (D^{Y} + D^{Y})
         z = (D^{Y} + R^{Y}) / (D^{Y'} + R^{Y'})
     where Y is the year we are modeling and Y' is the previous election year.
@@ -386,11 +386,14 @@ class BootstrapElectionModel(BaseElectionModel):
         Apply the probability integral transform for each strata
         """
         unifs = []
+        # for each strata, apply the CDF to the residual to turn the residual into perecntil
         for strata_dummies in x_train_strata_unique:
             delta_strata = delta_hat[np.where((strata_dummies == x_train_strata).all(axis=1))[0]]
 
+            # 1e-6 is added to solve with numerical issues
             unifs_strata = stratum_cdfs_delta[tuple(strata_dummies)](delta_strata + 1e-6).reshape(-1, 1)
 
+            # if the uniform is close to 1/0 set percentile to 0.01/0.99 also for numerical issues
             unifs_strata[np.isclose(unifs_strata, 1)] = np.max(self.taus)
             unifs_strata[np.isclose(unifs_strata, 0)] = np.min(self.taus)      
 
@@ -400,11 +403,15 @@ class BootstrapElectionModel(BaseElectionModel):
     def _bootstrap_deltas(self, unifs, x_train_strata, x_train_strata_unique, stratum_ppfs_delta_y, stratum_ppfs_delta_z):
         n_train = unifs.shape[0]
 
+        # re-sample uniform random variables
         unifs_B = self.rng.choice(unifs, (n_train, self.B), replace=True)
 
         delta_y_B = np.zeros((n_train, self.B))
         delta_z_B = np.zeros((n_train, self.B))
 
+        # convert percentile (uniforms) back into residuals
+        # we need to do this separately for each strata because there is a different 
+        # inverse function per stratum
         for strata_dummies in x_train_strata_unique:
             strata_indices = np.where((strata_dummies == x_train_strata).all(axis=1))[0]
             unifs_strata = unifs_B[strata_indices]
@@ -413,6 +420,26 @@ class BootstrapElectionModel(BaseElectionModel):
         return delta_y_B, delta_z_B
     
     def _bootstrap_epsilons(self, epsilon_y_hat, epsilon_z_hat, x_train_strata, x_train_strata_unique, stratum_ppfs_delta_y, stratum_ppfs_delta_z, aggregate_indicator_train):
+        """
+        Bootstrap epsilons, which are the contest level effects
+
+        In a random effects model we assume that the contest level random effects are drawn from a normal distribution with some mean and variance
+            \epsilon_y, \epsilon_z ~ N(0, \Sigma) 
+        and for now we assume \Sigma is diagional (e.g. contest level random effects between normalized margin and turnout are uncorrelated)
+
+        So in order to generate bootstrap samples for (\epsilon_y, \epsilon_z) we fit a normal distribution to the data we have and sample
+        B new contest level random effects
+        """
+        # we use interquartile-range (IQR) as our estimate for the variance (diagonals of \Sigma) because it is more 
+        # robust than the sample variance
+
+        # we initially defined epsilon to be the average unit level error per unit in the contest. So to get the 
+        # variance of epsilon we need to take the variance of the average unit level errors, which is the same
+        # as the average unit level variances (assuming no correlation at the unit level errors)
+        # The unit level variances are defined by the interquartile range of each strata (e.g. rural, urban, suburban)
+        # that the unit is coming from (we have defined the model that way)
+
+        # we first compute the unit variance estimate for each stratum
         iqr_y_strata = {}
         iqr_z_strata = {}
         for x_stratum in x_train_strata_unique:
@@ -427,18 +454,26 @@ class BootstrapElectionModel(BaseElectionModel):
         var_epsilon_y = np.zeros((aggregate_indicator_train.shape[1], ))
         var_epsilon_z = np.zeros((aggregate_indicator_train.shape[1], ))
 
+        # we are now adding the unit variances to create the contest level variances
         for strata_dummies in x_train_strata_unique:
+            # grab the indices of the units per state that within strata defined by strata_dummies
             strata_indices = np.where((strata_dummies == x_train_strata).all(axis=1))[0]
+            # add variances
             var_epsilon_y += (aggregate_indicator_train[strata_indices] * (iqr_y_strata[tuple(strata_dummies)] ** 2)).sum(axis=0)
             var_epsilon_z += (aggregate_indicator_train[strata_indices] * (iqr_z_strata[tuple(strata_dummies)] ** 2)).sum(axis=0)
+        
+        # IQR constant for a normal random variable
         iqr_scale = 1.349
         var_epsilon_y /= (iqr_scale ** 2)
         var_epsilon_z /= (iqr_scale ** 2)
         var_epsilon_y /= aggregate_indicator_train.sum(axis=0)
         var_epsilon_z /= aggregate_indicator_train.sum(axis=0)
+        
+        # if we only have 1 unit in a contest we define the variance to be zero
         var_epsilon_y[aggregate_indicator_train.sum(axis=0) < 2] = 0
         var_epsilon_z[aggregate_indicator_train.sum(axis=0) < 2] = 0
 
+        # sample B new epsilons
         epsilon_y_B = self.rng.multivariate_normal(mean=epsilon_y_hat.flatten(), cov=np.diag(var_epsilon_y), size=self.B).T
         epsilon_z_B = self.rng.multivariate_normal(mean=epsilon_z_hat.flatten(), cov=np.diag(var_epsilon_z), size=self.B).T
         return epsilon_y_B, epsilon_z_B
@@ -448,10 +483,12 @@ class BootstrapElectionModel(BaseElectionModel):
         
         epsilon_y_B, epsilon_z_B = self._bootstrap_epsilons(epsilon_y_hat, epsilon_z_hat, x_train_strata, x_train_strata_unique, stratum_ppfs_delta_y, stratum_ppfs_delta_z, aggregate_indicator_train)
 
+        # turn residuals into percentiles so that we can re-sample those
         unifs_y = self._strata_pit(x_train_strata, x_train_strata_unique, delta_y_hat, stratum_cdfs_y)
         unifs_z = self._strata_pit(x_train_strata, x_train_strata_unique, delta_z_hat, stratum_cdfs_z)
         unifs = np.concatenate([unifs_y, unifs_z], axis=1)
 
+        # re-sample uniforms and apply the inverse CDF (PPF) to convert back to re-sampled residuals
         delta_y_B, delta_z_B = self._bootstrap_deltas(unifs, x_train_strata, x_train_strata_unique, stratum_ppfs_delta_y, stratum_ppfs_delta_z)
 
         return (epsilon_y_B, epsilon_z_B), (delta_y_B, delta_z_B)
@@ -562,15 +599,15 @@ class BootstrapElectionModel(BaseElectionModel):
 
         In each iteration of the bootstrap we need to generate a new "true" version (e.g. an equivalent of w_i * y_i * z_i) and 
         we also need to generate a new "estimated" version (e.g. an equivalent of w_i * \hat{y_i} * \hat{z_i}). We will call the 
-            w_i * y_i * z_i                -->     w_i * y_i^{b} z_i^{b}
+            w_i * y_i * z_i                -->     w_i * (\hat{y_i} + \epsilon_i^{b}) * (\hat{z_i} + \gamma_i^{b})
             w_i * \hat{y_i} * \hat{z_i}    -->     w_i * \tilde{y_i}^{b} * \tilde{z_i}^{b}
         
         In the unit case we can now compute the quantity we are interested in:
-            w_i * \tilde{y_i}^{b} * \tilde{z_i}^{b} - w_i * y_i^{b} z_i^{b}
+            w_i * \tilde{y_i}^{b} * \tilde{z_i}^{b} - w_i * (\hat{y_i} + \epsilon_i^{b}) * (\hat{z_i} + \gamma_i^{b})
         for each b. And then take the quantile over the sampling distribution to get the prediction interval at that level
 
         In the aggregate case we can do the equivalent:
-            \sum_{i = 1}^N w_i * \tilde{y_i}^{b} * \tilde{z_i}^{b} - \sum_{i = 1}^N w_i * y_i^{b} z_i^{b}
+            \sum_{i = 1}^N w_i * \tilde{y_i}^{b} * \tilde{z_i}^{b} - \sum_{i = 1}^N w_i * (\hat{y_i} + \epsilon_i^{b}) * (\hat{z_i} + \gamma_i^{b})
         for each b. And again take the quantiles.
         """
         # prepare data (generate fixed effects, add intercept etc.)
@@ -639,21 +676,32 @@ class BootstrapElectionModel(BaseElectionModel):
         z_train_pred = ols_z.predict(x_train)
 
         # step 3) calculate residuals
-        # NOTE: WHY ARE WE TREATING THE EPSILON SEPARATELY HERE -> COULD WE NOT DO IT ALL WITH DELTA?
+        # we estimate a contest level effect (epsilon) separately from the unit level effect (delta)
         residuals_y, epsilon_y_hat, delta_y_hat = self._estimate_model_errors(ols_y, x_train, y_train, aggregate_indicator_train)
         residuals_z, epsilon_z_hat, delta_z_hat = self._estimate_model_errors(ols_z, x_train, z_train, aggregate_indicator_train)
         
-        # instead of just re-sampling the residuals B times we create a distribution of residuals to sample from
-        # this allows us to create synthetic data that is very similar, but still a bit different than if we were to just re-assign (NOTE: ???)
-        # to do this, we generate ppfs/cdfs of the error distribution and then sample uniform random variables and use the probability integral transform
-        # to generate a random variable with the distribution we want from a uniform random variable. (NOTE: WHY NOT SAMPLE FROM ERROR DISTRIBUTION DIRECTLY)
+        # instead of just re-sampling the residuals B times we create a distribution of residuals to sample from we create synethetic (bootstrap)
+        # data in a different way. We want to make sure that counties within strata (e.g. rural, suburban, urban) only receive errors from 
+        # units within their strata. This is why we only sample new residuals within each strata.
+        
+        # Instead of sampling the residuals directly with replacement we generate distributions for each strata. We convert the residuals
+        # into uniform random variables using the distributions CDF (probability integral transform),
+        # we then re-sample with replacement from the uniform random variables
+        # and then convert the uniform random variables back into residual using the PPF of the distribution (inverse CDF)
+        # We do this part because we have two errors to sample (z error and y error) by sampling the observed CDFs we can maintain the correlation
+        # between the y and z error. 
+        #   E.g. take a rural residual (residual_y, residual_z), evaluate CDF -> get percentile for each residual (0.75, 0.85)
+        #   if you do this for every pair points, you will notice that these two percentiles are correlated (a big y error and a big z error co-occur)
+        # This approach using uniform random variables allows us to smooth over the distribution in cases where we have only seen very few obserations
+        # per strata. We can also impose a worst/best case scenario by adding an additional datapoint for each stratum when generating the distribution.
         
         # we only want re-sample residuals in each strata (ie. rural counties should only receive errors from rural counties, same for suburban and urban)
         # this means that we need to generate error distributions conditional on each strata value (ie. conditional on urban, rural and suburban)
         # to do this, we first need to get the strata
         x_train_strata, x_test_strata = self._get_strata(reporting_units, nonreporting_units)
 
-        # we then compute the probability distribution for the errors given each strata
+        # we then compute the probability distribution (CDF/PPF) for the errors given each strata, this will allow us to move from the residual space
+        # to the percentile space [0, 1] and back again after re-sampling
         stratum_ppfs_delta_y, stratum_cdfs_delta_y = self._estimate_strata_dist(x_train, x_train_strata, x_test, x_test_strata, delta_y_hat, self.y_LB, self.y_UB)
         stratum_ppfs_delta_z, stratum_cdfs_delta_z = self._estimate_strata_dist(x_train, x_train_strata, x_test, x_test_strata, delta_z_hat, self.z_LB, self.z_UB)
 
@@ -664,25 +712,26 @@ class BootstrapElectionModel(BaseElectionModel):
         delta_y_B, delta_z_B = delta_B
  
         # step 4b) add the bootstrapped errors to our original fitted dependent variables
+        # this creates our bootstrapped dataset (residual bootstrap, where we add the bootstrapped residuals to our fitted predictions)
         y_train_B = y_train_pred + (aggregate_indicator_train @ epsilon_y_B) + delta_y_B
         z_train_B = z_train_pred + (aggregate_indicator_train @ epsilon_z_B) + delta_z_B
         
         # step 5) refit the model
+        # we are using the normal equations from the original model since x_train has stayed the same and the normal
+        # equations are only dependent on x_train. This saves compute.
         ols_y_B = OLSRegression().fit(x_train, y_train_B, weights_train, normal_eqs=ols_y.normal_eqs, n_feat_ignore_reg=2)
         ols_z_B = OLSRegression().fit(x_train, z_train_B, weights_train, normal_eqs=ols_z.normal_eqs, n_feat_ignore_reg=2)
 
-        # these are our predictions on our training set using the model fitted with the bootstrapped data
+        # to generate test predictions we need contest level effect estimates. We use the bootstrapped data to do that
+        # we generate new bootstrapped predictions to compute new bootstraped residuals to compute bootstraped epsilon estimates
         y_train_pred_B = ols_y_B.predict(x_train)
         z_train_pred_B = ols_z_B.predict(x_train)
-
-        # the residual of the bootstrap model (the difference between the "true" dependent variable and the fitted dependent variable but in the bootstrap world)
         residuals_y_B = ols_y_B.residuals(y_train_B, y_train_pred_B, loo=True, center=True)
         residuals_z_B = ols_z_B.residuals(z_train_B, z_train_pred_B, loo=True, center=True)
-
-        # estimate epsilon (contest level random effect) -> the average error per contest
         epsilon_y_hat_B = self._estimate_epsilon(residuals_y_B, aggregate_indicator_train)
         epsilon_z_hat_B = self._estimate_epsilon(residuals_z_B, aggregate_indicator_train)
 
+        # This is \tilde{y_i}^{b} and \tilde{z_i}^{b} 
         y_test_pred_B = (ols_y_B.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat_B)).clip(min=y_partial_reporting_lower, max=y_partial_reporting_upper)
         z_test_pred_B = (ols_z_B.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat_B)).clip(min=z_partial_reporting_lower, max=z_partial_reporting_upper)
 
@@ -692,6 +741,14 @@ class BootstrapElectionModel(BaseElectionModel):
         z_test_pred = (ols_z.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat)).clip(min=z_partial_reporting_lower, max=z_partial_reporting_upper)
         yz_test_pred = y_test_pred * z_test_pred
 
+        # replace y, z with y_hat, z_hat (no bootstrapping at all)
+        # take our model for the prediction errors: defined by stratum ppf/cdf and generate fresh prediction errors
+        # y_hat and z_hat is our best guess for the conditional mean of y, z | x
+        # we are not interested in y_hat * z_hat - mu_y * mu_z | x
+        # we are interested in y_hat * z_hat - y, z (which is mu_y + some irreducable error, mu_z + some irreducable error)
+        # we are going to a model of our irreducable error and sampling new versions of that
+        # y = x \beta + epsilon
+        # y_hat is our estimate for x \beta, so estimate y we need new epsilons (we cannot use the old ones)
         test_residuals_y, test_residuals_z = self._sample_test_errors(
             residuals_y, 
             residuals_z, 
@@ -706,9 +763,11 @@ class BootstrapElectionModel(BaseElectionModel):
         
         self.errors_B_1 = yz_test_pred_B * weights_test
 
+        # x \hat{beta} + new errors
         errors_B_2 = (y_test_pred + test_residuals_y).clip(min=y_partial_reporting_lower, max=y_partial_reporting_upper)
         errors_B_2 *= (z_test_pred + test_residuals_z).clip(min=z_partial_reporting_lower, max=z_partial_reporting_upper)
 
+        # we also need errors for the denominator of the aggregate
         self.errors_B_2 = errors_B_2 * weights_test 
 
         self.errors_B_3 = z_test_pred_B * weights_test # has already been clipped above
