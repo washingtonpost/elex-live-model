@@ -46,7 +46,7 @@ class MockLiveDataHandler:
         self.data = data
         if data is not None:
             # passed in as a df
-            data_for_estimands = self.load_data(data, estimands, historical)
+            data_for_estimands = self.load_data(data)
             self.data = data_for_estimands
         else:
             self.data = self.get_data()
@@ -76,17 +76,18 @@ class MockLiveDataHandler:
             live_data,
             dtype={"geographic_unit_fips": str, "geographic_unit_type": str, "county_fips": str, "district": str},
         )
-        data = self.load_data(data, self.estimands, self.historical)
+        data = self.load_data(data)
         return data
 
     def get_live_data_file_path(self):
         directory_path = get_directory_path()
         return f"{directory_path}/data/{self.election_id}/{self.office_id}/data_{self.geographic_unit_type}.csv"
 
-    def load_data(self, data, estimands, historical):
+    def load_data(self, data):
         columns_to_return = ["postal_code", "geographic_unit_fips"]
-        for estimand in estimands:
-            if historical:
+
+        for estimand in self.estimands:
+            if self.historical:
                 data[f"results_{estimand}"] = np.nan
             results_column_names = [x for x in data.columns if x.startswith("results")]
             # If this is not a historical run, then this is a live election
@@ -96,6 +97,7 @@ class MockLiveDataHandler:
             if f"results_{estimand}" not in results_column_names:
                 raise MockLiveDataHandlerException("This is missing results data for estimand: ", estimand)
             columns_to_return.append(f"results_{estimand}")
+
         self.shuffle_dataframe = data[self.shuffle_columns].copy()
         return data[columns_to_return].copy()
 

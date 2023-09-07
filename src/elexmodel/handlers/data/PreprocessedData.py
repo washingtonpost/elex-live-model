@@ -39,7 +39,7 @@ class PreprocessedDataHandler:
         self.local_file_path = self.get_preprocessed_data_path()
 
         if data is not None:
-            self.data = self.load_data(data, estimand_baselines)
+            self.data = self.load_data(data)
         else:
             self.data = self.get_data()
 
@@ -61,7 +61,7 @@ class PreprocessedDataHandler:
             preprocessed_data = self.local_file_path
 
         data = pd.read_csv(preprocessed_data, dtype={"geographic_unit_fips": str, "county_fips": str, "district": str})
-        return self.load_data(data, self.estimand_baselines)
+        return self.load_data(data)
 
     def get_preprocessed_data_path(self):
         directory_path = get_directory_path()
@@ -76,7 +76,7 @@ class PreprocessedDataHandler:
         )
         return data
 
-    def load_data(self, preprocessed_data, estimand_baselines):
+    def load_data(self, preprocessed_data):
         """
         Load preprocessed csv data as df
         """
@@ -88,7 +88,7 @@ class PreprocessedDataHandler:
             # so we don't care about the total voters or the baseline election.
             return preprocessed_data
 
-        for estimand, pointer in estimand_baselines.items():
+        for estimand, pointer in self.estimand_baselines.items():
             baseline_name = f"baseline_{pointer}"
             # Adding one to prevent zero divison
             preprocessed_data[f"last_election_results_{estimand}"] = preprocessed_data[baseline_name].copy() + 1
