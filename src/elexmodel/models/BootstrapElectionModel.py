@@ -154,51 +154,65 @@ class BootstrapElectionModelException(Exception):
 class BootstrapElectionModel(BaseElectionModel):
     """
     The bootstrap election model. 
-    This approach to live election modeling uses ordinary least squares regression for point predictions and the bootstrap to generate prediction intervals.
-    Also, in this model we are modeling the two party margin as estimand only.
+    
+    This model uses ordinary least squares regression for point predictions and the bootstrap to generate prediction intervals.
+    
+    In this setup, we are modeling normalized two party margin. But because we need to sum our estimand from the unit level to the aggregate level, we need
+        to be able to convert normalized margin to unormalized margin (since normalized margins don't sum). This means on the unit level we will be modeling
+        unnormalized margin and on the aggregate level normalized margin. 
 
-    We have found that decomposing the normalized margin into two quantities because the linear model assumption is much for plausible for each individually:
-        y = (D^{Y} - R^{Y}) / (D^{Y} + D^{Y})
-        z = (D^{Y} + R^{Y}) / (D^{Y'} + R^{Y'})
+    We have found that instead of modeling the unit margin directly, decomposing the estimand into two quantites works better because the linear
+        model assumption is more plausible for each individually. The two quantities are normalized margin (y) and a turnout factor (z)
+            y = (D^{Y} - R^{Y}) / (D^{Y} + D^{Y})
+            z = (D^{Y} + R^{Y}) / (D^{Y'} + R^{Y'})
     where Y is the year we are modeling and Y' is the previous election year.
-    if we define weights to be the to total two party turnout in a previous election: w = (D^{Y'} + R^{Y'})
-    then we get that: wyz = (D^{Y} - R^{Y}) 
-    We cannot model y directly since we also need a model for turnout in order to sum our unit level predictions to aggregate predictions
-    y is the normalized two party margin and z is the turnout factor between this election and a previous election. We have found that
-    modeling those two quantities is relatively easy given the county level information that we have.
+    
+    If we define weights to be the total two party turnout in a previous election: 
+        w = (D^{Y'} + R^{Y'}) -> w * y * z = (D^{Y} - R^{Y}) 
+    so (w * y * z) is the unnormalized margin.
     
     We define our model as:
         y_i = f_y(x) + \epsilon_y(x)
         z_i = f_z(x) + \epsilon_z(x)
     where f_y(x) and f_z(x) are ordinary least squares regressions and the epsilons are contest (state/district) level random effects.
-    
-    Our model also assumes that we have a baseline normalized margin (D^{Y'} - R^{Y'}) / (D^{Y'} + R^{Y'}) is one of the covariates
-    since we have found that predicts y and z very well.
     """
 
     def __init__(self, model_settings={}):
         super().__init__(model_settings)
-        self.seed = model_settings.get("seed", 0)
-        self.B = model_settings.get("B", 2000)
-        self.strata = model_settings.get("strata", ['county_classification']) # change this
-        self.T = model_settings.get("T", 5000)
-        self.hard_threshold = model_settings.get("agg_model_hard_threshold", False)
+        self.B = model_settings.get("B", 2000) # number of bootstrap samples
+        self.strata = model_settings.get("strata", ['county_classification']) # columns to stratify the data by
+        self.T = model_settings.get("T", 5000) # temperature for aggregate model
+        self.hard_threshold = model_settings.get("agg_model_hard_threshold", False) # use sigmoid or hard thresold when calculating agg model
         self.district_election = model_settings.get("district_election", False)
-        self.y_LB = model_settings.get("y_LB", -0.3)
-        self.y_UB = model_settings.get("y_UB", 0.3)
-        self.z_LB = model_settings.get("z_LB", -0.5)
-        self.z_UB = model_settings.get("z_UB", 0.5)
-        self.y_unobserved_upper_bound = model_settings.get("y_unobserved_upper_bound", 1.0)
+
+        # upper and lower bounds for the quantile regression which define the strata distributions
+        # these make sure that we can control the worst cases for the distributions in case we
+        # haven't seen enough data ayet
+        self.y_LB = model_settings.get("y_LB", -0.3) # normalied margin lower bound
+        self.y_UB = model_settings.get("y_UB", 0.3) # normalized margin upper bound
+        self.z_LB = model_settings.get("z_LB", -0.5) # turnout factor lower bound
+        self.z_UB = model_settings.get("z_UB", 0.5) # turnout factor upper bound
+
+        # percentiles to compute the strata distributions for
+        self.taus_lower = np.arange(0.01, 0.5, 0.01)
+        self.taus_upper = np.arange(0.50, 1, 0.01)
+        self.taus = np.concatenate([self.taus_lower, self.taus_upper]) 
+        
+        # upper and lower bounds for normalized margin and turnout factor as to how the "outstanding vote" in 
+        # non-reporting units can go. Used to clip our predictions
         self.y_unobserved_lower_bound = model_settings.get("y_unobserved_lower_bound", -1.0)
+        self.y_unobserved_upper_bound = model_settings.get("y_unobserved_upper_bound", 1.0) 
         self.percent_expected_vote_error_bound = model_settings.get("percent_expected_vote_error_bound", 0.5)
         self.z_unobserved_upper_bound = model_settings.get("z_unobserved_upper_bound", 1.5)
         self.z_unobserved_lower_bound = model_settings.get("z_unobserved_lower_bound", 0.5)
+        
         self.featurizer = Featurizer(self.features, self.fixed_effects)
-        self.rng = np.random.default_rng(seed=self.seed)
+        self.seed = model_settings.get("seed", 0)
+        self.rng = np.random.default_rng(seed=self.seed) # used for sampling
         self.ran_bootstrap = False
-        self.taus_lower = np.arange(0.01, 0.5, 0.01)
-        self.taus_upper = np.arange(0.50, 1, 0.01)
-        self.taus = np.concatenate([self.taus_lower, self.taus_upper])
+
+
+        # Assume that we have a baseline normalized margin (D^{Y'} - R^{Y'}) / (D^{Y'} + R^{Y'}) is one of the covariates
         if 'baseline_normalized_margin' not in self.features:
             raise BootstrapElectionModelException("baseline_normalized_margin not included as feature. This is necessary for the model to work.")
 
@@ -572,43 +586,74 @@ class BootstrapElectionModel(BaseElectionModel):
         #  less conservative accounting of partial reporting (unit level predictions should adapt and not just snap to lower/upper bounds)
     def compute_bootstrap_errors(self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, unexpected_units: pd.DataFrame):
         """
-        Runs the bootstrap.
+        Computes unit level point predictions and runs the bootstrap.
+        The bootstrap is run to compute the error components in isolation, which lets us generate the unit and aggregate prediction 
+        intervals later.
         
-        The bootstrap generally re-samples the observed data with replacement in order to generate B synthentic "bootstrap" datasets,
+        The bootstrap generally re-samples the observed data with replacement in order to generate synthentic "bootstrap" datasets,
             which can be used to estimate the sampling distribution of a quantity that we are interested in.
-        This implements a version of the stratified residual bootstrap. In the residual bootstrap we sample residuals for each actually
-            observed unit B time and generate the synthetic dataset by adding the bootstrapped residuals to the fitted values. 
-        We stratify the sampling since the obsered units are not independent and identically distributed, which means we cannot assign
-            the error from any unit to any other unit. For now, this model assumes that we stratify based on whether a county is urban/rural/suburban
+        Our implementation is the stratified residual bootstrap. The residual bootstrap samples residuals of a model (instead of the original dataset)
+            this is preferable in a regression setting because it removes the the component of the observation that is not random.
+        We use the stratified bootstrap because our units are not independent and identically distributed, which means that we cannot assign
+            the error of any unit to any other unit (e.g. the residual for an urban unit would likely not fit for a rural unit). For now, this model
+            stratifies on county classification (rural/urban/suburban).
 
-        Generally we are interested in a prediction interval over functions of:
-            w * y * z, which is equivalent to (ie. weights * normalized margin * turnout factor = unnormalized margin)
-        In the case of unit prediction intervals we are interested in the raw quantity but in the case of aggregate prediction intervals
-            we want to sum the unnormalized margin over the units in that aggregate (ie. units in the state) to generate the unnormalized
-            margin in that aggregate and then normalizing that (in order to get the state level normalized margin). While in the case of the 
-            aggregate model we want an interval over the sums of electoral votes generated by the prediction.
+        Generally we are interested in predicting functions of:
+                w * y * z = weights * normalized_margin * turnout_factor = unnormalized_margin
         
-        This means we want to create a bootstrapped distribution for:
-            w_i * \hat{y_i} * \hat{z_i} - w_i * y_i * z_i (unit case) or
-            \sum_{i = 1}^N w_i * \hat{y_i} * \hat{z_i} - \sum_{i = 1}^N w_i * y_i * z_i (aggregate case) or
-            \sum_{s = 1}^{51} \sigmoid{\sum_{i=1}^{N_s} w_i * \hat{y_i} * \hat{z_i}} * ev_s - \sum_{s = 1}^{51} \sigmoid{\sum_{i=1}^{N_s} w_i * y_i * z_i} * ev_s (national aggregate case)
-
-        In order to keep this model as flexible as possible for all these cases, we will generate bootstrapped estimates for 
-            w_i * \hat{y_i} * \hat{z_i} and w_i * y_i * z_i 
-        and store those so that we can later compute any quantity of interest with them.
-
-        In each iteration of the bootstrap we need to generate a new "true" version (e.g. an equivalent of w_i * y_i * z_i) and 
-        we also need to generate a new "estimated" version (e.g. an equivalent of w_i * \hat{y_i} * \hat{z_i}). We will call the 
-            w_i * y_i * z_i                -->     w_i * (\hat{y_i} + \epsilon_i^{b}) * (\hat{z_i} + \gamma_i^{b})
-            w_i * \hat{y_i} * \hat{z_i}    -->     w_i * \tilde{y_i}^{b} * \tilde{z_i}^{b}
+        There are three cases:
+            1) In the unit case we are interested in the unnormalized margin:
+                    w_i * y_i * z_i
+            2) In the aggregate (e.g. state aggregation) case we are interested in the normalized sum of the unnormalized margin of units
+                    (\sum_{i = 1}^N w_i * y_i * z_i) / (sum_{i = 1}^N w_i * z_i)
+            3) In the national case we are interested in an interval over the sum of electoral votes generated by the predictions
+                    \sum_{s = 1}^{51} \sigmoid{\sum_{i = 1}^{N_s} w_i * y_i * z_i} * ev_s
         
-        In the unit case we can now compute the quantity we are interested in:
-            w_i * \tilde{y_i}^{b} * \tilde{z_i}^{b} - w_i * (\hat{y_i} + \epsilon_i^{b}) * (\hat{z_i} + \gamma_i^{b})
-        for each b. And then take the quantile over the sampling distribution to get the prediction interval at that level
+        Our point prediction for each is:
+            1) w_i * \hat{y_i} * \hat{z_i}
+            2) (\sum_{i = 1}^N w_i * \hat{y_i} * \hat_{z_i}) / (sum_{i = 1}^N w_i \hat{z_i})
+            3) \sum_{s = 1}^{51} \sigmoid{\sum_{i=1}^{N_s} w_i * \hat{y_i} * \hat{z_i}} * ev_s
 
-        In the aggregate case we can do the equivalent:
-            \sum_{i = 1}^N w_i * \tilde{y_i}^{b} * \tilde{z_i}^{b} - \sum_{i = 1}^N w_i * (\hat{y_i} + \epsilon_i^{b}) * (\hat{z_i} + \gamma_i^{b})
-        for each b. And again take the quantiles.
+        This function computs the first quantity only, the other quantities are computed in their respective functions using
+            the unit predictions.            
+        
+        We are also interested in generating prediction intervals for the quantities, we do that by bootstrapping the error in our predictions
+            and then taking the appropriate percentiles of those errors. The errors we are interested in are between the true quantity and 
+            our prediction:
+        
+        There are three cases that mirror the cases above:
+            1) w_i * \hat{y_i} * \hat{z_i} - w_i * y_i * z_i 
+            2) (\sum_{i = 1}^N w_i * \hat{y_i} * \hat{z_i}) / (\sum_{i = 1}^n w_i \hat{z_i}) - (\sum_{i = 1}^N w_i * y_i * z_i) / (\sum_{i = 1}^n w_i z_i)
+            3) \sum_{s = 1}^{51} \sigmoid{\sum_{i=1}^{N_s} w_i * \hat{y_i} * \hat{z_i}} * ev_s - \sum_{s = 1}^{51} \sigmoid{\sum_{i=1}^{N_s} w_i * y_i * z_i} * ev_s
+
+        In order to keep this model as flexible as possible for all potential cases, this function generates bootstrap estimates for
+            1) w_i * \hat{y_i} * \hat{z_i} 
+            2) w_i * y_i * z_i 
+            3) w_i * \hat{z_i}
+            4) w_i * z_i
+        and store those so that we can later compute prediction interevals for any function of these quantities in their respective functions.
+
+        In a normal setting the bootstrap works by assuming that our fitted predictions (e.g. w_i * \hat{y_i} * \hat{z_i}) is now the true 
+            value. Then using the bootstrap to generate new synthentic samples (e.g. w_i \hat{y_i}^b * \hat{z_i}^b) and computing the error 
+            between the two. This would give us a confidence interval (ie. the error between a quantity and it's mean), but we are interested
+            in a prediction interval, which means we also need to take into account the additional uncertainty in sampling new y_i and z_i
+        
+        This means that our new "true" quantity (the equivalent of w_i * y_i * z_i) needs a new fresh sampled uncertainty, so we sample
+            new test errors 
+                \residuals_{y, i}^{b}, \residuals_{z, i}^{b}
+            in order to compute:
+                \hat{y_i} + \residuals_{y, i}^{b}
+                \hat{z_i} + \residuals_{z, i}^{b}
+            so that:
+                w_i * y_i * z_i     -->     w_i * (\hat{y_i} + \residuals_{y, i}^{b}) * (\hat{z_i} + \residuals_{z, i}^{b})
+
+        We also need new "estimated" quantities (the equivalent of w_i * \hat{y_i} * \hat{z_i}), these are the outcome
+            of the stratified residual bootstrap:
+                w_i * \hat{y_i} * \hat{z_i}    -->     w_i * \tilde{y_i}^{b} * \tilde{z_i}^{b}
+
+        For completeness, we also generate estimates for the other two quantities:
+                w_i * z_i -> w_i * (\hat{z_i} + \epsilon_{z, i}^{b})
+                w_i * \hat{z_i} -> w_i * \tilde{z_i}^{b}
         """
         # prepare data (generate fixed effects, add intercept etc.)
         all_units = pd.concat([reporting_units, nonreporting_units, unexpected_units], axis=0)
@@ -783,8 +828,9 @@ class BootstrapElectionModel(BaseElectionModel):
 
     def get_unit_predictions(self,  reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, estimand: str, **kwargs) -> np.ndarray:
         """
-        Generate and retun unit predictions.
-        Unless it's already been run, also generates bootstrap samples
+        Returns the unit predictions, if necessary also generates them
+        The unit predictions are the *unnormalized margin*
+            w_i * \hat{y_i} * \hat{z_i}
         """
         # if bootstrap hasn't been run yet, run it
         if not self.ran_bootstrap:
@@ -807,13 +853,17 @@ class BootstrapElectionModel(BaseElectionModel):
 
     def get_aggregate_predictions(self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, unexpected_units: pd.DataFrame, aggregate: list, estimand: str) -> pd.DataFrame:
         """
-        Generates and returns the aggregate prediction for arbitrary aggregates
+        Generates and returns the normalized margin for arbitrary aggregates
+            \sum_{i = 1}^N (w_i * \hat{y_i} * \hat{z_i}) / \sum_{i = 1}^N (w_i * \hat{z_i})
         """
-        n = reporting_units.shape[0]
-        m = nonreporting_units.shape[0]
+        n_train = reporting_units.shape[0]
+        n_test = nonreporting_units.shape[0]
 
         all_units = pd.concat([reporting_units, nonreporting_units, unexpected_units], axis=0)
 
+        # if we want to aggregate to something that isn't postal_code we need to generate a temporary 
+        # column so that we create a dummary variable for each level of the aggregate 
+        # aggreagate_1 * aggregate_2 rather than aggregate_1 + aggregate_2 which is what would happen otherwise
         if len(aggregate) > 1:
             aggregate_temp_column_name = '-'.join(aggregate)
             all_units[aggregate_temp_column_name] = all_units[aggregate].agg('_'.join, axis=1)
@@ -822,24 +872,39 @@ class BootstrapElectionModel(BaseElectionModel):
             aggregate_indicator = pd.get_dummies(all_units[aggregate]).values
             aggregate_temp_column_name = aggregate
 
-        aggregate_indicator_expected = aggregate_indicator[:(n + m)]
+        # the unit level predictions that come in through reporting_units and nonreporting_units
+        # are unnormalized. Since we want the normalized margin for the aggregate predictions
+        # we need to divide the sum of unnormalized aggregates by the total turnout predictions
+        # so we first compute the total turnout predictions
 
-        aggregate_indicator_unexpected = aggregate_indicator[(n + m):]
+        aggregate_indicator_expected = aggregate_indicator[:(n_train + n_test)]
+        aggregate_indicator_unexpected = aggregate_indicator[(n_train + n_test):]
+        
+        # two party turnout
         turnout_unexpected = (unexpected_units['results_dem'] + unexpected_units['results_gop']).values.reshape(-1, 1)
         
-        aggregate_indicator_train = aggregate_indicator_expected[:n]
-        aggregate_indicator_test = aggregate_indicator_expected[n:]
+        aggregate_indicator_train = aggregate_indicator_expected[:n_train]
+        aggregate_indicator_test = aggregate_indicator_expected[n_train:]
         weights_train = reporting_units['weights'].values.reshape(-1, 1)
         z_train = reporting_units['turnout_factor'].values.reshape(-1, 1)
 
+        # get turnout for aggregate (w_i * z_i)
         aggregate_z_train = aggregate_indicator_train.T @ (weights_train * z_train)
-        
         aggregate_z_unexpected = aggregate_indicator_unexpected.T @ turnout_unexpected
+
+        # total turnout predictions
         aggregate_z_total = aggregate_z_unexpected + aggregate_z_train + aggregate_indicator_test.T @ self.weighted_z_test_pred
 
+        # use get_aggregate_predictions from BaseElectionModel to sum unnormalized margin of all the units
         raw_margin_df = super().get_aggregate_predictions(reporting_units, nonreporting_units, unexpected_units, aggregate, estimand)
-        raw_margin_df['pred_margin'] /= (aggregate_z_total.flatten() + 1)
-        raw_margin_df['results_margin'] /= (aggregate_z_total.flatten() + 1) # avoid NaN
+
+        # divide the unnormalized margin and results by the total turnout predictions to get the normalized margin for the aggregate
+        # turnot prediction could be zero, in which case predicted margin is also zero, so replace NaNs with zero in that case
+        raw_margin_df['pred_margin'] = np.nan_to_num(raw_margin_df.pred_margin / aggregate_z_total.flatten())
+        raw_margin_df['results_margin'] /= np.nan_to_num(raw_margin_df / aggregate_z_total.flatten())
+
+        # if we are in the top level prediction, then save the aggregated baseline margin, which we will need for the national
+        # summary (e.g. ecv) model
         if self._is_top_level_aggregate(aggregate):
             aggregate_sum = all_units.groupby(aggregate_temp_column_name).sum()
             self.aggregate_baseline_margin = ((aggregate_sum.baseline_dem - aggregate_sum.baseline_gop) / (aggregate_sum.baseline_turnout + 1)).values
@@ -849,14 +914,26 @@ class BootstrapElectionModel(BaseElectionModel):
     def get_unit_prediction_intervals(self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, alpha: float, estimand: str) -> PredictionIntervals:
         """
         Generate and return unit level prediction intervals
+        
+        In the unit case, the error in our prediciton is:
+                w_i * \hat{y_i} * \hat{z_i} - w_i * y_i * z_i
+        In the bootstrap setting this has been estimated as:
+                w_i * \tilde{y_i}^{b} * \tilde{z_i}^{b} - w_i * (\hat{y_i} + \residual_{y, i}^{b}) * (\hat{z_i} + \residual_{z, i}^{b})
+        
+        The alpha% prediction interval is the (1 - alpha) / 2 and (1 + alpha) / 2 percentiles over the bootstrap samples of this quantity
         """
+        # error_B_1: w_i * \tilde{y_i}^{b} * \tilde{z_i}^{b}
+        # error_B_2: w_i * (\hat{y_i} + \residual_{y, i}^{b}) * (\hat{z_i} + \residual_{z, i}^{b})
         errors_B = self.errors_B_1 - self.errors_B_2
 
         lower_alpha = (1 - alpha) / 2
         upper_alpha = 1 - lower_alpha
+
+        # adjust percentiles to account for bootsrap
         lower_q = np.floor(lower_alpha * (self.B + 1)) / self.B
         upper_q = np.ceil(upper_alpha * (self.B - 1)) / self.B
 
+        # sum in the prediction to our lower and upper esimate of the error in our prediction
         interval_upper, interval_lower = (self.weighted_yz_test_pred - np.quantile(errors_B, q=[lower_q, upper_q], axis=-1).T).T
 
         interval_upper = interval_upper.reshape(-1,1)
@@ -876,9 +953,16 @@ class BootstrapElectionModel(BaseElectionModel):
     ) -> PredictionIntervals:
         """
         Generate and return aggregate prediction intervals for arbitrary aggregates
+
+        In the aggregate case, the error in our prediction is:
+                (\sum_{i = 1}^N w_i * \hat{y_i} * \hat{z_i}) / (\sum_{i = 1}^n w_i \hat{z_i}) - (\sum_{i = 1}^N w_i * y_i * z_i) / (\sum_{i = 1}^n w_i z_i)
+        In the bootstrap setting this has been estimated as:
+                (sum_{i = 1}^N w_i * \tilde_{y_i}^b * \tilde_{z_i}^b) / (\sum_{i = 1}^N w_i * \tilde_{z_i}^b) - (\sum_{i = 1}^N w_i * (\hat_{y_i} + \residual_{y, i}^b) * (\hat{z_i} + \residual_{z, i}^b)) / (\sum_{i = 1}^N w_i * (\hat{z_i} + \residual_{z, i}^b))
+
+        The alpha% prediction interval is the (1 - alpha) / 2 and (1 + alpha) / 2 percentiles over the bootstrap samples of this quantity
         """
-        n = reporting_units.shape[0]
-        m = nonreporting_units.shape[0]
+        n_train = reporting_units.shape[0]
+        n_test = nonreporting_units.shape[0]
 
         all_units = pd.concat([reporting_units, nonreporting_units, unexpected_units], axis=0)
 
@@ -888,29 +972,41 @@ class BootstrapElectionModel(BaseElectionModel):
             aggregate_indicator = pd.get_dummies(all_units[aggregate_temp_column_name]).values
         else:
             aggregate_indicator = pd.get_dummies(all_units[aggregate]).values
-        aggregate_indicator_expected = aggregate_indicator[:(n + m)]
+        aggregate_indicator_expected = aggregate_indicator[:(n_train + n_test)]
 
-        aggregate_indicator_unexpected = aggregate_indicator[(n + m):]
+        # first compute turnout and unnormalized margin for unexpected units. 
+        # this is a known quantity
+        aggregate_indicator_unexpected = aggregate_indicator[(n_train + n_test):]
         margin_unexpected = unexpected_units['results_margin'].values.reshape(-1,1)
         turnout_unexpected = (unexpected_units['results_dem'] + unexpected_units['results_gop']).values.reshape(-1, 1)
         aggregate_z_unexpected = aggregate_indicator_unexpected.T @ turnout_unexpected
         aggregate_yz_unexpected = aggregate_indicator_unexpected.T @ margin_unexpected
 
-        aggregate_indicator_train = aggregate_indicator_expected[:n]
-        aggregate_indicator_test = aggregate_indicator_expected[n:]
+        aggregate_indicator_train = aggregate_indicator_expected[:n_train]
+        aggregate_indicator_test = aggregate_indicator_expected[n_train:]
         weights_train = reporting_units['weights'].values.reshape(-1, 1)
+        
+        # compute turnout and unnormalized margin for reporting units.
+        # this is also a known quantity with no uncertainty
         y_train = reporting_units['normalized_margin'].values.reshape(-1, 1)
         z_train = reporting_units['turnout_factor'].values.reshape(-1, 1)
-
         yz_train = y_train * z_train
         aggregate_z_train = aggregate_indicator_train.T @ (weights_train * z_train)
         aggregate_yz_train = aggregate_indicator_train.T @ (weights_train * yz_train)
 
+        # (sum_{i = 1}^N w_i * \tilde_{y_i}^b * \tilde_{z_i}^b)
         aggregate_yz_test_B =  aggregate_indicator_test.T @ self.errors_B_1
+
+        # (\sum_{i = 1}^N w_i * (\hat_{y_i} + \residual_{y, i}^b) * (\hat{z_i} + \residual_{z, i}^b))
         aggregate_yz_test_pred =  aggregate_indicator_test.T @ self.errors_B_2
+
+        # (\sum_{i = 1}^N w_i * \tilde_{z_i}^b)
         aggregate_z_test_B = aggregate_indicator_test.T @ self.errors_B_3
+
+        # (\sum_{i = 1}^N w_i * (\hat{z_i} + \residual_{z, i}^b))
         aggregate_z_test_pred = aggregate_indicator_test.T @ self.errors_B_4
 
+        # sum the aggregate error components with the known quantities from reporting and unexpected units
         aggregate_yz_total_B = aggregate_yz_train + aggregate_yz_test_B  + aggregate_yz_unexpected
         aggregate_yz_total_pred = aggregate_yz_train + aggregate_yz_test_pred + aggregate_yz_unexpected
         aggregate_z_total_B = aggregate_z_train + aggregate_z_test_B + aggregate_z_unexpected
@@ -921,9 +1017,13 @@ class BootstrapElectionModel(BaseElectionModel):
         aggregate_error_B_3 = aggregate_z_total_B
         aggregate_error_B_4 = aggregate_z_total_pred
 
+        # (sum_{i = 1}^N w_i * \tilde_{y_i}^b * \tilde_{z_i}^b) /  (\sum_{i = 1}^N w_i * \tilde_{z_i}^b)
         divided_error_B_1 = np.nan_to_num(aggregate_error_B_1 / aggregate_error_B_3)
+
+        # (\sum_{i = 1}^N w_i * (\hat_{y_i} + \residual_{y, i}^b) * (\hat{z_i} + \residual_{z, i}^b)) /  (\sum_{i = 1}^N w_i * (\hat{z_i} + \residual_{z, i}^b))
         divided_error_B_2 = np.nan_to_num(aggregate_error_B_2 / aggregate_error_B_4)
 
+        # subtract to get bootstrap error for estimate in our predictions
         aggregate_error_B = divided_error_B_1 - divided_error_B_2
 
         lower_alpha = (1 - alpha) / 2
@@ -931,11 +1031,16 @@ class BootstrapElectionModel(BaseElectionModel):
         lower_q = np.floor(lower_alpha * (self.B + 1)) / self.B
         upper_q = np.ceil(upper_alpha * (self.B - 1)) / self.B
 
+        # we also need to re-compute our aggregate prediction to add to our error to get the prediction interval
+        # first the turnout component
         aggregate_z_total = aggregate_z_unexpected + aggregate_z_train + aggregate_indicator_test.T @ self.weighted_z_test_pred
+        # then the unnormalied margin component
         aggregate_yz_total = aggregate_yz_unexpected + aggregate_yz_train + aggregate_indicator_test.T @ self.weighted_yz_test_pred
+        # calculate normalized margin in the aggregate prediction
+        # turnout prediction could be zero, so convert NaN -> 0
         aggregate_perc_margin_total = np.nan_to_num(aggregate_yz_total / aggregate_z_total)
         
-        # saves the aggregate errors in case we want to generate somem form of super-aggregate statistic (like ECV or House seats)
+        # saves the aggregate errors in case we want to generate somem form of national predictions (like ecv)
         if self._is_top_level_aggregate(aggregate):
             self.aggregate_error_B_1 = aggregate_error_B_1
             self.aggregate_error_B_2 = aggregate_error_B_2
@@ -944,7 +1049,7 @@ class BootstrapElectionModel(BaseElectionModel):
             self.aggregate_perc_margin_total = aggregate_perc_margin_total
 
         interval_upper, interval_lower = (
-            aggregate_perc_margin_total - # move into y space from residual space
+            aggregate_perc_margin_total -
             np.quantile(
                 aggregate_error_B, 
                 q=[lower_q, upper_q],
@@ -954,12 +1059,19 @@ class BootstrapElectionModel(BaseElectionModel):
         interval_upper = interval_upper.reshape(-1,1)
         interval_lower = interval_lower.reshape(-1,1)
 
-        return PredictionIntervals(interval_lower, interval_upper) # removed round
+        return PredictionIntervals(interval_lower.round(decimals=0), interval_upper.round(decimals=0))
 
     def get_national_summary_estimates(self, nat_sum_data_dict: dict, called_states: dict, base_to_add: int | float, alpha: float) -> list:
         """
         Generates and returns a national summary estimate (ie. electoral votes or total number of senate seats)
+        This function does both the point prediction and the lower and upper estimates
+
         First element in the list is the prediction, second is the lower end of the interval and third is the upper end of the interval
+
+        The point prediction and prediction intervals are very similar to get_aggregate_prediction / get_aggregate_prediction_intervals
+        except that we pass our bootstrapped preditions (and our stand-in for the "true" value) through a sigmoid (or a threshold) and assign
+        weights. This creates gives us bootstrapped national summary estimate (e.g. electoral votes), which we can use to generate
+        a prediction interval
         """
         # if nat_sum_data_dict is None then we assign 1 for every contest (ie. Senate or House)
         if nat_sum_data_dict is None:
