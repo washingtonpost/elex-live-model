@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from elexmodel.utils.file_utils import create_directory, get_directory_path
+from elexmodel.handlers.data.Estimandizer import Estimandizer
 
 LOG = logging.getLogger(__name__)
 
@@ -35,6 +36,7 @@ class PreprocessedDataHandler:
         self.s3_client = s3_client
         self.estimand_baselines = estimand_baselines
         self.historical = historical
+        self.estimandizer = Estimandizer()
 
         self.local_file_path = self.get_preprocessed_data_path()
 
@@ -88,12 +90,7 @@ class PreprocessedDataHandler:
             # so we don't care about the total voters or the baseline election.
             return preprocessed_data
 
-        for estimand, pointer in self.estimand_baselines.items():
-            baseline_name = f"baseline_{pointer}"
-            # Adding one to prevent zero divison
-            preprocessed_data[f"last_election_results_{estimand}"] = preprocessed_data[baseline_name].copy() + 1
-
-        return preprocessed_data
+        return self.estimandizer.add_estimand_baselines(preprocessed_data, self.estimand_baselines)
 
     def save_data(self, preprocessed_data):
         if not Path(self.local_file_path).parent.exists():

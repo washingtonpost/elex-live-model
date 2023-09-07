@@ -1,4 +1,8 @@
-import re
+from numpy import nan
+
+
+class EstimandException(Exception):
+    pass
 
 
 class Estimandizer:
@@ -6,144 +10,81 @@ class Estimandizer:
     Estimandizer. Generate estimands explicitly.
     """
 
-    def __init__(self, data_handler, election_type, estimand_fns={}):
-        self.data_handler = data_handler
-        self.election_type = election_type
-        self.estimand_fns = estimand_fns
-        self.transformations = []
-        self.transformation_map = {
-            "party_vote_share": [self.calculate_party_vote_share],
-            "candidate": [self.candidate],
-        }
+    def __init__(self):
+        self.RESULTS_PREFIX = "results_"
+        self.BASELINE_PREFIX = "baseline_"
 
-    def pre_check_estimands(self):
-        """
-        Check to see if the inputted estimand isn't one of the pre-specified values that should be already included.
-        If they are not included, then we will manually add them. This is dependent on if we set "dem" and/or "gop" as the inital estimand in order to have corresponding data columns.
-        """
-        standard = ["dem_votes", "gop_votes", "total_votes"]
-        if not self.check_input_columns(standard):
-            self.create_estimand(None, self.standard)
 
-    def check_input_columns(self, columns):
-        """
-        Function to check that input columns contain all neccessary values for a calculation.
-        """
-        missing_columns = [col for col in columns if col not in self.data_handler.data.columns]
-        return len(missing_columns) == 0
+    def check_and_create_estimands(self, data_df, estimands, historical):
+        columns_to_return = []
 
-    def verify_estimand(self, estimand):
-        """
-        Verify which pre-written estimands can be formed given a handler and a list of estimands we would like to create.
-        """
-        # Check if estimand is a supported value
-        if estimand not in self.transformation_map:
-            raise ValueError(f"Estimand '{estimand}' is not supported.")
-        self.transformations = self.transformation_map[estimand]
+        for estimand in estimands:
+            results_col = f"{self.RESULTS_PREFIX}{estimand}"
+            baseline_col = f"{self.BASELINE_PREFIX}{estimand}"
 
-        # Check if estimand function contains all the neccessary local variables to run
-        if not self.check_input_columns(
-            [col for transform in self.transformations for col in transform.__code__.co_varnames[1:]]
-        ):
-            return []
-
-        return self.transformations
-
-    def create_estimand(self, estimand=None, given_function=None):
-        """
-        Create an estimand given either a pre-written estimand name or a new function.
-        You must give either a estimand name or a pre-written function.
-        """
-        if estimand is None and given_function is not None:  # Builds an estimand given a function
-            if isinstance(given_function, str):
-                eval(f"{given_function}(self)")
+            if historical:
+                data_df[results_col] = nan
             else:
-                given_function()
-        else:  # Builds a pre-written estimand
-            if given_function is None and estimand is not None:
-                if estimand in self.transformation_map:
-                    if self.transformation_map[estimand][0] in self.transformations:
-                        transformation_func = self.transformations[
-                            self.transformations.index(self.transformation_map[estimand][0])
-                        ]
-                        transformation_func()
+                if results_col not in data_df.columns:
+                    raise EstimandException("This is missing results data for estimand: ", estimand)
+            columns_to_return.append(results_col)
 
-    def generate_estimands(self):
-        """
-        Main function to call for this class in order to generate estimands
-        """
-        self.pre_check_estimands()
+            if baseline_col not in data_df.columns:
+                raise EstimandException("Coming soon!")
 
-        for key, value in self.estimand_fns.items():
-            if value is None:  # Option 1: Pass in a list of estimands we want to build from a pre-set list
-                self.verify_estimand(key)
-                self.create_estimand(key, None)
+        results_column_names = [x for x in data_df.columns if x.startswith(self.RESULTS_PREFIX)]
+        # If this is not a historical run, then this is a live election
+        # so we are expecting that there will be actual results data
+        if not historical and len(results_column_names) == 0:
+            raise EstimandException("This is not a test election, it is missing results data")
 
-            else:  # Option 2: Pass in pre-built functions
-                self.create_estimand(None, value)
+        return (data_df, columns_to_return)
 
-        return self.data_handler
 
-    # Transformation methods
-    def standard(self):
-        """
-        Create/overwrite the standard estimands: ["dem_votes", "gop_votes", "total_votes"]
-        """
-        if "results_dem" in self.data_handler.data.columns:
-            self.data_handler.data["dem_votes"] = self.data_handler.data["results_dem"]
-        if "results_gop" in self.data_handler.data.columns:
-            self.data_handler.data["gop_votes"] = self.data_handler.data["results_gop"]
-        if "results_turnout" in self.data_handler.data.columns:
-            self.data_handler.data["total_votes"] = self.data_handler.data["results_turnout"]
-        elif (
-            "results_turnout" not in self.data_handler.data.columns
-            and "results_dem" in self.data_handler.data.columns
-            and "results_gop" in self.data_handler.data.columns
-        ):
-            self.data_handler.data["total_votes"] = (
-                self.data_handler.data["results_dem"] + self.data_handler.data["results_gop"]
-            )
-        else:
-            self.data_handler.data["total_votes"] = None
-            if "results_dem" in self.data_handler.data.columns and "results_gop" in self.data_handler.data.columns:
-                self.data_handler.data["results_dem"] = None
-                self.data_handler.data["results_gop"] = None
+    def add_estimand_baselines(self, data_df, estimand_baselines):
+        for estimand, pointer in estimand_baselines.items():
+            baseline_name = f"{self.BASELINE_PREFIX}{pointer}"
+            # Adding one to prevent zero divison
+            data_df[f"last_election_results_{estimand}"] = data_df[baseline_name].copy() + 1
 
-    def calculate_party_vote_share(self):
-        """
-        Create all possible estimands related to party vote shares
-        """
-        if "dem_votes" in self.data_handler.data.columns and "total_votes" in self.data_handler.data.columns:
-            self.data_handler.data["party_vote_share_dem"] = (
-                self.data_handler.data["dem_votes"] / self.data_handler.data["total_votes"]
-            )
-        if "gop_votes" in self.data_handler.data.columns and "total_votes" in self.data_handler.data.columns:
-            self.data_handler.data["party_vote_share_gop"] = (
-                self.data_handler.data["gop_votes"] / self.data_handler.data["total_votes"]
-            )
-        if (
-            "baseline_dem_votes" in self.data_handler.data.columns
-            and "baseline_total_votes" in self.data_handler.data.columns
-        ):
-            self.data_handler.data["baseline_party_vote_share_dem"] = (
-                self.data_handler.data["baseline_dem_votes"] / self.data_handler.data["baseline_total_votes"]
-            )
-        if (
-            "baseline_gop_votes" in self.data_handler.data.columns
-            and "baseline_total_votes" in self.data_handler.data.columns
-        ):
-            self.data_handler.data["baseline_party_vote_share_gop"] = (
-                self.data_handler.data["baseline_gop_votes"] / self.data_handler.data["baseline_total_votes"]
-            )
+        return data_df
 
-    def candidate(self):
-        """
-        Create estimands for a given candidate in a primary election
-        """
-        # cands_old = re.findall(r'results_(\w+)_(\d+)', self.data_handler.data.columns)
-        r = re.compile("results_*")
-        cands = list(filter(r.match, self.data_handler.data.columns))
-        # cand_set = set(candidate_data)
-        for cand_name in cands:
-            new_name = cand_name[8:]
-            self.data_handler.data[new_name] = self.data_handler.data[cand_name]
+
+    # def calculate_party_vote_share(self):
+    #     """
+    #     Create all possible estimands related to party vote shares
+    #     """
+    #     if "dem_votes" in self.data_handler.data.columns and "total_votes" in self.data_handler.data.columns:
+    #         self.data_handler.data["party_vote_share_dem"] = (
+    #             self.data_handler.data["dem_votes"] / self.data_handler.data["total_votes"]
+    #         )
+    #     if "gop_votes" in self.data_handler.data.columns and "total_votes" in self.data_handler.data.columns:
+    #         self.data_handler.data["party_vote_share_gop"] = (
+    #             self.data_handler.data["gop_votes"] / self.data_handler.data["total_votes"]
+    #         )
+    #     if (
+    #         "baseline_dem_votes" in self.data_handler.data.columns
+    #         and "baseline_total_votes" in self.data_handler.data.columns
+    #     ):
+    #         self.data_handler.data["baseline_party_vote_share_dem"] = (
+    #             self.data_handler.data["baseline_dem_votes"] / self.data_handler.data["baseline_total_votes"]
+    #         )
+    #     if (
+    #         "baseline_gop_votes" in self.data_handler.data.columns
+    #         and "baseline_total_votes" in self.data_handler.data.columns
+    #     ):
+    #         self.data_handler.data["baseline_party_vote_share_gop"] = (
+    #             self.data_handler.data["baseline_gop_votes"] / self.data_handler.data["baseline_total_votes"]
+    #         )
+
+    # def candidate(self):
+    #     """
+    #     Create estimands for a given candidate in a primary election
+    #     """
+    #     # cands_old = re.findall(r'results_(\w+)_(\d+)', self.data_handler.data.columns)
+    #     r = re.compile("results_*")
+    #     cands = list(filter(r.match, self.data_handler.data.columns))
+    #     # cand_set = set(candidate_data)
+    #     for cand_name in cands:
+    #         new_name = cand_name[8:]
+    #         self.data_handler.data[new_name] = self.data_handler.data[cand_name]

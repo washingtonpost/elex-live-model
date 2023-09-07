@@ -27,7 +27,7 @@ class CombinedDataHandler:
         # if unreporting is 'drop' then drop units that are not reporting (ie. units where results are na)
         # this is necessary if units will not be returning results in this election,
         # but we didn't know that (ie. townships)
-        result_cols = [f"results_{estimand}" for estimand in estimands]
+        result_cols = [f"results_{estimand}" for estimand in self.estimands]
         if handle_unreporting == "drop":
             # Drop the whole row if an estimand is not reporting
             data = data.dropna(axis=0, how="any", subset=result_cols)
