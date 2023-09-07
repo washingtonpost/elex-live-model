@@ -84,7 +84,7 @@ def va_governor_precinct_data(get_fixture):
     return get_fixture(path, load=False, pandas=True)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def va_governor_county_data(get_fixture):
     path = os.path.join("data", "2017-11-07_VA_G", "G", "data_county.csv")
     return get_fixture(path, load=False, pandas=True)

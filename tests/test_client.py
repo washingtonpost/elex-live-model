@@ -765,7 +765,7 @@ def test_estimandizer_input(model_client, va_governor_county_data, va_config):
     election_id = "2017-11-07_VA_G"
     office_id = "G"
     geographic_unit_type = "county"
-    estimands = ["turnout", "party_vote_share"]
+    estimands = ["turnout", "party_vote_share_dem"]
     prediction_intervals = [0.9]
     percent_reporting_threshold = 100
 

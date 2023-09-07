@@ -5,33 +5,37 @@ class EstimandException(Exception):
     pass
 
 
+RESULTS_PREFIX = "results_"
+BASELINE_PREFIX = "baseline_"
+
+
 class Estimandizer:
     """
     Estimandizer. Generate estimands explicitly.
     """
 
-    def __init__(self):
-        self.RESULTS_PREFIX = "results_"
-        self.BASELINE_PREFIX = "baseline_"
-
     def check_and_create_estimands(self, data_df, estimands, historical):
         columns_to_return = []
 
         for estimand in estimands:
-            results_col = f"{self.RESULTS_PREFIX}{estimand}"
-            baseline_col = f"{self.BASELINE_PREFIX}{estimand}"
+            results_col = f"{RESULTS_PREFIX}{estimand}"
+            baseline_col = f"{BASELINE_PREFIX}{estimand}"
+
+            if baseline_col not in data_df.columns:
+                # will raise a NotImplementedError if a function with the same name as `estimand`
+                # doesn't exist in this module
+                data_df = globals()[estimand](data_df)
+                data_df[results_col] = data_df[baseline_col].copy()  # TODO: is this right?
 
             if historical:
                 data_df[results_col] = nan
             else:
                 if results_col not in data_df.columns:
                     raise EstimandException("This is missing results data for estimand: ", estimand)
+
             columns_to_return.append(results_col)
 
-            if baseline_col not in data_df.columns:
-                raise EstimandException("Coming soon!")
-
-        results_column_names = [x for x in data_df.columns if x.startswith(self.RESULTS_PREFIX)]
+        results_column_names = [x for x in data_df.columns if x.startswith(RESULTS_PREFIX)]
         # If this is not a historical run, then this is a live election
         # so we are expecting that there will be actual results data
         if not historical and len(results_column_names) == 0:
@@ -41,38 +45,27 @@ class Estimandizer:
 
     def add_estimand_baselines(self, data_df, estimand_baselines):
         for estimand, pointer in estimand_baselines.items():
-            baseline_name = f"{self.BASELINE_PREFIX}{pointer}"
+            baseline_name = f"{BASELINE_PREFIX}{pointer}"
+
+            if baseline_name not in data_df.columns:
+                # will raise a NotImplementedError if a function with the same name as `estimand`
+                # doesn't exist in this module
+                data_df = globals()[pointer](data_df)
+
             # Adding one to prevent zero divison
             data_df[f"last_election_results_{estimand}"] = data_df[baseline_name].copy() + 1
 
         return data_df
 
-    # def calculate_party_vote_share(self):
-    #     """
-    #     Create all possible estimands related to party vote shares
-    #     """
-    #     if "dem_votes" in self.data_handler.data.columns and "total_votes" in self.data_handler.data.columns:
-    #         self.data_handler.data["party_vote_share_dem"] = (
-    #             self.data_handler.data["dem_votes"] / self.data_handler.data["total_votes"]
-    #         )
-    #     if "gop_votes" in self.data_handler.data.columns and "total_votes" in self.data_handler.data.columns:
-    #         self.data_handler.data["party_vote_share_gop"] = (
-    #             self.data_handler.data["gop_votes"] / self.data_handler.data["total_votes"]
-    #         )
-    #     if (
-    #         "baseline_dem_votes" in self.data_handler.data.columns
-    #         and "baseline_total_votes" in self.data_handler.data.columns
-    #     ):
-    #         self.data_handler.data["baseline_party_vote_share_dem"] = (
-    #             self.data_handler.data["baseline_dem_votes"] / self.data_handler.data["baseline_total_votes"]
-    #         )
-    #     if (
-    #         "baseline_gop_votes" in self.data_handler.data.columns
-    #         and "baseline_total_votes" in self.data_handler.data.columns
-    #     ):
-    #         self.data_handler.data["baseline_party_vote_share_gop"] = (
-    #             self.data_handler.data["baseline_gop_votes"] / self.data_handler.data["baseline_total_votes"]
-    #         )
+
+# custom estimands
+
+
+def party_vote_share_dem(data_df):
+    data_df[f"{BASELINE_PREFIX}party_vote_share_dem"] = (
+        data_df[f"{BASELINE_PREFIX}dem"] / data_df[f"{BASELINE_PREFIX}turnout"]
+    )
+    return data_df
 
     # def candidate(self):
     #     """
