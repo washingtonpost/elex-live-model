@@ -75,6 +75,26 @@ Parameters for the CLI tool:
 Note: When running the model with multiple fixed effects, make sure they are not linearly dependent. For example, `county_fips` and `county_classification` are linearly dependent when run together. That's because every county is in one county class, so all the fixed effect columns of the counties in the county class sum up to the fixed effect column of that county class.
 
 
+#### Custom Estimands
+
+It's possible to create a custom estimand based on other data elements.  Here's how to create a new estimand called "my_estimand":
+
+1. In `src/elexmodel/handlers/data/Estimandizer.py`, create a function with the signature `def my_estimand(data_df)`.
+2. In `my_estimand()`, use the columns in `data_df` to create a new column, `baseline_my_estimand`.  See the `party_vote_share_dem` function for an example.
+3. Specify `my_estimand` as one of your estimands.  For example, via the command line:
+
+```
+elexmodel 2017-11-07_VA_G --estimands my_estimand --office_id=G --geographic_unit_type=county --percent_reporting 50
+```
+
+Your output should have columns including `baseline_my_estimand`, `results_my_estimand`, and related columns for the prediction intervals, if using them.
+
+Here's an example showing multiple estimands, including `my_estimand`:
+
+```
+elexmodel 2017-11-07_VA_G --estimands=turnout --estimands my_estimand --estimands party_vote_share_dem --office_id=G --geographic_unit_type=county --percent_reporting 50
+```
+
 #### Python
 
 ##### Model Parameters
