@@ -1,3 +1,5 @@
+import logging
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -5,7 +7,10 @@ import pytest
 from elexmodel.client import ModelNotEnoughSubunitsException
 from elexmodel.handlers.config import ConfigHandler
 from elexmodel.handlers.data.LiveData import MockLiveDataHandler
+from elexmodel.logging import initialize_logging
 from elexmodel.utils import math_utils
+
+initialize_logging()
 
 # A set of valid model parameters
 office = "G"
@@ -80,15 +85,15 @@ def test_check_input_parameters_pi_method(model_client, va_config):
         )
 
 
-def test_check_input_parameters_estimand(model_client, va_config):
+def test_check_input_parameters_estimand(caplog, model_client, va_config):
     election_id = "2017-11-07_VA_G"
     config_handler = ConfigHandler(election_id, config=va_config)
 
-    with pytest.raises(ValueError):
+    with caplog.at_level(logging.INFO):
         model_client._check_input_parameters(
             config_handler,
             office,
-            ["estimand"],
+            ["foo"],
             geographic_unit_type,
             features,
             aggregates,
@@ -97,6 +102,8 @@ def test_check_input_parameters_estimand(model_client, va_config):
             model_parameters,
             handle_unreporting,
         )
+
+    assert "Found additional estimands " in caplog.text
 
 
 def test_check_input_parameters_geographic_unit_type(model_client, va_config):
@@ -792,5 +799,5 @@ def test_estimandizer_input(model_client, va_governor_county_data, va_config):
             preprocessed_data=preprocessed_data,
             save_output=[],
         )
-    except ValueError:
+    except KeyError:
         pytest.raises("Error with clinet input for estimandizer")

@@ -44,6 +44,10 @@ class Estimandizer:
 
     def add_estimand_baselines(self, data_df, estimand_baselines):
         for estimand, pointer in estimand_baselines.items():
+            if pointer is None:
+                # should only happen when we're going to create a new estimand
+                pointer = estimand
+
             baseline_name = f"{BASELINE_PREFIX}{pointer}"
 
             if baseline_name not in data_df.columns:

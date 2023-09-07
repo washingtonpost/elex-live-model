@@ -61,14 +61,7 @@ class ConfigHandler:
     def get_baseline_pointer(self, office):
         # then we are using the old configs, without baseline pointers
         return self._get_office_subconfig(office).get(
-            "baseline_pointer",
-            {
-                "dem": "dem",
-                "gop": "gop",
-                "turnout": "turnout",
-                "party_vote_share_dem": "party_vote_share_dem",
-                "party_vote_share_gop": "party_vote_share_gop",
-            },
+            "baseline_pointer", {"dem": "dem", "gop": "gop", "turnout": "turnout"}
         )
 
     def get_estimand_baselines(self, office, estimands):
