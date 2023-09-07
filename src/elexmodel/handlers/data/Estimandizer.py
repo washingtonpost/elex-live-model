@@ -14,7 +14,6 @@ class Estimandizer:
         self.RESULTS_PREFIX = "results_"
         self.BASELINE_PREFIX = "baseline_"
 
-
     def check_and_create_estimands(self, data_df, estimands, historical):
         columns_to_return = []
 
@@ -40,7 +39,6 @@ class Estimandizer:
 
         return (data_df, columns_to_return)
 
-
     def add_estimand_baselines(self, data_df, estimand_baselines):
         for estimand, pointer in estimand_baselines.items():
             baseline_name = f"{self.BASELINE_PREFIX}{pointer}"
@@ -48,7 +46,6 @@ class Estimandizer:
             data_df[f"last_election_results_{estimand}"] = data_df[baseline_name].copy() + 1
 
         return data_df
-
 
     # def calculate_party_vote_share(self):
     #     """

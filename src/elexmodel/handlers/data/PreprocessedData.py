@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from elexmodel.utils.file_utils import create_directory, get_directory_path
 from elexmodel.handlers.data.Estimandizer import Estimandizer
+from elexmodel.utils.file_utils import create_directory, get_directory_path
 
 LOG = logging.getLogger(__name__)
 

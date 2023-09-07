@@ -5,8 +5,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from elexmodel.utils.file_utils import get_directory_path
 from elexmodel.handlers.data.Estimandizer import Estimandizer
+from elexmodel.utils.file_utils import get_directory_path
 
 
 class MockLiveDataHandler:
@@ -84,8 +84,7 @@ class MockLiveDataHandler:
     def load_data(self, data):
         columns_to_return = ["postal_code", "geographic_unit_fips"]
 
-        (data, more_columns) = self.estimandizer.check_and_create_estimands(
-            data, self.estimands, self.historical)
+        (data, more_columns) = self.estimandizer.check_and_create_estimands(data, self.estimands, self.historical)
         columns_to_return += more_columns
 
         self.shuffle_dataframe = data[self.shuffle_columns].copy()
