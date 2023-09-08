@@ -1,10 +1,7 @@
-import math
-
 import numpy as np
 import pandas as pd
 import statsmodels.formula.api as smf
 from scipy.optimize import linprog
-from scipy.stats import norm
 
 from elexmodel.handlers.data.Featurizer import Featurizer
 from elexmodel.models.BaseElectionModel import BaseElectionModel, PredictionIntervals
