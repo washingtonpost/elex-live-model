@@ -42,20 +42,27 @@ class Estimandizer:
 
         return (data_df, columns_to_return)
 
-    def add_estimand_baselines(self, data_df, estimand_baselines):
+    def add_estimand_baselines(self, data_df, estimand_baselines, historical):
+        # if we are in a historical election we are only reading preprocessed data to get
+        # the historical election results of the currently reporting units.
+        # so we don't care about the total voters or the baseline election.
+
         for estimand, pointer in estimand_baselines.items():
             if pointer is None:
                 # should only happen when we're going to create a new estimand
                 pointer = estimand
 
-            baseline_name = f"{BASELINE_PREFIX}{pointer}"
+            baseline_col = f"{BASELINE_PREFIX}{pointer}"
 
-            if baseline_name not in data_df.columns:
+            if baseline_col not in data_df.columns:
                 # will raise a KeyError if a function with the same name as `pointer` doesn't exist
                 data_df = globals()[pointer](data_df)
+                results_col = f"{RESULTS_PREFIX}{estimand}"
+                data_df[results_col] = data_df[baseline_col].copy()
 
-            # Adding one to prevent zero divison
-            data_df[f"last_election_results_{estimand}"] = data_df[baseline_name].copy() + 1
+            if not historical:
+                # Adding one to prevent zero divison
+                data_df[f"last_election_results_{estimand}"] = data_df[baseline_col].copy() + 1
 
         return data_df
 

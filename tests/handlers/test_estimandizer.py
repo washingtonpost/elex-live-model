@@ -32,8 +32,19 @@ def test_check_and_create_estimands_historical(va_governor_county_data):
     assert result_columns == ["results_party_vote_share_dem"]
 
 
-def test_add_estimand_baselines(va_governor_county_data):
+def test_add_estimand_baselines_not_historical(va_governor_county_data):
     estimand_baselines = {"turnout": "turnout", "party_vote_share_dem": "party_vote_share_dem"}
     estimandizer = Estimandizer()
-    output_df = estimandizer.add_estimand_baselines(va_governor_county_data.copy(), estimand_baselines)
+    output_df = estimandizer.add_estimand_baselines(va_governor_county_data.copy(), estimand_baselines, False)
     assert "baseline_party_vote_share_dem" in output_df.columns
+    assert "results_party_vote_share_dem" in output_df.columns
+    assert "last_election_results_party_vote_share_dem" in output_df.columns
+
+
+def test_add_estimand_baselines_historical(va_governor_county_data):
+    estimand_baselines = {"turnout": "turnout", "party_vote_share_dem": "party_vote_share_dem"}
+    estimandizer = Estimandizer()
+    output_df = estimandizer.add_estimand_baselines(va_governor_county_data.copy(), estimand_baselines, True)
+    assert "baseline_party_vote_share_dem" in output_df.columns
+    assert "results_party_vote_share_dem" in output_df.columns
+    assert "last_election_results_party_vote_share_dem" not in output_df.columns

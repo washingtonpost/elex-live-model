@@ -84,13 +84,7 @@ class PreprocessedDataHandler:
         """
         LOG.info("Loading preprocessed data: %s, %s, %s", self.election_id, self.office, self.geographic_unit_type)
 
-        if self.historical:
-            # if we are in a historical election we are only reading preprocessed data to get
-            # the historical election results of the currently reporting units.
-            # so we don't care about the total voters or the baseline election.
-            return preprocessed_data
-
-        return self.estimandizer.add_estimand_baselines(preprocessed_data, self.estimand_baselines)
+        return self.estimandizer.add_estimand_baselines(preprocessed_data, self.estimand_baselines, self.historical)
 
     def save_data(self, preprocessed_data):
         if not Path(self.local_file_path).parent.exists():
