@@ -85,9 +85,9 @@ class MockLiveDataHandler:
 
     def load_data(self, data, estimands, historical):
         columns_to_return = ["postal_code", "geographic_unit_fips"]
-        estimands_to_use = ['turnout'] # in any case we want the turnout in order to compute turnout_factor
-        if 'margin' in estimands:
-            estimands_to_use = estimands_to_use + ['dem', 'gop']
+        estimands_to_use = ["turnout"]  # in any case we want the turnout in order to compute turnout_factor
+        if "margin" in estimands:
+            estimands_to_use = estimands_to_use + ["dem", "gop"]
             columns_to_return.extend(["results_margin", "normalized_margin"])
         else:
             estimands_to_use = list(set(estimands + estimands_to_use))
@@ -103,11 +103,11 @@ class MockLiveDataHandler:
             if f"results_{estimand}" not in results_column_names:
                 raise MockLiveDataHandlerException("This is missing results data for estimand: ", estimand)
             columns_to_return.append(f"results_{estimand}")
-            
+
         # TODO: move to estimandizer
-        if 'margin' in estimands:
-            data['results_margin'] = data.results_dem - data.results_gop
-            data['normalized_margin'] = (data.results_dem - data.results_gop) / (data.results_dem + data.results_gop)
+        if "margin" in estimands:
+            data["results_margin"] = data.results_dem - data.results_gop
+            data["normalized_margin"] = (data.results_dem - data.results_gop) / (data.results_dem + data.results_gop)
 
         self.shuffle_dataframe = data[self.shuffle_columns].copy()
 

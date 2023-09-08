@@ -23,7 +23,6 @@ class Featurizer:
                 else:
                     self.fixed_effect_params[fe] = params
 
-
         # we differentiate between expanded fixed effects and active fixed effect values
         # expanded fixed effects are those fixed effect values that appear in any part of the
         # the data (fitting or heldout) exlcluding those that have been dropped to avoid
@@ -63,21 +62,23 @@ class Featurizer:
         """
         return [x for x in list_ if x.startswith(fe)]
 
-    def prepare_data(self, df: pd.DataFrame, center_features: bool = True, scale_features: bool = True, add_intercept: bool = True) -> pd.DataFrame:
+    def prepare_data(
+        self, df: pd.DataFrame, center_features: bool = True, scale_features: bool = True, add_intercept: bool = True
+    ) -> pd.DataFrame:
         """
-        Prepares features. 
+        Prepares features.
         Adds dummy variables for fixed effects. Also includes centering, scaling continuous covariates and adding intercept.
         """
-        df = df.copy() # create copy so we can do things to the values
+        df = df.copy()  # create copy so we can do things to the values
         if center_features:
             df[self.features] -= df[self.features].mean()
         if scale_features:
             # this expects there to be some variation in the data, otherwise we are dividing by zero
             df[self.features] /= df[self.features].std()
         if add_intercept:
-            self.complete_features += ['intercept']
-            self.active_features += ['intercept']
-            df['intercept'] = 1
+            self.complete_features += ["intercept"]
+            self.active_features += ["intercept"]
+            df["intercept"] = 1
 
         if len(self.fixed_effect_cols) > 0:
             df = self._expand_fixed_effects(df)
@@ -101,8 +102,12 @@ class Featurizer:
             # if we add an intercept we need to drop a value/column per fixed effect in order to avoid multicolinearity.
             # the intercept column is now a stand-in for the the dropped fixed effect value/column
             if add_intercept:
-                active_fixed_effects = [] # fixed effects that exist in the fitting_data (excluding one dropped column to avoid multicolinearity)
-                intercept_column = [] # we need to save the fixed effect categories that the intercept is now standing in for
+                active_fixed_effects = (
+                    []
+                )  # fixed effects that exist in the fitting_data (excluding one dropped column to avoid multicolinearity)
+                intercept_column = (
+                    []
+                )  # we need to save the fixed effect categories that the intercept is now standing in for
                 # we want to drop one value/column per fixed effect to avoid multicolinearity
                 for fe in self.fixed_effect_cols:
                     # grab the potentially active fixed effect names for this fixed effect
@@ -111,7 +116,7 @@ class Featurizer:
                     active_fixed_effects.extend(fe_fixed_effect_filter[1:])
                     # save the name of the fixed effect that we dropped
                     intercept_column.append(fe_fixed_effect_filter[0])
-            
+
                 self.active_fixed_effects = active_fixed_effects
                 self.intercept_column = intercept_column
                 # expanded fixed effects do not include the ones that we dropped to avoid multicolinearity
@@ -125,7 +130,7 @@ class Featurizer:
         self.complete_features += self.features + self.expanded_fixed_effects
         self.active_features += self.features + self.active_fixed_effects
         df = df[self.complete_features]
-        
+
         return df
 
     def filter_to_active_features(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -133,7 +138,7 @@ class Featurizer:
         Get active features (ie. features + active fixed effects)
         """
         return df[self.active_features]
-    
+
     def generate_holdout_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Generate fixed effects for the holdout data (ie. data that we will predict on)

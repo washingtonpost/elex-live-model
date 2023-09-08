@@ -17,8 +17,16 @@ def test_centering_features():
     df = pd.DataFrame({"a": [1, 1, 1, 1], "b": [2, 2, 2, 2], "c": [3, 3, np.nan, 3], "d": [1, 2, 3, 4]})
 
     df_new = featurizer.prepare_data(df, center_features=True, scale_features=False, add_intercept=False)
-    df_expected_result = pd.DataFrame({"a": [0.0, 0.0, 0.0, 0.0], "b": [0.0, 0.0, 0.0, 0.0], "c": [0.0, 0.0, np.nan, 0.0], "d": [-1.5, -0.5, 0.5, 1.5]})
+    df_expected_result = pd.DataFrame(
+        {
+            "a": [0.0, 0.0, 0.0, 0.0],
+            "b": [0.0, 0.0, 0.0, 0.0],
+            "c": [0.0, 0.0, np.nan, 0.0],
+            "d": [-1.5, -0.5, 0.5, 1.5],
+        }
+    )
     pd.testing.assert_frame_equal(df_new, df_expected_result)
+
 
 def test_adding_intercept():
     """
@@ -36,6 +44,7 @@ def test_adding_intercept():
     assert "intercept" in featurizer.active_features
     pd.testing.assert_series_equal(df_new.intercept, pd.Series([1, 1, 1, 1], name="intercept"))
 
+
 def test_scaling_features():
     """
     Test whether scaling features works
@@ -48,7 +57,14 @@ def test_scaling_features():
 
     df_new = featurizer.prepare_data(df, center_features=False, scale_features=True, add_intercept=False)
 
-    df_expected_result = pd.DataFrame({"a": [2.0, 2.0, 2.0, 4.0], "b": [1.0, 1.0, 1.0, 3.0], "c": [0.5, 0.5, 0.5, 2.5], "d": [np.inf, np.inf, np.inf, np.inf]})
+    df_expected_result = pd.DataFrame(
+        {
+            "a": [2.0, 2.0, 2.0, 4.0],
+            "b": [1.0, 1.0, 1.0, 3.0],
+            "c": [0.5, 0.5, 0.5, 2.5],
+            "d": [np.inf, np.inf, np.inf, np.inf],
+        }
+    )
     pd.testing.assert_frame_equal(df_new, df_expected_result)
 
 
@@ -63,16 +79,18 @@ def test_column_names():
     split_fitting_heldout = 4
     # fe_a: "c" exists in fitting but not in heldout, "d" exists in heldout but not in fitting
     # fe_b: "x", "7" and "y" exist in fitting but not in heldout, "z", "w" exist in heldout but not in fitting
-    df = pd.DataFrame({
-        "a": [5, 3, 1, 5, 2, 2, 2, 2],
-        "b": [2, 2, 2, 2, 3, 3, 3, 3],
-        "c": [3, 3, 3, 3, 1, 2, 3, 4],
-        "d": [1, 2, 3, 4, 5, 3, 1, 5],
-        "fe_a": ["a", "a", "b", "c", "a", "a", "b", "d"], 
-        "fe_b": ["1", "x", "7", "y", "1", "z", "z", "w"],
-        "reporting": [True, True, True, True, False, False, False, False],
-        "expected": [True, True, True, True, False, False, False, False]
-    })
+    df = pd.DataFrame(
+        {
+            "a": [5, 3, 1, 5, 2, 2, 2, 2],
+            "b": [2, 2, 2, 2, 3, 3, 3, 3],
+            "c": [3, 3, 3, 3, 1, 2, 3, 4],
+            "d": [1, 2, 3, 4, 5, 3, 1, 5],
+            "fe_a": ["a", "a", "b", "c", "a", "a", "b", "d"],
+            "fe_b": ["1", "x", "7", "y", "1", "z", "z", "w"],
+            "reporting": [True, True, True, True, False, False, False, False],
+            "expected": [True, True, True, True, False, False, False, False],
+        }
+    )
 
     df_new = featurizer.prepare_data(df, center_features=False, scale_features=False, add_intercept=True)
 
@@ -80,46 +98,47 @@ def test_column_names():
     df_heldout = featurizer.generate_holdout_data(df_new[split_fitting_heldout:])
     assert (df_fitting.columns == df_heldout.columns).all()
 
-    assert 'a' in df_fitting.columns
-    assert 'a' in df_heldout.columns
-    assert 'a' in featurizer.features
-    assert 'a' in featurizer.active_features
-    assert 'a' in featurizer.complete_features
+    assert "a" in df_fitting.columns
+    assert "a" in df_heldout.columns
+    assert "a" in featurizer.features
+    assert "a" in featurizer.active_features
+    assert "a" in featurizer.complete_features
 
-    assert 'fe_a' in featurizer.fixed_effect_cols
-    assert 'fe_a' in featurizer.fixed_effect_params.keys()
+    assert "fe_a" in featurizer.fixed_effect_cols
+    assert "fe_a" in featurizer.fixed_effect_params.keys()
 
     # a is in fitting and in heldout BUT it's the first and therefore dropped to avoid multicolinearity
-    assert 'fe_a_a' not in featurizer.expanded_fixed_effects
-    assert 'fe_a_a' not in featurizer.active_fixed_effects
-    assert 'fe_a_a' not in featurizer.active_features
-    assert 'fe_a_a' not in featurizer.complete_features
-    assert 'fe_a_a' not in df_fitting.columns
-    assert 'fe_a_a' not in df_heldout.columns
+    assert "fe_a_a" not in featurizer.expanded_fixed_effects
+    assert "fe_a_a" not in featurizer.active_fixed_effects
+    assert "fe_a_a" not in featurizer.active_features
+    assert "fe_a_a" not in featurizer.complete_features
+    assert "fe_a_a" not in df_fitting.columns
+    assert "fe_a_a" not in df_heldout.columns
 
     # b is in fitting and in heldout
-    assert 'fe_a_b' in featurizer.expanded_fixed_effects
-    assert 'fe_a_b' in featurizer.active_fixed_effects
-    assert 'fe_a_b' in featurizer.active_features
-    assert 'fe_a_b' in featurizer.complete_features
-    assert 'fe_a_b' in df_fitting.columns
-    assert 'fe_a_b' in df_heldout.columns
+    assert "fe_a_b" in featurizer.expanded_fixed_effects
+    assert "fe_a_b" in featurizer.active_fixed_effects
+    assert "fe_a_b" in featurizer.active_features
+    assert "fe_a_b" in featurizer.complete_features
+    assert "fe_a_b" in df_fitting.columns
+    assert "fe_a_b" in df_heldout.columns
 
     # c is in fitting but not in heldout
-    assert 'fe_a_c' in featurizer.expanded_fixed_effects
-    assert 'fe_a_c' in featurizer.active_fixed_effects
-    assert 'fe_a_c' in featurizer.active_features
-    assert 'fe_a_c' in featurizer.complete_features
-    assert 'fe_a_c' in df_fitting.columns
-    assert 'fe_a_c' in df_heldout.columns # should still be in heldout since added manually
+    assert "fe_a_c" in featurizer.expanded_fixed_effects
+    assert "fe_a_c" in featurizer.active_fixed_effects
+    assert "fe_a_c" in featurizer.active_features
+    assert "fe_a_c" in featurizer.complete_features
+    assert "fe_a_c" in df_fitting.columns
+    assert "fe_a_c" in df_heldout.columns  # should still be in heldout since added manually
 
     # d is not in fitting but in heldout
-    assert 'fe_a_d' in featurizer.expanded_fixed_effects
-    assert 'fe_a_d' not in featurizer.active_fixed_effects
-    assert 'fe_a_d' not in featurizer.active_features
-    assert 'fe_a_d' in featurizer.complete_features
-    assert 'fe_a_d' not in df_fitting.columns
-    assert 'fe_a_d' not in df_heldout.columns
+    assert "fe_a_d" in featurizer.expanded_fixed_effects
+    assert "fe_a_d" not in featurizer.active_fixed_effects
+    assert "fe_a_d" not in featurizer.active_features
+    assert "fe_a_d" in featurizer.complete_features
+    assert "fe_a_d" not in df_fitting.columns
+    assert "fe_a_d" not in df_heldout.columns
+
 
 def test_generating_heldout_set():
     """
@@ -132,16 +151,18 @@ def test_generating_heldout_set():
     split_fitting_heldout = 4
     # fe_a: "c" exists in fitting but not in heldout, "d" exists in heldout but not in fitting
     # fe_b: "x", "7" and "y" exist in fitting but not in heldout, "z", "w" exist in heldout but not in fitting
-    df = pd.DataFrame({
-        "a": [5, 3, 1, 5, 2, 2, 2, 2],
-        "b": [2, 2, 2, 2, 3, 3, 3, 3],
-        "c": [3, 3, 3, 3, 1, 2, 3, 4],
-        "d": [1, 2, 3, 4, 5, 3, 1, 5],
-        "fe_a": ["a", "a", "b", "c", "a", "a", "b", "d"], 
-        "fe_b": ["1", "x", "7", "y", "1", "z", "z", "w"],
-        "reporting": [True, True, True, True, False, False, False, False],
-        "expected": [True, True, True, True, False, False, False, False]
-    })
+    df = pd.DataFrame(
+        {
+            "a": [5, 3, 1, 5, 2, 2, 2, 2],
+            "b": [2, 2, 2, 2, 3, 3, 3, 3],
+            "c": [3, 3, 3, 3, 1, 2, 3, 4],
+            "d": [1, 2, 3, 4, 5, 3, 1, 5],
+            "fe_a": ["a", "a", "b", "c", "a", "a", "b", "d"],
+            "fe_b": ["1", "x", "7", "y", "1", "z", "z", "w"],
+            "reporting": [True, True, True, True, False, False, False, False],
+            "expected": [True, True, True, True, False, False, False, False],
+        }
+    )
 
     df_new = featurizer.prepare_data(df, center_features=False, scale_features=False, add_intercept=True)
 
@@ -150,24 +171,24 @@ def test_generating_heldout_set():
     "a" in df_heldout.columns
     "b" in df_heldout.columns
     "c" in df_heldout.columns
-    "d" not in df_heldout.columns # not specified in features
+    "d" not in df_heldout.columns  # not specified in features
 
-    "fe_a_a" not in df_heldout.columns # dropped to avoid multicolinearity
+    "fe_a_a" not in df_heldout.columns  # dropped to avoid multicolinearity
     "fe_a_b" in df_heldout.columns
     "fe_a_c" in df_heldout.columns
-    "fe_a_d" not in df_heldout.columns # not an active fixed effect
+    "fe_a_d" not in df_heldout.columns  # not an active fixed effect
 
-    assert df_heldout.loc[6, "fe_a_b"]  == 1 # since row 7 has an inactive fixed effect
-    assert df_heldout.loc[7, "fe_a_b"]  == 1/3 # since row 7 has an inactive fixed effect
-    assert df_heldout.loc[7, "fe_a_c"]  == 1/3 # since row 7 has an inactive fixed effect
+    assert df_heldout.loc[6, "fe_a_b"] == 1  # since row 7 has an inactive fixed effect
+    assert df_heldout.loc[7, "fe_a_b"] == 1 / 3  # since row 7 has an inactive fixed effect
+    assert df_heldout.loc[7, "fe_a_c"] == 1 / 3  # since row 7 has an inactive fixed effect
 
-    "fe_b_1" not in df_heldout.columns # dropped to avoid multicolinearity
+    "fe_b_1" not in df_heldout.columns  # dropped to avoid multicolinearity
     "fe_b_x" in df_heldout.columns
-    "fe_b_z" not in df_heldout.columns # inactive
+    "fe_b_z" not in df_heldout.columns  # inactive
 
-    assert df_heldout.loc[6, "fe_a_b"]  == 1 # since row 7 has an inactive fixed effect
-    assert df_heldout.loc[7, "fe_a_b"]  == 1/3 # since row 7 has an inactive fixed effect
-    assert df_heldout.loc[7, "fe_a_c"]  == 1/3 # since row 7 has an inactive fixed effect
+    assert df_heldout.loc[6, "fe_a_b"] == 1  # since row 7 has an inactive fixed effect
+    assert df_heldout.loc[7, "fe_a_b"] == 1 / 3  # since row 7 has an inactive fixed effect
+    assert df_heldout.loc[7, "fe_a_c"] == 1 / 3  # since row 7 has an inactive fixed effect
 
     # element 4 has the dropped fixed effect value in fe_b and so should only have an intercept
     assert df_heldout.loc[4, "intercept"] == 1
@@ -180,7 +201,6 @@ def test_generating_heldout_set():
     assert df_heldout.loc[5, "fe_b_7"] == 1 / 4
     assert df_heldout.loc[5, "fe_b_x"] == 1 / 4
     assert df_heldout.loc[5, "fe_b_y"] == 1 / 4
-
 
 
 def test_expanding_fixed_effects_basic():
@@ -298,6 +318,7 @@ def test_expand_fixed_effects_selective():
             }
         ).sort_index(axis=1),
     )
+
 
 def test_generate_fixed_effects(va_governor_county_data):
     """
@@ -452,7 +473,7 @@ def test_generate_fixed_effects_not_all_reporting(va_governor_county_data):
     assert (
         "county_fips_51790" not in nonreporting_data_features.columns
     )  # not in here because not in featurizer.complete_features
-    
+
     assert "county_fips" in featurizer.fixed_effect_cols
     assert len(featurizer.expanded_fixed_effects) == 133 - 1
     assert len(featurizer.active_fixed_effects) == n - 1
@@ -505,7 +526,7 @@ def test_generate_fixed_effects_mixed_reporting(va_governor_precinct_data):
     assert combined_data_handler.data.shape == (2360, 34)
 
     n_expected_columns = 7  # when n = 100 we get to county 51013 (minus dropped fixed effect, plus intercept)
-    assert reporting_data_features.shape == (n_train, n_expected_columns) # use n_train since dropping columns
+    assert reporting_data_features.shape == (n_train, n_expected_columns)  # use n_train since dropping columns
     assert nonreporting_data_features.shape == (n_test, n_expected_columns)
 
     assert "county_fips_51001" not in reporting_data_features.columns  # dropped from get_dummies because first

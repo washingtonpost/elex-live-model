@@ -1,7 +1,8 @@
+import numpy as np
+
 from elexmodel.handlers import s3
 from elexmodel.utils.file_utils import S3_FILE_PATH, TARGET_BUCKET, convert_df_to_csv
 
-import numpy as np
 
 class CombinedDataHandler:
     """
@@ -27,8 +28,8 @@ class CombinedDataHandler:
         data = preprocessed_data.merge(current_data, how="left", on=["postal_code", "geographic_unit_fips"])
         result_cols = [f"results_{estimand}" for estimand in estimands]
         # TODO: deal with this somewhere else
-        if 'margin' in estimands:
-            result_cols.extend(['normalized_margin'])
+        if "margin" in estimands:
+            result_cols.extend(["normalized_margin"])
         # if unreporting is 'drop' then drop units that are not passing results (ie. units where results are na)
         # this is necessary if units will not be returning results in this election, but we didn't know that (ie. townships)
         if handle_unreporting == "drop":
@@ -43,14 +44,21 @@ class CombinedDataHandler:
 
         # TODO: move to estimandizer
         # assumes that data.weights > 0, which means we cannot have units where turnout (or two party turnout) was zero
-        data['turnout_factor'] = data.results_turnout / data.weights
-        if 'margin' in estimands:
+        data["turnout_factor"] = data.results_turnout / data.weights
+        if "margin" in estimands:
             # overwrite to make two party comparison fair
-            data['turnout_factor'] = np.nan_to_num((data.results_dem + data.results_gop) / data.weights)
+            data["turnout_factor"] = np.nan_to_num((data.results_dem + data.results_gop) / data.weights)
 
         self.data = data
 
-    def get_reporting_units(self, percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper, features_to_normalize=[], add_intercept=True):
+    def get_reporting_units(
+        self,
+        percent_reporting_threshold,
+        turnout_factor_lower,
+        turnout_factor_upper,
+        features_to_normalize=[],
+        add_intercept=True,
+    ):
         """
         Get reporting data. These are units where the expected vote is greater than the percent reporting threshold.
         """
@@ -61,7 +69,6 @@ class CombinedDataHandler:
         reporting_units = reporting_units[reporting_units.turnout_factor > turnout_factor_lower]
         reporting_units = reporting_units[reporting_units.turnout_factor < turnout_factor_upper]
 
-
         # residualize + normalize
         for estimand in self.estimands:
             reporting_units[f"residuals_{estimand}"] = (
@@ -69,22 +76,29 @@ class CombinedDataHandler:
             ) / reporting_units[f"last_election_results_{estimand}"]
 
         reporting_units["reporting"] = int(1)
-        reporting_units['expected'] = True
+        reporting_units["expected"] = True
 
         return reporting_units
 
-    def get_nonreporting_units(self, percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper, features_to_normalize=[], add_intercept=True):
+    def get_nonreporting_units(
+        self,
+        percent_reporting_threshold,
+        turnout_factor_lower,
+        turnout_factor_upper,
+        features_to_normalize=[],
+        add_intercept=True,
+    ):
         """
         Get nonreporting data. These are units where expected vote is less than the percent reporting threshold
         """
         # if turnout factor <= 0.2 assume the AP made a mistake and treat them as non-reporting units
         nonreporting_units = self.data.query(
-            "(percent_expected_vote < @percent_reporting_threshold) | (turnout_factor <= @turnout_factor_upper) | (turnout_factor >= @turnout_factor_lower)" #
+            "(percent_expected_vote < @percent_reporting_threshold) | (turnout_factor <= @turnout_factor_upper) | (turnout_factor >= @turnout_factor_lower)"  #
         ).reset_index(  # not checking if results.isnull() anymore across multiple estimands
             drop=True
         )
         nonreporting_units["reporting"] = int(0)
-        nonreporting_units['expected'] = True
+        nonreporting_units["expected"] = True
 
         return nonreporting_units
 
@@ -104,7 +118,7 @@ class CombinedDataHandler:
         """
         components = geographic_unit_fips.split("_")
         if "district" in self.geographic_unit_type:
-            return components[0] # CHANGE BACK
+            return components[0]  # CHANGE BACK
         return components[0]
 
     def _get_district_from_geographic_unit_fips(self, geographic_unit_fips):
@@ -112,7 +126,7 @@ class CombinedDataHandler:
         Get district from geographic unit fips
         """
         components = geographic_unit_fips.split("_")
-        return str(int(components[1])) # CHANGE BACK
+        return str(int(components[1]))  # CHANGE BACK
 
     def get_unexpected_units(self, percent_reporting_threshold, aggregates):
         """
@@ -138,7 +152,7 @@ class CombinedDataHandler:
             )
 
         unexpected_units["reporting"] = int(1)
-        unexpected_units['expected'] = False
+        unexpected_units["expected"] = False
 
         return unexpected_units
 

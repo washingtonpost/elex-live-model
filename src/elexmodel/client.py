@@ -10,9 +10,9 @@ from elexmodel.handlers.data.CombinedData import CombinedDataHandler
 from elexmodel.handlers.data.ModelResults import ModelResultsHandler
 from elexmodel.handlers.data.PreprocessedData import PreprocessedDataHandler
 from elexmodel.logging import initialize_logging
+from elexmodel.models.BootstrapElectionModel import BootstrapElectionModel
 from elexmodel.models.ConformalElectionModel import ConformalElectionModel
 from elexmodel.models.GaussianElectionModel import GaussianElectionModel
-from elexmodel.models.BootstrapElectionModel import BootstrapElectionModel
 from elexmodel.models.NonparametricElectionModel import NonparametricElectionModel
 from elexmodel.utils.constants import AGGREGATE_ORDER, DEFAULT_AGGREGATES, VALID_AGGREGATES_MAPPING
 from elexmodel.utils.file_utils import APP_ENV, S3_FILE_PATH, TARGET_BUCKET
@@ -96,9 +96,13 @@ class ModelClient:
                 not isinstance(model_parameters["lambda_"], (float, int)) or model_parameters["lambda_"] < 0
             ):
                 raise ValueError("lambda is not valid. It has to be numeric and greater than zero.")
-            if 'turnout_factor_lower' in model_parameters and not isinstance(model_parameters["turnout_factor_lower"], float):
+            if "turnout_factor_lower" in model_parameters and not isinstance(
+                model_parameters["turnout_factor_lower"], float
+            ):
                 raise ValueError("turnout_factor_lower is not valid. Has to be a float.")
-            if 'turnout_factor_upper' in model_parameters and not isinstance(model_parameters["turnout_factor_upper"], float):
+            if "turnout_factor_upper" in model_parameters and not isinstance(
+                model_parameters["turnout_factor_upper"], float
+            ):
                 raise ValueError("turnout_factor_upper is not valid. Has to be a float.")
             if pi_method == "gaussian":
                 if "beta" in model_parameters and not isinstance(model_parameters["beta"], (int, float)):
@@ -108,14 +112,16 @@ class ModelClient:
             elif pi_method == "nonparametric":
                 if "robust" in model_parameters and not isinstance(model_parameters["robust"], bool):
                     raise ValueError("robust is not valid. Has to be a boolean.")
-            elif pi_method == 'bootstrap':
+            elif pi_method == "bootstrap":
                 if "B" in model_parameters and not isinstance(model_parameters["B"], int):
                     raise ValueError("B is not valid. Has to be either an integer.")
                 if "T" in model_parameters and not isinstance(model_parameters["T"], (int, float)):
                     raise ValueError("T is not valid. Has to be either an integer or a float.")
                 if "strata" in model_parameters and not isinstance(model_parameters["strata"], list):
                     raise ValueError("strata is not valid. Has to be a list.")
-                if "agg_model_hard_threshold" in model_parameters and not isinstance(model_parameters["agg_model_hard_threshold"], bool):
+                if "agg_model_hard_threshold" in model_parameters and not isinstance(
+                    model_parameters["agg_model_hard_threshold"], bool
+                ):
                     raise ValueError("agg_model_hard_threshold is not valid. Has to be a boolean.")
                 if "y_LB" in model_parameters and not isinstance(model_parameters["y_LB"], float):
                     raise ValueError("y_LB is not valid. Has to be a float.")
@@ -125,15 +131,25 @@ class ModelClient:
                     raise ValueError("z_LB is not valid. Has to be a float.")
                 if "z_UB" in model_parameters and not isinstance(model_parameters["z_UB"], float):
                     raise ValueError("z_UB is not valid. Has to be a float.")
-                if "y_unobserved_upper_bound" in model_parameters and not isinstance(model_parameters["y_unobserved_upper_bound"], float):
+                if "y_unobserved_upper_bound" in model_parameters and not isinstance(
+                    model_parameters["y_unobserved_upper_bound"], float
+                ):
                     raise ValueError("y_unobserved_upper_bound is not valid. Has to be a float.")
-                if "y_unobserved_lower_bound" in model_parameters and not isinstance(model_parameters["y_unobserved_lower_bound"], float):
+                if "y_unobserved_lower_bound" in model_parameters and not isinstance(
+                    model_parameters["y_unobserved_lower_bound"], float
+                ):
                     raise ValueError("y_unobserved_lower_bound is not valid. Has to be a float.")
-                if "percent_expected_vote_error_bound" in model_parameters and not isinstance(model_parameters["percent_expected_vote_error_bound"], float):
+                if "percent_expected_vote_error_bound" in model_parameters and not isinstance(
+                    model_parameters["percent_expected_vote_error_bound"], float
+                ):
                     raise ValueError("z_UB is not valid. Has to be a float.")
-                if "z_unobserved_upper_bound" in model_parameters and not isinstance(model_parameters["z_unobserved_upper_bound"], float):
+                if "z_unobserved_upper_bound" in model_parameters and not isinstance(
+                    model_parameters["z_unobserved_upper_bound"], float
+                ):
                     raise ValueError("z_unobserved_upper_bound is not valid. Has to be a float.")
-                if "z_unobserved_lower_bound" in model_parameters and not isinstance(model_parameters["z_unobserved_lower_bound"], float):
+                if "z_unobserved_lower_bound" in model_parameters and not isinstance(
+                    model_parameters["z_unobserved_lower_bound"], float
+                ):
                     raise ValueError("z_unobserved_lower_bound is not valid. Has to be a float.")
         if handle_unreporting not in {"drop", "zero"}:
             raise ValueError("handle_unreporting must be either `drop` or `zero`")
@@ -185,7 +201,7 @@ class ModelClient:
         handle_unreporting = kwargs.get("handle_unreporting", "drop")
 
         district_election = False
-        if office in {'H', 'Y', 'Z'}:
+        if office in {"H", "Y", "Z"}:
             district_election = True
 
         model_settings = {
@@ -203,7 +219,7 @@ class ModelClient:
         config_handler = ConfigHandler(
             election_id, config=raw_config, s3_client=s3.S3JsonUtil(TARGET_BUCKET), save=save_config
         )
-        
+
         self._check_input_parameters(
             config_handler,
             office,
@@ -216,7 +232,7 @@ class ModelClient:
             model_parameters,
             handle_unreporting,
         )
-        
+
         states_with_election = config_handler.get_states(office)
         estimand_baselines = config_handler.get_estimand_baselines(office, estimands)
 
@@ -250,10 +266,18 @@ class ModelClient:
         turnout_factor_upper = model_parameters.get("turnout_factor_upper", 1.5)
 
         reporting_units = data.get_reporting_units(
-            percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper, features_to_normalize=features, add_intercept=True
+            percent_reporting_threshold,
+            turnout_factor_lower,
+            turnout_factor_upper,
+            features_to_normalize=features,
+            add_intercept=True,
         )
         nonreporting_units = data.get_nonreporting_units(
-            percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper, features_to_normalize=features, add_intercept=True
+            percent_reporting_threshold,
+            turnout_factor_lower,
+            turnout_factor_upper,
+            features_to_normalize=features,
+            add_intercept=True,
         )
         unexpected_units = data.get_unexpected_units(percent_reporting_threshold, aggregates)
 
@@ -271,7 +295,7 @@ class ModelClient:
             self.model = NonparametricElectionModel(model_settings=model_settings)
         elif pi_method == "gaussian":
             self.model = GaussianElectionModel(model_settings=model_settings)
-        elif pi_method == 'bootstrap':
+        elif pi_method == "bootstrap":
             self.model = BootstrapElectionModel(model_settings=model_settings)
 
         minimum_reporting_units_max = 0
@@ -308,7 +332,9 @@ class ModelClient:
         )
 
         for estimand in estimands:
-            unit_predictions = self.model.get_unit_predictions(reporting_units, nonreporting_units, estimand, unexpected_units=unexpected_units)
+            unit_predictions = self.model.get_unit_predictions(
+                reporting_units, nonreporting_units, estimand, unexpected_units=unexpected_units
+            )
             results_handler.add_unit_predictions(estimand, unit_predictions)
             # gets prediciton intervals for each alpha
             alpha_to_unit_prediction_intervals = {}
