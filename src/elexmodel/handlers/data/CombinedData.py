@@ -1,4 +1,5 @@
 from elexmodel.handlers import s3
+from elexmodel.handlers.data.Estimandizer import Estimandizer
 from elexmodel.utils.file_utils import S3_FILE_PATH, TARGET_BUCKET, convert_df_to_csv
 
 
@@ -16,6 +17,10 @@ class CombinedDataHandler:
         handle_unreporting="drop",
     ):
         self.estimands = estimands
+
+        estimandizer = Estimandizer()
+        (current_data, _) = estimandizer.check_and_create_estimands(current_data.copy(), self.estimands, False)
+
         # if we're running this for a past election, drop results columns from preprocessed data
         # so we use results_{estimand} numbers from current_data
         preprocessed_results_columns = list(filter(lambda col: col.startswith("results_"), preprocessed_data.columns))

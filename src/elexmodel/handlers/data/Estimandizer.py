@@ -22,9 +22,13 @@ class Estimandizer:
             baseline_col = f"{BASELINE_PREFIX}{estimand}"
 
             if baseline_col not in data_df.columns:
-                # will raise a KeyError if a function with the same name as `estimand` doesn't exist
-                data_df = globals()[estimand](data_df)
-                data_df[results_col] = data_df[baseline_col].copy()
+                if results_col in data_df.columns:
+                    # should only happen when we're replaying an election
+                    data_df[baseline_col] = data_df[results_col].copy()
+                else:
+                    # will raise a KeyError if a function with the same name as `estimand` doesn't exist
+                    data_df = globals()[estimand](data_df)
+                    data_df[results_col] = data_df[baseline_col].copy()
 
             if historical:
                 data_df[results_col] = nan
@@ -71,6 +75,12 @@ class Estimandizer:
 
 
 def party_vote_share_dem(data_df):
+    # should only happen when we're replaying an election
+    if f"{BASELINE_PREFIX}dem" not in data_df.columns:
+        data_df[f"{BASELINE_PREFIX}dem"] = data_df[f"{RESULTS_PREFIX}dem"].copy()
+    if f"{BASELINE_PREFIX}turnout" not in data_df.columns:
+        data_df[f"{BASELINE_PREFIX}turnout"] = data_df[f"{RESULTS_PREFIX}turnout"].copy()
+
     data_df[f"{BASELINE_PREFIX}party_vote_share_dem"] = (
         data_df[f"{BASELINE_PREFIX}dem"] / data_df[f"{BASELINE_PREFIX}turnout"]
     )
