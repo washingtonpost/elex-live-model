@@ -800,4 +800,4 @@ def test_estimandizer_input(model_client, va_governor_county_data, va_config):
             save_output=[],
         )
     except KeyError:
-        pytest.raises("Error with clinet input for estimandizer")
+        pytest.raises("Error with client input for estimandizer")
