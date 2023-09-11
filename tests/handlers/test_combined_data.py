@@ -16,7 +16,7 @@ def test_load(va_governor_county_data):
     combined_data_handler = CombinedDataHandler(
         va_governor_county_data, current_data, estimands, "county", handle_unreporting="drop"
     )
-    assert combined_data_handler.data.shape == (133, 30)
+    assert combined_data_handler.data.shape == (133, 29)
 
 
 def test_zero_unreporting_missing_single_estimand_value(va_governor_county_data):
@@ -37,7 +37,7 @@ def test_zero_unreporting_missing_single_estimand_value(va_governor_county_data)
     assert (
         combined_data_handler.data["percent_expected_vote"].iloc[0] == 0
     )  # percent expected vote with na result has been set to zero
-    assert combined_data_handler.data.shape == (133, 33)  # didn't drop any
+    assert combined_data_handler.data.shape == (133, 31)  # didn't drop any
     assert combined_data_handler.data["results_dem"].iloc[1] != 0  # didn't accidentally set other to zero
 
 
@@ -58,7 +58,7 @@ def test_zero_unreporting_missing_multiple_estimands_value(va_governor_county_da
     assert combined_data_handler.data["results_dem"].iloc[0] == 0.0
     assert combined_data_handler.data["results_turnout"].iloc[0] == 0.0
     assert combined_data_handler.data["percent_expected_vote"].iloc[0] == 0.0
-    assert combined_data_handler.data.shape == (133, 33)
+    assert combined_data_handler.data.shape == (133, 31)
     assert combined_data_handler.data["results_dem"].iloc[1] != 0  # didn't accidentally set other to zero
     assert combined_data_handler.data["results_turnout"].iloc[1] != 0  # didn't accidentally set other to zero
 
@@ -79,7 +79,7 @@ def test_zero_unreporting_missing_percent_expected_vote_value(va_governor_county
     )
     assert combined_data_handler.data["results_dem"].iloc[0] == 0.0
     assert combined_data_handler.data["percent_expected_vote"].iloc[0] == 0.0
-    assert combined_data_handler.data.shape == (133, 33)
+    assert combined_data_handler.data.shape == (133, 31)
     assert combined_data_handler.data["results_dem"].iloc[1] != 0  # didn't accidentally set other to zero
 
 
@@ -98,7 +98,7 @@ def test_zero_unreporting_random_percent_expected_vote_value(va_governor_county_
     )
     assert combined_data_handler.data["results_dem"].iloc[0] == 0.0  # all values set to 0.0
     assert combined_data_handler.data["percent_expected_vote"].iloc[0] == 0.0
-    assert combined_data_handler.data.shape == (133, 33)
+    assert combined_data_handler.data.shape == (133, 31)
     assert combined_data_handler.data["results_dem"].iloc[1] != 0  # didn't accidentally set other to zero
 
 
@@ -115,7 +115,7 @@ def test_drop_unreporting_missing_single_estimand_value(va_governor_county_data)
     combined_data_handler = CombinedDataHandler(
         va_governor_county_data, current_data, estimands, "county", handle_unreporting="drop"
     )
-    assert combined_data_handler.data.shape == (132, 33)  # dropped one
+    assert combined_data_handler.data.shape == (132, 31)  # dropped one
     assert combined_data_handler.data["results_dem"].iloc[0] != 0  # didn't accidentally set other to zero
 
 
