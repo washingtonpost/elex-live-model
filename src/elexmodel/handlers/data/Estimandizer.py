@@ -20,11 +20,13 @@ class Estimandizer:
         for estimand in estimands:
             results_col = f"{RESULTS_PREFIX}{estimand}"
             baseline_col = f"{BASELINE_PREFIX}{estimand}"
+            baseline_col_added = False
 
             if baseline_col not in data_df.columns:
                 if results_col in data_df.columns:
                     # should only happen when we're replaying an election
                     data_df[baseline_col] = data_df[results_col].copy()
+                    baseline_col_added = True
                 else:
                     # will raise a KeyError if a function with the same name as `estimand` doesn't exist
                     data_df = globals()[estimand](data_df)
@@ -35,6 +37,9 @@ class Estimandizer:
             else:
                 if results_col not in data_df.columns:
                     raise EstimandException("This is missing results data for estimand: ", estimand)
+
+            if baseline_col_added:
+                del data_df[baseline_col]
 
             columns_to_return.append(results_col)
 
