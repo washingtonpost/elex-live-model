@@ -23,8 +23,11 @@ class Estimandizer:
             target_col = results_col if current_data else baseline_col
 
             if target_col not in data_df.columns:
-                # will raise a KeyError if a function with the same name as `estimand` doesn't exist
-                data_df = globals()[estimand](data_df)
+                if estimand in data_df.columns:
+                    data_df[target_col] = data_df[estimand].copy()
+                else:
+                    # will raise a KeyError if a function with the same name as `estimand` doesn't exist
+                    data_df = globals()[estimand](data_df)
                 if target_col == baseline_col:
                     data_df[results_col] = data_df[baseline_col].copy()
 
