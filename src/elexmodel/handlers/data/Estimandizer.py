@@ -14,22 +14,18 @@ class Estimandizer:
     Estimandizer. Generate estimands explicitly.
     """
 
-    def check_and_create_estimands(self, data_df, estimands, historical):
+    def check_and_create_estimands(self, data_df, estimands, historical, current_data=False):
         columns_to_return = []
 
         for estimand in estimands:
             results_col = f"{RESULTS_PREFIX}{estimand}"
             baseline_col = f"{BASELINE_PREFIX}{estimand}"
-            baseline_col_added = False
+            target_col = results_col if current_data else baseline_col
 
-            if baseline_col not in data_df.columns:
-                if results_col in data_df.columns:
-                    # should only happen when we're replaying an election
-                    data_df[baseline_col] = data_df[results_col].copy()
-                    baseline_col_added = True
-                else:
-                    # will raise a KeyError if a function with the same name as `estimand` doesn't exist
-                    data_df = globals()[estimand](data_df)
+            if target_col not in data_df.columns:
+                # will raise a KeyError if a function with the same name as `estimand` doesn't exist
+                data_df = globals()[estimand](data_df)
+                if target_col == baseline_col:
                     data_df[results_col] = data_df[baseline_col].copy()
 
             if historical:
@@ -37,9 +33,6 @@ class Estimandizer:
             else:
                 if results_col not in data_df.columns:
                     raise EstimandException("This is missing results data for estimand: ", estimand)
-
-            if baseline_col_added:
-                del data_df[baseline_col]
 
             columns_to_return.append(results_col)
 
@@ -81,12 +74,12 @@ class Estimandizer:
 
 def party_vote_share_dem(data_df):
     # should only happen when we're replaying an election
-    if f"{BASELINE_PREFIX}dem" not in data_df.columns:
-        data_df[f"{BASELINE_PREFIX}dem"] = data_df[f"{RESULTS_PREFIX}dem"].copy()
-    if f"{BASELINE_PREFIX}turnout" not in data_df.columns:
-        data_df[f"{BASELINE_PREFIX}turnout"] = data_df[f"{RESULTS_PREFIX}turnout"].copy()
-
-    data_df[f"{BASELINE_PREFIX}party_vote_share_dem"] = (
-        data_df[f"{BASELINE_PREFIX}dem"] / data_df[f"{BASELINE_PREFIX}turnout"]
-    )
+    if f"{BASELINE_PREFIX}dem" not in data_df.columns and f"{BASELINE_PREFIX}turnout" not in data_df.columns:
+        data_df[f"{RESULTS_PREFIX}party_vote_share_dem"] = (
+            data_df[f"{RESULTS_PREFIX}dem"] / data_df[f"{RESULTS_PREFIX}turnout"]
+        )
+    else:
+        data_df[f"{BASELINE_PREFIX}party_vote_share_dem"] = (
+            data_df[f"{BASELINE_PREFIX}dem"] / data_df[f"{BASELINE_PREFIX}turnout"]
+        )
     return data_df
