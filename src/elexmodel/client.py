@@ -58,21 +58,27 @@ class ModelClient:
         offices = config_handler.get_offices()
         if office not in offices:
             raise ValueError(f"Office '{office}' is not valid. Please check config.")
-        valid_estimands = config_handler.get_estimands(office)
-        for estimand in estimands:
-            if estimand not in valid_estimands:
-                raise ValueError(f"Estimand: '{estimand}' is not valid. Please check config")
+
+        estimands_in_config = config_handler.get_estimands(office)
+        extra_estimands = set(estimands).difference(set(estimands_in_config))
+        if len(extra_estimands) > 0:
+            # this is ok; later they'll all be created by the Estimandizer
+            LOG.info("Found additional estimands that were not specified in the config file: %s", extra_estimands)
+
         geographic_unit_types = config_handler.get_geographic_unit_types(office)
         if geographic_unit_type not in geographic_unit_types:
             raise ValueError(f"Geographic unit type: '{geographic_unit_type}' is not valid. Please check config")
+
         model_features = config_handler.get_features(office)
-        invalid_features = [feature for feature in features if feature not in model_features]
+        invalid_features = list(set(features).difference(set(model_features)))
         if len(invalid_features) > 0:
             raise ValueError(f"Feature(s): {invalid_features} not valid. Please check config")
+
         model_aggregates = config_handler.get_aggregates(office)
         invalid_aggregates = [aggregate for aggregate in aggregates if aggregate not in model_aggregates]
         if len(invalid_aggregates) > 0:
             raise ValueError(f"Aggregate(s): {invalid_aggregates} not valid. Please check config")
+
         model_fixed_effects = config_handler.get_fixed_effects(office)
         if isinstance(fixed_effects, dict):
             invalid_fixed_effects = [
@@ -89,9 +95,10 @@ class ModelClient:
                 f"Prediction interval method: {pi_method} is not valid. \
                     pi_method has to be either `gaussian` or `nonparametric`."
             )
+
         if not isinstance(model_parameters, dict):
             raise ValueError("model_paramters is not valid. Has to be a dict.")
-        elif model_parameters != {}:
+        if model_parameters != {}:
             if "lambda_" in model_parameters and (
                 not isinstance(model_parameters["lambda_"], (float, int)) or model_parameters["lambda_"] < 0
             ):
@@ -153,6 +160,7 @@ class ModelClient:
                     raise ValueError("z_unobserved_lower_bound is not valid. Has to be a float.")
         if handle_unreporting not in {"drop", "zero"}:
             raise ValueError("handle_unreporting must be either `drop` or `zero`")
+
         return True
 
     def get_aggregate_list(self, office, aggregate):

@@ -20,8 +20,8 @@ class PythonLiteralOption(click.Option):
     def type_cast_value(self, ctx, value):
         try:
             return ast.literal_eval(value)
-        except ValueError:
-            raise click.BadParameter(value)
+        except ValueError as e:
+            raise click.BadParameter(value) from e
 
 
 @click.command()
