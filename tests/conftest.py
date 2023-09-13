@@ -26,15 +26,20 @@ def setup_logging():
 def get_fixture():
     def _get_fixture(filename, load=True, pandas=False):
         filepath = os.path.join(FIXTURE_DIR, filename)
-        fileobj = open(filepath, encoding="utf-8")
-        if load:
-            return json.load(fileobj)
-        if pandas:
-            return pd.read_csv(
-                filepath,
-                dtype={"geographic_unit_fips": str, "geographic_unit_type": str, "county_fips": str, "district": str},
-            )
-        return fileobj
+        with open(filepath, encoding="utf-8") as fileobj:
+            if load:
+                return json.load(fileobj)
+            if pandas:
+                return pd.read_csv(
+                    filepath,
+                    dtype={
+                        "geographic_unit_fips": str,
+                        "geographic_unit_type": str,
+                        "county_fips": str,
+                        "district": str,
+                    },
+                )
+            return fileobj
 
     return _get_fixture
 
@@ -79,7 +84,7 @@ def va_governor_precinct_data(get_fixture):
     return get_fixture(path, load=False, pandas=True)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def va_governor_county_data(get_fixture):
     path = os.path.join("data", "2017-11-07_VA_G", "G", "data_county.csv")
     return get_fixture(path, load=False, pandas=True)
@@ -94,6 +99,12 @@ def va_assembly_county_data(get_fixture):
 @pytest.fixture(scope="session")
 def va_assembly_precinct_data(get_fixture):
     path = os.path.join("data", "2017-11-07_VA_G", "Y", "data_precinct-district.csv")
+    return get_fixture(path, load=False, pandas=True)
+
+
+@pytest.fixture(scope="session")
+def az_assembly_precinct_data(get_fixture):
+    path = os.path.join("data", "2020-08-04_AZ_R", "S", "data_precinct.csv")
     return get_fixture(path, load=False, pandas=True)
 
 
