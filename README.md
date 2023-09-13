@@ -80,7 +80,7 @@ Note: When running the model with multiple fixed effects, make sure they are not
 It's possible to create a custom estimand based on other data elements.  Here's how to create a new estimand called "my_estimand":
 
 1. In `src/elexmodel/handlers/data/Estimandizer.py`, create a function with the signature `def my_estimand(data_df)`.
-2. In `my_estimand()`, use the columns in `data_df` to create a new column, `baseline_my_estimand`.  See the `party_vote_share_dem` function for an example.
+2. In `my_estimand()`, use the columns in `data_df` to create a new column, either `baseline_my_estimand` or `results_my_estimand` as necessary.  See the `party_vote_share_dem` function for an example.
 3. Specify `my_estimand` as one of your estimands.  For example, via the command line:
 
 ```
