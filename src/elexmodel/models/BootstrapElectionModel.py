@@ -1212,8 +1212,7 @@ class BootstrapElectionModel(BaseElectionModel):
         # divide the unnormalized margin and results by the total turnout predictions to get the normalized margin for the aggregate
         # turnot prediction could be zero, in which case predicted margin is also zero, so replace NaNs with zero in that case
         raw_margin_df["pred_margin"] = np.nan_to_num(raw_margin_df.pred_margin / aggregate_z_total.flatten())
-        raw_margin_df["results_margin"] /= np.nan_to_num(raw_margin_df.results_margin / aggregate_z_total.flatten())
-
+        raw_margin_df["results_margin"] = np.nan_to_num(raw_margin_df.results_margin / aggregate_z_total.flatten())
         # if we are in the top level prediction, then save the aggregated baseline margin, which we will need for the national
         # summary (e.g. ecv) model
         if self._is_top_level_aggregate(aggregate):

@@ -5,8 +5,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from elexmodel.handlers.data.Estimandizer import Estimandizer
 from elexmodel.utils.file_utils import get_directory_path
+
+
+class MockLiveDataHandlerException(Exception):
+    pass
 
 
 class MockLiveDataHandler:
@@ -32,7 +35,6 @@ class MockLiveDataHandler:
         self.s3_client = s3_client
         self.historical = historical
         self.unexpected_rows = unexpected_units
-        self.estimandizer = Estimandizer()
 
         self.shuffle_columns = [
             "postal_code",
@@ -44,7 +46,7 @@ class MockLiveDataHandler:
         self.data = data
         if data is not None:
             # passed in as a df
-            data_for_estimands = self.load_data(data)
+            data_for_estimands = self.load_data(data, estimands, historical)
             self.data = data_for_estimands
         else:
             self.data = self.get_data()
@@ -74,18 +76,38 @@ class MockLiveDataHandler:
             live_data,
             dtype={"geographic_unit_fips": str, "geographic_unit_type": str, "county_fips": str, "district": str},
         )
-        data = self.load_data(data)
+        data = self.load_data(data, self.estimands, self.historical)
         return data
 
     def get_live_data_file_path(self):
         directory_path = get_directory_path()
         return f"{directory_path}/data/{self.election_id}/{self.office_id}/data_{self.geographic_unit_type}.csv"
 
-    def load_data(self, data):
+    def load_data(self, data, estimands, historical):
         columns_to_return = ["postal_code", "geographic_unit_fips"]
+        estimands_to_use = ["turnout"]  # in any case we want the turnout in order to compute turnout_factor
+        if "margin" in estimands:
+            estimands_to_use = estimands_to_use + ["dem", "gop"]
+            columns_to_return.extend(["results_margin", "normalized_margin"])
+        else:
+            estimands_to_use = list(set(estimands + estimands_to_use))
 
-        (data, more_columns) = self.estimandizer.check_and_create_estimands(data, self.estimands, self.historical)
-        columns_to_return += more_columns
+        for estimand in estimands_to_use:
+            if historical:
+                data[f"results_{estimand}"] = np.nan
+            results_column_names = [x for x in data.columns if x.startswith("results")]
+            # If this is not a historical run, then this is a live election
+            # so we are expecting that there will be actual results  data
+            if not self.historical and len(results_column_names) == 0:
+                raise MockLiveDataHandlerException("This is not a test election, it is missing results data")
+            if f"results_{estimand}" not in results_column_names:
+                raise MockLiveDataHandlerException("This is missing results data for estimand: ", estimand)
+            columns_to_return.append(f"results_{estimand}")
+
+        # TODO: move to estimandizer
+        if "margin" in estimands:
+            data["results_margin"] = data.results_dem - data.results_gop
+            data["normalized_margin"] = (data.results_dem - data.results_gop) / (data.results_dem + data.results_gop)
 
         self.shuffle_dataframe = data[self.shuffle_columns].copy()
 

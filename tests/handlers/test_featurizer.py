@@ -44,7 +44,6 @@ def test_adding_intercept():
     assert "intercept" in featurizer.active_features
     pd.testing.assert_series_equal(df_new.intercept, pd.Series([1, 1, 1, 1], name="intercept"))
 
-
 def test_scaling_features():
     """
     Test whether scaling features works
@@ -91,7 +90,6 @@ def test_column_names():
             "expected": [True, True, True, True, False, False, False, False],
         }
     )
-
     df_new = featurizer.prepare_data(df, center_features=False, scale_features=False, add_intercept=True)
 
     df_fitting = featurizer.filter_to_active_features(df_new[:split_fitting_heldout])
@@ -178,7 +176,7 @@ def test_generating_heldout_set():
     "fe_a_c" in df_heldout.columns
     "fe_a_d" not in df_heldout.columns  # not an active fixed effect
 
-    assert df_heldout.loc[6, "fe_a_b"] == 1  # since row 7 has an inactive fixed effect
+    assert df_heldout.loc[6, "fe_a_b"] == 1  # since row 6 has an active fixed effect
     assert df_heldout.loc[7, "fe_a_b"] == 1 / 3  # since row 7 has an inactive fixed effect
     assert df_heldout.loc[7, "fe_a_c"] == 1 / 3  # since row 7 has an inactive fixed effect
 
@@ -186,7 +184,7 @@ def test_generating_heldout_set():
     "fe_b_x" in df_heldout.columns
     "fe_b_z" not in df_heldout.columns  # inactive
 
-    assert df_heldout.loc[6, "fe_a_b"] == 1  # since row 7 has an inactive fixed effect
+    assert df_heldout.loc[6, "fe_a_b"] == 1  # since row 6 has an active fixed effect
     assert df_heldout.loc[7, "fe_a_b"] == 1 / 3  # since row 7 has an inactive fixed effect
     assert df_heldout.loc[7, "fe_a_c"] == 1 / 3  # since row 7 has an inactive fixed effect
 
@@ -389,7 +387,6 @@ def test_generate_fixed_effects(va_governor_county_data):
     nonreporting_data = combined_data_handler.get_nonreporting_units(99)
 
     n_train = reporting_data.shape[0]
-    n_test = nonreporting_data.shape[0]
     all_units = pd.concat([reporting_data, nonreporting_data], axis=0)
 
     x_all = featurizer.prepare_data(all_units, center_features=False, scale_features=False, add_intercept=True)
@@ -447,10 +444,12 @@ def test_generate_fixed_effects_not_all_reporting(va_governor_county_data):
 
     featurizer = Featurizer([], {"county_fips": ["all"]})
     n_train = reporting_data.shape[0]
-    n_test = nonreporting_data.shape[0]
     all_units = pd.concat([reporting_data, nonreporting_data], axis=0)
 
     x_all = featurizer.prepare_data(all_units, center_features=False, scale_features=False, add_intercept=True)
+
+    reporting_data_features = featurizer.filter_to_active_features(x_all[:n_train])
+    nonreporting_data_features = featurizer.generate_holdout_data(x_all[n_train:])
 
     reporting_data_features = featurizer.filter_to_active_features(x_all[:n_train])
     nonreporting_data_features = featurizer.generate_holdout_data(x_all[n_train:])
@@ -519,6 +518,9 @@ def test_generate_fixed_effects_mixed_reporting(va_governor_precinct_data):
     all_units = pd.concat([reporting_data, nonreporting_data], axis=0)
 
     x_all = featurizer.prepare_data(all_units, center_features=False, scale_features=False, add_intercept=True)
+
+    reporting_data_features = featurizer.filter_to_active_features(x_all[:n_train])
+    nonreporting_data_features = featurizer.generate_holdout_data(x_all[n_train:])
 
     reporting_data_features = featurizer.filter_to_active_features(x_all[:n_train])
     nonreporting_data_features = featurizer.generate_holdout_data(x_all[n_train:])

@@ -67,7 +67,12 @@ class Featurizer:
     ) -> pd.DataFrame:
         """
         Prepares features.
-        Adds dummy variables for fixed effects. Also includes centering, scaling continuous covariates and adding intercept.
+        Adds dummy variables for fixed effects, also determines which fixed effects are expanded and active.
+        if center_features is true we subtract the features by their average column value, which sets the average column value to zero
+            this allows us to interpret the intercept as the mean response given all other covariates at their average value
+        if scale_features is true we divide the features by their standard deviation, which gives them all the same scale
+            this can improve the convergence of optimization algorithms
+        if add_intercept is true an intercept column is added to the features and one fixed effect value is dropped
         """
         df = df.copy()  # create copy so we can do things to the values
         if center_features:
@@ -93,7 +98,7 @@ class Featurizer:
                 if x.startswith(tuple([fixed_effect + "_" for fixed_effect in self.fixed_effect_cols]))
             ]
 
-            df_fitting = df[(df.reporting == True) & (df.expected == True)]
+            df_fitting = df[(df.reporting) & (df.expected)]
             # get the indices of all expanded fixed effects in the fitting data (active fixed effects + the fixed effect we will drop for multicolinearity)
             active_fixed_effect_boolean_df = df_fitting[all_expanded_fixed_effects].sum(axis=0) > 0
             # get the names of those fixed effects, since we we will want to know which fixed effect was dropped
@@ -164,6 +169,15 @@ class Featurizer:
 
             # set the values for active fixed effect in rows that have inactive fixed effect to be 1 / (n + 1)
             # rows that have an inactive fixed effect value need to receive the treat of the average fixed effects
-            # NOTE: aren't we now applying 1 * the dropped fixed effect and 1 / (n + 1) times the other fixed effects?
             df.loc[rows_w_inactive_fixed_effects, fe_active_fixed_effects] = 1 / (len(fe_active_fixed_effects) + 1)
+            # This is correct because even rows with active fixed effects have an interept columns, so the coefficient
+            # of the fixed effect value column is actually the *difference* between the dropped column (for which the intercept is
+            # the stand in and the fixed effect column.
+            # Another way to think about this is that for a fixed effect value that is present the fixed effect estimate is:
+            # if there are three fixed effects r, u and s where s is dropped.
+            # beta_0 + beta_r * indic{r}
+            # beta_0 + beta_u * indic{u}
+            # and the fixed effect estimate for the dropped value is beta_0, so the average is:
+            # beta_0 + (beta_r / 3) + (beta_u / 3)
+
         return self.filter_to_active_features(df)
