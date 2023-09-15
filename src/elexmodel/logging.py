@@ -17,7 +17,7 @@ LOGGING_CONFIG = {
         "elexmodel": {
             "handlers": ["default"],
             "level": "INFO",
-            "propagate": True,
+            "propagate": False,
         }
     },
 }
