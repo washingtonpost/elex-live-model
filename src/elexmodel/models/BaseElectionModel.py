@@ -171,3 +171,6 @@ class BaseElectionModel(ABC):
         These coefficients are for the point prediciton only.
         """
         return self.features_to_coefficients
+
+    def get_national_summary_estimates(self, nat_sum_data_dict, called_states, base_to_add):
+        raise NotImplementedError()
