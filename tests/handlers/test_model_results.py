@@ -112,4 +112,4 @@ def test_no_unit_data():
     handler.add_agg_predictions("e1", "postal_code", agg1_e1, intervals1_e1)
     handler.process_final_results()
 
-    assert "unit_data" not in handler.final_results
+    assert "unit_data" not in handler.final_results.keys()
