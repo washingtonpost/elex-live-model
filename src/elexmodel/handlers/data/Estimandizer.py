@@ -1,6 +1,3 @@
-from numpy import nan
-
-
 class EstimandException(Exception):
     pass
 
@@ -18,17 +15,9 @@ class Estimandizer:
         columns_to_return = []
         for estimand in estimands:
             results_col = f"{RESULTS_PREFIX}{estimand}"
-
             if results_col not in data_df.columns:
                 # will raise a KeyError if a function with the same name as `estimand` doesn't exist
                 data_df = globals()[estimand](data_df, RESULTS_PREFIX)
-
-            if historical:
-                data_df[results_col] = nan
-            else:
-                if results_col not in data_df.columns:
-                    raise EstimandException("This is missing results data for estimand: ", estimand)
-
             columns_to_return.append(results_col)
 
         results_column_names = [x for x in data_df.columns if x.startswith(RESULTS_PREFIX)]
@@ -67,12 +56,8 @@ class Estimandizer:
 
 
 def party_vote_share_dem(data_df, col_prefix):
-    if f"{col_prefix}dem" in data_df.columns and f"{col_prefix}turnout" in data_df.columns:
-        numer = f"{col_prefix}dem"
-        denom = f"{col_prefix}turnout"
-    else:
-        numer = "dem"
-        denom = "total"
+    numer = f"{col_prefix}dem"
+    denom = f"{col_prefix}turnout"
 
     data_df[f"{col_prefix}party_vote_share_dem"] = data_df.apply(
         lambda x: 0 if x[numer] == 0 or x[denom] == 0 else x[numer] / x[denom], axis=1

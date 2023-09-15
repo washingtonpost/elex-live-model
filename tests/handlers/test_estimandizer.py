@@ -28,7 +28,6 @@ def test_add_estimand_results_historical(va_governor_county_data):
 
     assert "results_party_vote_share_dem" in output_df.columns
     assert result_columns == ["results_party_vote_share_dem"]
-    assert output_df["results_party_vote_share_dem"].isnull().all()
 
 
 def test_add_estimand_baselines_not_historical(va_governor_county_data):
