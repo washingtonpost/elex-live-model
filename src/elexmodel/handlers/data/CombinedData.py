@@ -61,7 +61,8 @@ class CombinedDataHandler:
                 reporting_units[f"results_{estimand}"] - reporting_units[f"last_election_results_{estimand}"]
             ) / reporting_units[f"last_election_results_{estimand}"]
 
-        reporting_units["reporting"] = 1
+        reporting_units["reporting"] = int(1)
+        reporting_units["expected"] = True
 
         return reporting_units
 
@@ -75,7 +76,8 @@ class CombinedDataHandler:
             drop=True
         )
 
-        nonreporting_units["reporting"] = 0
+        nonreporting_units["reporting"] = int(0)
+        nonreporting_units["expected"] = True
 
         return nonreporting_units
 
@@ -128,7 +130,8 @@ class CombinedDataHandler:
                 self._get_district_from_geographic_unit_fips
             )
 
-        unexpected_units["reporting"] = 1
+        unexpected_units["reporting"] = int(1)
+        unexpected_units["expected"] = False
 
         return unexpected_units
 

@@ -97,7 +97,7 @@ class ModelClient:
 
         if not isinstance(model_parameters, dict):
             raise ValueError("model_paramters is not valid. Has to be a dict.")
-        if model_parameters != {}:
+        if len(model_parameters) > 0:
             if "lambda_" in model_parameters and (
                 not isinstance(model_parameters["lambda_"], (float, int)) or model_parameters["lambda_"] < 0
             ):

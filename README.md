@@ -74,7 +74,6 @@ Parameters for the CLI tool:
 
 Note: When running the model with multiple fixed effects, make sure they are not linearly dependent. For example, `county_fips` and `county_classification` are linearly dependent when run together. That's because every county is in one county class, so all the fixed effect columns of the counties in the county class sum up to the fixed effect column of that county class.
 
-
 #### Custom Estimands
 
 It's possible to create a custom estimand based on other data elements.  Here's how to create a new estimand called "my_estimand":
