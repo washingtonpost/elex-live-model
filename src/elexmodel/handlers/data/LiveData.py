@@ -84,7 +84,9 @@ class MockLiveDataHandler:
     def load_data(self, data):
         columns_to_return = ["postal_code", "geographic_unit_fips"]
 
-        (data, more_columns) = self.estimandizer.check_and_create_estimands(data, self.estimands, self.historical)
+        print(data)
+        print(data.columns)
+        (data, more_columns) = self.estimandizer.add_estimand_results(data, self.estimands, self.historical)
         columns_to_return += more_columns
 
         self.shuffle_dataframe = data[self.shuffle_columns].copy()

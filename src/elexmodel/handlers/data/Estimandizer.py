@@ -14,7 +14,7 @@ class Estimandizer:
     Estimandizer. Generate estimands explicitly.
     """
 
-    def check_and_create_estimands(self, data_df, estimands, historical):
+    def add_estimand_results(self, data_df, estimands, historical):
         columns_to_return = []
         for estimand in estimands:
             results_col = f"{RESULTS_PREFIX}{estimand}"
@@ -58,7 +58,7 @@ class Estimandizer:
                 data_df[f"last_election_results_{estimand}"] = data_df[baseline_col].copy() + 1
 
         if include_results_estimand:
-            data_df, ___ = self.check_and_create_estimands(data_df, estimand_baselines.keys(), historical)
+            data_df, ___ = self.add_estimand_results(data_df, estimand_baselines.keys(), historical)
 
         return data_df
 

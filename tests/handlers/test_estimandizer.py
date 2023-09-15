@@ -1,30 +1,30 @@
 from elexmodel.handlers.data.Estimandizer import Estimandizer
 
 
-def test_check_and_create_estimands_not_historical(va_governor_county_data):
+def test_add_estimand_results_not_historical(va_governor_county_data):
     """
-    Tests the check_and_create_estimands() method.
+    Tests the add_estimand_results() method.
     """
 
     va_data_copy = va_governor_county_data.copy()
     estimands = ["party_vote_share_dem"]
 
     estimandizer = Estimandizer()
-    (output_df, result_columns) = estimandizer.check_and_create_estimands(va_data_copy, estimands, False)
+    (output_df, result_columns) = estimandizer.add_estimand_results(va_data_copy, estimands, False)
 
     assert "results_party_vote_share_dem" in output_df.columns
     assert result_columns == ["results_party_vote_share_dem"]
 
 
-def test_check_and_create_estimands_historical(va_governor_county_data):
+def test_add_estimand_results_historical(va_governor_county_data):
     """
-    Tests the check_and_create_estimands() method with historical elections.
+    Tests the add_estimand_results() method with historical elections.
     """
     va_data_copy = va_governor_county_data.copy()
     estimands = ["party_vote_share_dem"]
 
     estimandizer = Estimandizer()
-    (output_df, result_columns) = estimandizer.check_and_create_estimands(va_data_copy, estimands, True)
+    (output_df, result_columns) = estimandizer.add_estimand_results(va_data_copy, estimands, True)
 
     assert "results_party_vote_share_dem" in output_df.columns
     assert result_columns == ["results_party_vote_share_dem"]
