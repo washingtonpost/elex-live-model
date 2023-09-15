@@ -19,9 +19,7 @@ class CombinedDataHandler:
         self.estimands = estimands
 
         estimandizer = Estimandizer()
-        (current_data, _) = estimandizer.check_and_create_estimands(
-            current_data.copy(), self.estimands, False, current_data=True
-        )
+        (current_data, _) = estimandizer.check_and_create_estimands(current_data.copy(), self.estimands, False)
 
         # if we're running this for a past election, drop results columns from preprocessed data
         # so we use results_{estimand} numbers from current_data

@@ -25,7 +25,7 @@ class PreprocessedDataHandler:
         s3_client=None,
         historical=False,
         data=None,
-        include_results_estimand=False
+        include_results_estimand=False,
     ):
         """
         Initialize preprocessed data. If not present, download from s3.
@@ -85,7 +85,12 @@ class PreprocessedDataHandler:
         Load preprocessed csv data as df
         """
         LOG.info("Loading preprocessed data: %s, %s, %s", self.election_id, self.office, self.geographic_unit_type)
-        data = self.estimandizer.add_estimand_baselines(preprocessed_data, self.estimand_baselines, self.historical, incl_results_estimand=self.include_results_estimand)
+        data = self.estimandizer.add_estimand_baselines(
+            preprocessed_data,
+            self.estimand_baselines,
+            self.historical,
+            include_results_estimand=self.include_results_estimand,
+        )
 
         return data
 
