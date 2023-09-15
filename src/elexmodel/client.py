@@ -391,6 +391,23 @@ class HistoricalModelClient(ModelClient):
         """
         Formats data for historical model run
         """
+
+        """
+        What does the historical model client do?
+            - If we are running the election in 2024 and 100 counties are reporting, we want to see what
+                our model error would have been in 2020 with these counties reporting
+            - To do that we need to merge the 2020 results onto the 2024 reporting counties
+
+            - So for 2020 (cli) this means -> we have 2020 data and we pick 100 random counties reporting
+              in the MockLiveDataHandler
+            - in this function we get the 2016 results and merge that to the 100 reporting counties in 2020
+
+
+        running election id: 2020-11-03_USA_G --historical
+            -> historical election id: 2016-11-08_USA_G, 2012, ...
+
+        """
+
         formatted_data = current_data[["postal_code", "geographic_unit_fips", "percent_expected_vote"]]
         print(f"Getting data for historical election: {historical_election_id}")
         preprocessed_data_handler = PreprocessedDataHandler(
@@ -401,6 +418,7 @@ class HistoricalModelClient(ModelClient):
             estimand_baselines,
             s3_client=s3.S3CsvUtil(TARGET_BUCKET),
             historical=True,
+            include_results_estimand=True,
         )
 
         results_to_return = [f"results_{estimand}" for estimand in estimands]

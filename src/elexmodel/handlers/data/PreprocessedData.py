@@ -25,6 +25,7 @@ class PreprocessedDataHandler:
         s3_client=None,
         historical=False,
         data=None,
+        include_results_estimand=False,
     ):
         """
         Initialize preprocessed data. If not present, download from s3.
@@ -36,6 +37,7 @@ class PreprocessedDataHandler:
         self.s3_client = s3_client
         self.estimand_baselines = estimand_baselines
         self.historical = historical
+        self.include_results_estimand = include_results_estimand
         self.estimandizer = Estimandizer()
 
         self.local_file_path = self.get_preprocessed_data_path()
@@ -83,8 +85,14 @@ class PreprocessedDataHandler:
         Load preprocessed csv data as df
         """
         LOG.info("Loading preprocessed data: %s, %s, %s", self.election_id, self.office, self.geographic_unit_type)
+        data = self.estimandizer.add_estimand_baselines(
+            preprocessed_data,
+            self.estimand_baselines,
+            self.historical,
+            include_results_estimand=self.include_results_estimand,
+        )
 
-        return self.estimandizer.add_estimand_baselines(preprocessed_data, self.estimand_baselines, self.historical)
+        return data
 
     def save_data(self, preprocessed_data):
         if not Path(self.local_file_path).parent.exists():

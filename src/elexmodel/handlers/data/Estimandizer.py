@@ -14,22 +14,14 @@ class Estimandizer:
     Estimandizer. Generate estimands explicitly.
     """
 
-    def check_and_create_estimands(self, data_df, estimands, historical, current_data=False):
+    def add_estimand_results(self, data_df, estimands, historical):
         columns_to_return = []
-
         for estimand in estimands:
             results_col = f"{RESULTS_PREFIX}{estimand}"
-            baseline_col = f"{BASELINE_PREFIX}{estimand}"
-            target_col = results_col if current_data else baseline_col
 
-            if target_col not in data_df.columns:
-                if estimand in data_df.columns:
-                    data_df[target_col] = data_df[estimand].copy()
-                else:
-                    # will raise a KeyError if a function with the same name as `estimand` doesn't exist
-                    data_df = globals()[estimand](data_df)
-                if target_col == baseline_col:
-                    data_df[results_col] = data_df[baseline_col].copy()
+            if results_col not in data_df.columns:
+                # will raise a KeyError if a function with the same name as `estimand` doesn't exist
+                data_df = globals()[estimand](data_df, RESULTS_PREFIX)
 
             if historical:
                 data_df[results_col] = nan
@@ -45,29 +37,28 @@ class Estimandizer:
         if not historical and len(results_column_names) == 0:
             raise EstimandException("This is not a test election, it is missing results data")
 
-        return (data_df, columns_to_return)
+        return data_df, columns_to_return
 
-    def add_estimand_baselines(self, data_df, estimand_baselines, historical):
+    def add_estimand_baselines(self, data_df, estimand_baselines, historical, include_results_estimand=False):
         # if we are in a historical election we are only reading preprocessed data to get
         # the historical election results of the currently reporting units.
         # so we don't care about the total voters or the baseline election.
 
         for estimand, pointer in estimand_baselines.items():
             if pointer is None:
-                # should only happen when we're going to create a new estimand
+                # when we are creating a new estimand
                 pointer = estimand
 
             baseline_col = f"{BASELINE_PREFIX}{pointer}"
 
             if baseline_col not in data_df.columns:
-                # will raise a KeyError if a function with the same name as `pointer` doesn't exist
-                data_df = globals()[pointer](data_df)
-                results_col = f"{RESULTS_PREFIX}{estimand}"
-                data_df[results_col] = data_df[baseline_col].copy()
+                data_df = globals()[estimand](data_df, BASELINE_PREFIX)
 
             if not historical:
-                # Adding one to prevent zero divison
                 data_df[f"last_election_results_{estimand}"] = data_df[baseline_col].copy() + 1
+
+        if include_results_estimand:
+            data_df, ___ = self.add_estimand_results(data_df, estimand_baselines.keys(), historical)
 
         return data_df
 
@@ -75,14 +66,16 @@ class Estimandizer:
 # custom estimands
 
 
-def party_vote_share_dem(data_df):
-    # should only happen when we're replaying an election
-    if f"{BASELINE_PREFIX}dem" not in data_df.columns and f"{BASELINE_PREFIX}turnout" not in data_df.columns:
-        data_df[f"{RESULTS_PREFIX}party_vote_share_dem"] = (
-            data_df[f"{RESULTS_PREFIX}dem"] / data_df[f"{RESULTS_PREFIX}turnout"]
-        )
+def party_vote_share_dem(data_df, col_prefix):
+    if f"{col_prefix}dem" in data_df.columns and f"{col_prefix}turnout" in data_df.columns:
+        numer = f"{col_prefix}dem"
+        denom = f"{col_prefix}turnout"
     else:
-        data_df[f"{BASELINE_PREFIX}party_vote_share_dem"] = (
-            data_df[f"{BASELINE_PREFIX}dem"] / data_df[f"{BASELINE_PREFIX}turnout"]
-        )
+        numer = "dem"
+        denom = "total"
+
+    data_df[f"{col_prefix}party_vote_share_dem"] = data_df.apply(
+        lambda x: 0 if x[numer] == 0 or x[denom] == 0 else x[numer] / x[denom], axis=1
+    )
+
     return data_df
