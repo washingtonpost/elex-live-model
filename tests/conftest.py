@@ -4,10 +4,11 @@ import os
 import sys
 
 import pandas as pd
+import numpy as np
 import pytest
 
 from elexmodel.client import HistoricalModelClient, ModelClient
-from elexmodel.models import BaseElectionModel, ConformalElectionModel
+from elexmodel.models import BaseElectionModel, ConformalElectionModel, BootstrapElectionModel
 
 _TEST_FOLDER = os.path.dirname(__file__)
 FIXTURE_DIR = os.path.join(_TEST_FOLDER, "fixtures")
@@ -60,6 +61,15 @@ def conformal_election_model():
     model_settings = {}
     return ConformalElectionModel.ConformalElectionModel(model_settings)
 
+@pytest.fixture(scope="session")
+def bootstrap_election_model():
+    model_settings = {'features': ['baseline_normalized_margin']}
+    return BootstrapElectionModel.BootstrapElectionModel(model_settings)
+
+@pytest.fixture(scope="session")
+def rng():
+    seed = 1941
+    return np.random.default_rng(seed=seed)
 
 @pytest.fixture(scope="session")
 def va_config(get_fixture):
