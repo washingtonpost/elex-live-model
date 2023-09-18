@@ -47,4 +47,5 @@ def test_estimate_model_error(bootstrap_election_model, rng):
     aggregate_indicator = rng.multivariate_hypergeometric([1] * 5, 1, size=100)
     residuals, epsilon_hat, delta_hat = bootstrap_election_model._estimate_model_errors(ols_regression, x, y, aggregate_indicator)
     y_hat = ols_regression.predict(x)
-    assert np.testing.assert_array_almost_equal(ols_regression.residuals(y, y_hat, loo=True, center=True), residuals)
+    np.testing.assert_array_almost_equal(ols_regression.residuals(y, y_hat, loo=True, center=True), residuals)
+    # epsilon_hat and delta_hat are tested above
