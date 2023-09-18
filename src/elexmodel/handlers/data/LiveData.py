@@ -84,8 +84,6 @@ class MockLiveDataHandler:
     def load_data(self, data):
         columns_to_return = ["postal_code", "geographic_unit_fips"]
 
-        print(data)
-        print(data.columns)
         (data, more_columns) = self.estimandizer.add_estimand_results(data, self.estimands, self.historical)
         columns_to_return += more_columns
 
