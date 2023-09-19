@@ -168,11 +168,13 @@ class ConformalElectionModel(BaseElectionModel.BaseElectionModel, ABC):
         # we are interested in f(X) - r
         # since later conformity scores care about deviation of bounds from residuals
         conformalization_lower_bounds = (
-            lower_qr.predict(conformalization_data_features.values).flatten() - conformalization_data[f"residuals_{estimand}"].values
+            lower_qr.predict(conformalization_data_features.values).flatten()
+            - conformalization_data[f"residuals_{estimand}"].values
         )
-        conformalization_upper_bounds = conformalization_data[f"residuals_{estimand}"].values - upper_qr.predict(
-            conformalization_data_features.values
-        ).flatten()
+        conformalization_upper_bounds = (
+            conformalization_data[f"residuals_{estimand}"].values
+            - upper_qr.predict(conformalization_data_features.values).flatten()
+        )
 
         # save conformalization bounds for later
         conformalization_data["upper_bounds"] = conformalization_upper_bounds

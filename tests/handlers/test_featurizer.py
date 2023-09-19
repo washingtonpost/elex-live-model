@@ -44,6 +44,7 @@ def test_adding_intercept():
     assert "intercept" in featurizer.active_features
     pd.testing.assert_series_equal(df_new.intercept, pd.Series([1, 1, 1, 1], name="intercept"))
 
+
 def test_scaling_features():
     """
     Test whether scaling features works
@@ -352,7 +353,6 @@ def test_generate_fixed_effects(va_governor_county_data):
     featurizer = Featurizer([], {"county_classification": "all"})
 
     n_train = reporting_data.shape[0]
-    n_test = nonreporting_data.shape[0]
     all_units = pd.concat([reporting_data, nonreporting_data], axis=0)
 
     x_all = featurizer.prepare_data(all_units, center_features=False, scale_features=False, add_intercept=True)

@@ -4,14 +4,12 @@ import logging
 
 import numpy as np
 import pandas as pd
-from scipy.optimize import linprog
+from elexsolver.OLSRegressionSolver import OLSRegressionSolver
+from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
 from scipy.special import expit
 
 from elexmodel.handlers.data.Featurizer import Featurizer
 from elexmodel.models.BaseElectionModel import BaseElectionModel, PredictionIntervals
-
-from elexsolver.OLSRegressionSolver import OLSRegressionSolver
-from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
 
 LOG = logging.getLogger(__name__)
 
@@ -110,7 +108,7 @@ class BootstrapElectionModel(BaseElectionModel):
             for test_chunk in range(k):
                 x_y_w_test = chunks[test_chunk]
                 # extract all chunks except for the current test chunk
-                x_y_w_train = np.concatenate(chunks[:test_chunk] + chunks[(test_chunk + 1) :], axis=0)
+                x_y_w_train = np.concatenate(chunks[:test_chunk] + chunks[(test_chunk + 1) :], axis=0)  # noqa: 203
                 # undo the concatenation above
                 x_test = x_y_w_test[:, :-2]
                 y_test = x_y_w_test[:, -2]
@@ -119,7 +117,15 @@ class BootstrapElectionModel(BaseElectionModel):
                 y_train = x_y_w_train[:, -2]
                 w_train = x_y_w_train[:, -1]
                 ols_lambda = OLSRegressionSolver()
-                ols_lambda.fit(x_train, y_train, weights=w_train, lambda_=lambda_, fit_intercept=True, regularize_intercept=False, n_feat_ignore_reg=1)
+                ols_lambda.fit(
+                    x_train,
+                    y_train,
+                    weights=w_train,
+                    lambda_=lambda_,
+                    fit_intercept=True,
+                    regularize_intercept=False,
+                    n_feat_ignore_reg=1,
+                )
                 y_hat_lambda = ols_lambda.predict(x_test)
                 # error is the weighted sum of squares of the residual between the actual heldout y and the predicted y on the heldout set
                 errors[i] += np.sum(
@@ -169,7 +175,7 @@ class BootstrapElectionModel(BaseElectionModel):
         return (residuals - (aggregate_indicator @ epsilon_hat)).flatten()
 
     def _estimate_model_errors(
-        self, model: OLSRegression, x: np.ndarray, y: np.ndarray, aggregate_indicator: np.ndarray
+        self, model: OLSRegressionSolver, x: np.ndarray, y: np.ndarray, aggregate_indicator: np.ndarray
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         This function estimates all components of the error in our bootstrap model
@@ -257,7 +263,7 @@ class BootstrapElectionModel(BaseElectionModel):
         qr_lower = QuantileRegressionSolver()
         qr_lower.fit(x_train_aug, delta_aug_lb, self.taus_lower, fit_intercept=False)
         betas_lower = qr_lower.coefficients
-        
+
         qr_upper = QuantileRegressionSolver()
         qr_upper.fit(x_train_aug, delta_aug_ub, self.taus_upper, fit_intercept=False)
         betas_upper = qr_upper.coefficients
@@ -321,7 +327,7 @@ class BootstrapElectionModel(BaseElectionModel):
             ).clip(min=0.01)
             # if 0 percent of the vote is in, the upper bound would be zero if we used the above
             # code. So instead we set it to the naive bound
-            upper_bound[np.isclose(upper_bound, 0)] = unobserved_upper_bound 
+            upper_bound[np.isclose(upper_bound, 0)] = unobserved_upper_bound
 
         # if percent reporting is 0 or 1, don't try to compute anything and revert to naive bounds
         lower_bound[
@@ -436,15 +442,15 @@ class BootstrapElectionModel(BaseElectionModel):
         # We now need to estimate Sigma, the covariance matrix of our contest level effects.
         # We assume that the contest level random effects between contests is uncorrelated so the diagonals of \Sigma are zero.
         # To estimate the variance (diagonals) we use the sum of the variances of the units within a contest.
-            # This is because residuals = epsilons + delta, if we have observed units in a contest then 
-            #   the true epsilon is no longer a random quantity and no residual_{i, j} ~ N(epsilon_{i}, \sigma_{j}) (for i in contest and j in strata)
-            #   which means that var(residuals) = var(delta). So that epsilon_hat = mean(residuals)
-            #   so that var(epsilon_hat) = var(mean(residuals)) = mean(var(residuals)) = mean(var(delta))
-            
-            #   The variance of deltas is defined by their probability distribution (it's the same per stratum
-            #   since we assume that deltas are iid within a stratum). So we use the distribution to compute
-            #   the variance of the delta. We use interquartile-range (IQR) since this is more robust than
-            #   sample standard deviation
+        # This is because residuals = epsilons + delta, if we have observed units in a contest then
+        #   the true epsilon is no longer a random quantity and no residual_{i, j} ~ N(epsilon_{i}, \sigma_{j}) (for i in contest and j in strata)
+        #   which means that var(residuals) = var(delta). So that epsilon_hat = mean(residuals)
+        #   so that var(epsilon_hat) = var(mean(residuals)) = mean(var(residuals)) = mean(var(delta))
+
+        #   The variance of deltas is defined by their probability distribution (it's the same per stratum
+        #   since we assume that deltas are iid within a stratum). So we use the distribution to compute
+        #   the variance of the delta. We use interquartile-range (IQR) since this is more robust than
+        #   sample standard deviation
 
         # we first compute the unit variance estimate for each stratum (since that defines the variance per unit)
         iqr_y_strata = {}
@@ -589,7 +595,7 @@ class BootstrapElectionModel(BaseElectionModel):
         # gives us contests for which there is at least one county not reporting
         contests_in_nonreporting_units = np.where(np.any(aggregate_indicator_test > 0, axis=0))[0]
         # contests that need a random effect are:
-        #   contests that we want to make predictions on (ie. there are still outstanding units) 
+        #   contests that we want to make predictions on (ie. there are still outstanding units)
         #   BUT no units in that contest are reporting
         contests_that_need_random_effect = np.intersect1d(
             contests_not_in_reporting_units, contests_in_nonreporting_units
@@ -645,7 +651,6 @@ class BootstrapElectionModel(BaseElectionModel):
         """
         # TODO: potentially generalize binning features for strata
         n_train = reporting_units.shape[0]
-        n_test = nonreporting_units.shape[0]
         # we can use the featurizer, since strata are defined by dummy variables in the same way that
         # fixed effects are (ie. rural could be (1, 0, 0) while urban could be (0, 1, 0) while suburban could be (0, 0, 1))
         # but like with fixed effects we drop one strata category and use the intercept instead so the example would be
@@ -754,7 +759,7 @@ class BootstrapElectionModel(BaseElectionModel):
         z_train = reporting_units["turnout_factor"].values.reshape(-1, 1)
         weights_train = reporting_units["weights"].values.reshape(-1, 1)
 
-        x_test_df = self.featurizer.generate_holdout_data(x_all[n_train : (n_train + n_test)])
+        x_test_df = self.featurizer.generate_holdout_data(x_all[n_train : (n_train + n_test)])  # noqa: 203
         x_test = x_test_df.values
         # y_test = nonreporting_units['normalized_margin'].values.reshape(-1, 1)
         # z_test = nonreporting_units['turnout_factor'].values.reshape(-1, 1)
@@ -771,7 +776,6 @@ class BootstrapElectionModel(BaseElectionModel):
             aggregate_indicator = pd.get_dummies(all_units["postal_code"]).values
 
         aggregate_indicator_expected = aggregate_indicator[: (n_train + n_test)]
-        aggregate_indicator_unexpected = aggregate_indicator[(n_train + n_test) :]
         aggregate_indicator_train = aggregate_indicator_expected[:n_train]
         aggregate_indicator_test = aggregate_indicator_expected[n_train:]
 
@@ -806,11 +810,23 @@ class BootstrapElectionModel(BaseElectionModel):
         # we don't want to regularize the intercept or the coefficient for baseline_normalized_margin
         ols_y = OLSRegressionSolver()
         ols_y.fit(
-            x_train, y_train, weights=weights_train, lambda_=optimal_lambda_y, fit_intercept=True, regularize_intercept=False, n_feat_ignore_reg=1
+            x_train,
+            y_train,
+            weights=weights_train,
+            lambda_=optimal_lambda_y,
+            fit_intercept=True,
+            regularize_intercept=False,
+            n_feat_ignore_reg=1,
         )
         ols_z = OLSRegressionSolver()
         ols_z.fit(
-            x_train, z_train, weights=weights_train, lambda_=optimal_lambda_z, fit_intercept=True, regularize_intercept=False, n_feat_ignore_reg=1
+            x_train,
+            z_train,
+            weights=weights_train,
+            lambda_=optimal_lambda_z,
+            fit_intercept=True,
+            regularize_intercept=False,
+            n_feat_ignore_reg=1,
         )
 
         # step 2) calculate the fitted values
@@ -892,11 +908,23 @@ class BootstrapElectionModel(BaseElectionModel):
         #       equations are only dependent on x_train. This saves compute.
         ols_y_B = OLSRegressionSolver()
         ols_y_B.fit(
-            x_train, y_train_B, weights_train, normal_eqs=ols_y.normal_eqs, fit_intercept=True, regularize_intercept=False, n_feat_ignore_reg=1
+            x_train,
+            y_train_B,
+            weights_train,
+            normal_eqs=ols_y.normal_eqs,
+            fit_intercept=True,
+            regularize_intercept=False,
+            n_feat_ignore_reg=1,
         )
         ols_z_B = OLSRegressionSolver()
         ols_z_B.fit(
-            x_train, z_train_B, weights_train, normal_eqs=ols_z.normal_eqs, fit_intercept=True, regularize_intercept=False, n_feat_ignore_reg=1
+            x_train,
+            z_train_B,
+            weights_train,
+            normal_eqs=ols_z.normal_eqs,
+            fit_intercept=True,
+            regularize_intercept=False,
+            n_feat_ignore_reg=1,
         )
 
         # we cannot just apply ols_y_B/old_z_B to the test units because that would be missing our contest level random effect
@@ -938,7 +966,7 @@ class BootstrapElectionModel(BaseElectionModel):
         # however, we want to produce prediction intervals (rather than just confidence intervals) so we need to take into account the extra
         # uncertainty that comes with prediction (ie. estimating the mean has some variance, but sampling from our mean estimate introduces an additional error)
         # To do that we need an estimate for our prediction error (ie. an estimate of the residuals = epsilon + delta)
-        # we cannot use our original residuals_y, residuals_z because they would cancel out our error used in the bootstrap 
+        # we cannot use our original residuals_y, residuals_z because they would cancel out our error used in the bootstrap
         test_residuals_y, test_residuals_z = self._sample_test_errors(
             residuals_y,
             residuals_z,
@@ -1046,8 +1074,8 @@ class BootstrapElectionModel(BaseElectionModel):
         # we need to divide the sum of unnormalized aggregates by the total turnout predictions
         # so we first compute the total turnout predictions
 
-        aggregate_indicator_expected = aggregate_indicator[: (n_train + n_test)]
-        aggregate_indicator_unexpected = aggregate_indicator[(n_train + n_test) :]
+        aggregate_indicator_expected = aggregate_indicator[: (n_train + n_test)]  # noqa: 203
+        aggregate_indicator_unexpected = aggregate_indicator[(n_train + n_test) :]  # noqa: 203
 
         # two party turnout
         turnout_unexpected = (unexpected_units["results_dem"] + unexpected_units["results_gop"]).values.reshape(-1, 1)
@@ -1154,7 +1182,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         # first compute turnout and unnormalized margin for unexpected units.
         # this is a known quantity
-        aggregate_indicator_unexpected = aggregate_indicator[(n_train + n_test) :]
+        aggregate_indicator_unexpected = aggregate_indicator[(n_train + n_test) :]  # noqa: 1185
         margin_unexpected = unexpected_units["results_margin"].values.reshape(-1, 1)
         turnout_unexpected = (unexpected_units["results_dem"] + unexpected_units["results_gop"]).values.reshape(-1, 1)
         aggregate_z_unexpected = aggregate_indicator_unexpected.T @ turnout_unexpected
