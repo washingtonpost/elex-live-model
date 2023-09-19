@@ -10,157 +10,10 @@ from scipy.special import expit
 from elexmodel.handlers.data.Featurizer import Featurizer
 from elexmodel.models.BaseElectionModel import BaseElectionModel, PredictionIntervals
 
+from elexsolver.OLSRegressionSolver import OLSRegressionSolver
+from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
+
 LOG = logging.getLogger(__name__)
-
-
-class OLSRegression(object):
-    """
-    A class for Ordinary Least Squares Regression.
-    We have our own implementation because this allows us to save the normal equations for re-use, which
-    saves times during the bootstrap
-    """
-
-    # OLS setup:
-    #       X beta = y
-    # since X might not be square, we multiply the above equation on both sides by X^T to generate X^T X, which is guaranteed
-    # to be square
-    #       X^T X beta = X^T y
-    # Since X^T X is square we can invert it
-    #       beta = (X^T X)^{-1} X^T y
-    # Since our version of the model bootstraps y, but keeps X constant we can
-    # pre-compute (X^T X)^{-1} X^T and then re-use it to compute beta_b for every bootstrap sample
-
-    def __init__(self):
-        self.normal_eqs = None
-        self.hat_matrix = None
-        self.beta_hat = None
-
-    def _compute_normal_equations(
-        self, x: np.ndarray, L: np.ndarray, lambda_: float, n_feat_ignore_reg: int
-    ) -> np.ndarray:
-        """
-        Computes the Normal Equations for OLS: (X^T X)^{-1} X^T
-        """
-        # Inverting X^T X directly is computationally expensive and mathematically unstable, so we use QR factorization
-        # which factors x into the sum of an orthogonal matrix Q and a upper tringular matrix R
-        # L is a diagonal matrix of weights
-        Q, R = np.linalg.qr(L @ x)
-        # lambda_I is the matrix for regularization, which need to be the same shape as R and
-        # have the regularization constant lambda_ along the diagonal
-        lambda_I = lambda_ * np.eye(R.shape[1])
-        # we don't want to regularize the coefficient for intercept and some features
-        # so set regularization constant to zero for those features
-        # this assumes that these are the first features
-        for i in range(n_feat_ignore_reg):
-            lambda_I[i, i] = 0
-        # substitute X = QR into the normal equations to get
-        #       R^T Q^T Q R \beta = R^T Q^T y
-        #       R^T R \beta = R^T Q^T y
-        #       \beta = (R^T R)^{-1} R^T Q^T y
-        # since R is upper triangular it is eqsier to invert
-        # lambda_I is the regularization matrix
-        return np.linalg.inv(R.T @ R + lambda_I) @ R.T @ Q.T
-
-    def fit(
-        self,
-        x: np.ndarray,
-        y: np.ndarray,
-        weights: np.ndarray | None = None,
-        lambda_: float = 0.0,
-        normal_eqs: np.ndarray | None = None,
-        n_feat_ignore_reg: int = 2,
-    ) -> OLSRegression:
-        """
-        Fits the OLS model.
-        Computes weights, computes normal equations and then computes
-        """
-        # if weights is none, assume that that all weights should be 1
-        if weights is None:
-            weights = np.ones((y.shape[0],))
-        # normalize weights and turn into diagional matrix
-        # square root because will be squared when R^T R happens later
-        L = np.diag(np.sqrt(weights.flatten() / weights.sum()))
-        # if normal equations are provided then use those, otherwise compute them
-        if normal_eqs is not None:
-            self.normal_eqs = normal_eqs
-        else:
-            self.normal_eqs = self._compute_normal_equations(x, L, lambda_, n_feat_ignore_reg)
-        # compute hat matrix: X (X^T X)^{-1} X^T
-        self.hat_vals = np.diag(x @ self.normal_eqs @ L)
-        # compute beta_hat: (X^T X)^{-1} X^T y
-        self.beta_hat = self.normal_eqs @ L @ y
-        return self
-
-    def predict(self, x: np.ndarray) -> np.ndarray:
-        """
-        Uses beta_hat to predict on new x matrix
-        """
-        return x @ self.beta_hat
-
-    def residuals(self, y: np.ndarray, y_hat: np.ndarray, loo: bool = True, center: bool = True) -> np.ndarray:
-        """
-        Computes residuals for the model
-        """
-        # compute standard residuals
-        residuals = y - y_hat
-        # if leave one out is True, inflate by (1 - P)
-        # in OLS setting inflating by (1 - P) is the same as computing the leave one out residuals
-        # the un-inflated training residuals are too small, since training covariates were observed during fitting
-        if loo:
-            residuals /= (1 - self.hat_vals).reshape(-1, 1)
-        # centering removes the column mean
-        if center:
-            residuals -= np.mean(residuals, axis=0)
-        return residuals
-
-
-class QuantileRegression(object):
-    """
-    A new version of quantile regression that uses the dual to solve faster
-    """
-
-    def __init__(self):
-        self.beta_hats = []
-
-    def _fit(
-        self, S: np.ndarray, Phi: np.ndarray, zeros: np.ndarray, N: int, weights: np.ndarray, tau: float
-    ) -> np.ndarray:
-        """
-        Fits the dual problem of a quantile regression, for more information see appendix 6 here: https://arxiv.org/pdf/2305.12616.pdf
-        """
-        bounds = weights.reshape(-1, 1) * np.asarray([(tau - 1, tau)] * N)
-        # A_eq are the equality constraint matrix
-        # b_eq is the equality constraint vector (ie. A_eq @ x = b_eq)
-        # bounds are the (min, max) possible values of every element of x
-        res = linprog(-1 * S, A_eq=Phi.T, b_eq=zeros, bounds=bounds, method="highs", options={"presolve": False})
-        # marginal are the dual values, since we are solving the dual this is equivalent to the primal
-        return -1 * res.eqlin.marginals
-
-    def fit(
-        self, x: np.ndarray, y: np.ndarray, taus: list | float = 0.5, weights: np.ndarray | None = None
-    ) -> np.ndarray:
-        """
-        Fits the quantile regression
-        """
-        # if weights is none, assume that that all weights should be 1
-        if weights is None:
-            weights = np.ones((y.shape[0],))
-
-        S = y
-        Phi = x
-        zeros = np.zeros((Phi.shape[1],))
-        N = y.shape[0]
-        # normalize weights
-        weights /= np.sum(weights)
-
-        # _fit assumes that taus is list, so if we want to do one value of tau then turn into a list
-        if isinstance(taus, float):
-            taus = [taus]
-
-        for tau in taus:
-            self.beta_hats.append(self._fit(S, Phi, zeros, N, weights, tau))
-
-        return self.beta_hats
 
 
 class BootstrapElectionModelException(Exception):
@@ -250,7 +103,6 @@ class BootstrapElectionModel(BaseElectionModel):
         self.rng.shuffle(x_y_w)
         # generate k chunks
         chunks = np.array_split(x_y_w, k, axis=0)
-        ols = OLSRegression()
         errors = np.zeros((len(lambdas_),))
         # for each possible lambda value perform k-fold cross validation
         # ie. train model on k-1 chunks and evaluate on one chunk (for all possible k combinations of heldout chunk)
@@ -266,7 +118,8 @@ class BootstrapElectionModel(BaseElectionModel):
                 x_train = x_y_w_train[:, :-2]
                 y_train = x_y_w_train[:, -2]
                 w_train = x_y_w_train[:, -1]
-                ols_lambda = ols.fit(x_train, y_train, weights=w_train, lambda_=lambda_, n_feat_ignore_reg=2)
+                ols_lambda = OLSRegressionSolver()
+                ols_lambda.fit(x_train, y_train, weights=w_train, lambda_=lambda_, fit_intercept=True, regularize_intercept=False, n_feat_ignore_reg=1)
                 y_hat_lambda = ols_lambda.predict(x_test)
                 # error is the weighted sum of squares of the residual between the actual heldout y and the predicted y on the heldout set
                 errors[i] += np.sum(
@@ -401,8 +254,13 @@ class BootstrapElectionModel(BaseElectionModel):
         # for where dummy variable position i is equal to 1
         # since we are fitting many quantile regressions at the same time, our beta is
         # beta[tau, i] where tau stretches from 0.01 to 0.99
-        betas_lower = QuantileRegression().fit(x_train_aug, delta_aug_lb, self.taus_lower)
-        betas_upper = QuantileRegression().fit(x_train_aug, delta_aug_ub, self.taus_upper)
+        qr_lower = QuantileRegressionSolver()
+        qr_lower.fit(x_train_aug, delta_aug_lb, self.taus_lower, fit_intercept=False)
+        betas_lower = qr_lower.coefficients
+        
+        qr_upper = QuantileRegressionSolver()
+        qr_upper.fit(x_train_aug, delta_aug_ub, self.taus_upper, fit_intercept=False)
+        betas_upper = qr_upper.coefficients
 
         betas = np.concatenate([betas_lower, betas_upper])
 
@@ -946,11 +804,13 @@ class BootstrapElectionModel(BaseElectionModel):
 
         # step 1) fit the initial model
         # we don't want to regularize the intercept or the coefficient for baseline_normalized_margin
-        ols_y = OLSRegression().fit(
-            x_train, y_train, weights=weights_train, lambda_=optimal_lambda_y, n_feat_ignore_reg=2
+        ols_y = OLSRegressionSolver()
+        ols_y.fit(
+            x_train, y_train, weights=weights_train, lambda_=optimal_lambda_y, fit_intercept=True, regularize_intercept=False, n_feat_ignore_reg=1
         )
-        ols_z = OLSRegression().fit(
-            x_train, z_train, weights=weights_train, lambda_=optimal_lambda_z, n_feat_ignore_reg=2
+        ols_z = OLSRegressionSolver()
+        ols_z.fit(
+            x_train, z_train, weights=weights_train, lambda_=optimal_lambda_z, fit_intercept=True, regularize_intercept=False, n_feat_ignore_reg=1
         )
 
         # step 2) calculate the fitted values
@@ -1030,11 +890,13 @@ class BootstrapElectionModel(BaseElectionModel):
         #   we need to generate bootstrapped test predictions and to do that we need to fit a bootstrap model
         #   we are using the normal equations from the original model since x_train has stayed the same and the normal
         #       equations are only dependent on x_train. This saves compute.
-        ols_y_B = OLSRegression().fit(
-            x_train, y_train_B, weights_train, normal_eqs=ols_y.normal_eqs, n_feat_ignore_reg=2
+        ols_y_B = OLSRegressionSolver()
+        ols_y_B.fit(
+            x_train, y_train_B, weights_train, normal_eqs=ols_y.normal_eqs, fit_intercept=True, regularize_intercept=False, n_feat_ignore_reg=1
         )
-        ols_z_B = OLSRegression().fit(
-            x_train, z_train_B, weights_train, normal_eqs=ols_z.normal_eqs, n_feat_ignore_reg=2
+        ols_z_B = OLSRegressionSolver()
+        ols_z_B.fit(
+            x_train, z_train_B, weights_train, normal_eqs=ols_z.normal_eqs, fit_intercept=True, regularize_intercept=False, n_feat_ignore_reg=1
         )
 
         # we cannot just apply ols_y_B/old_z_B to the test units because that would be missing our contest level random effect
