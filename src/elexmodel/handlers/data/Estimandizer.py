@@ -23,7 +23,7 @@ class Estimandizer:
                 try:
                     data_df = globals()[estimand](data_df, RESULTS_PREFIX)
                 except KeyError as e:
-                    if historical and f"{BASELINE_PREFIX}{estimand}" in data_df.columns:
+                    if historical:
                         data_df[results_col] = nan
                     else:
                         raise e
