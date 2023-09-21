@@ -298,7 +298,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         # turn expected for nonreporting units into decimal (also clip at 100)
         nonreporting_expected_vote_frac = nonreporting_units.percent_expected_vote.values.clip(max=100) / 100
-        if bootstrap_estimand == "normalized_margin":
+        if bootstrap_estimand == "results_normalized_margin":
             unobserved_upper_bound = self.y_unobserved_upper_bound
             unobserved_lower_bound = self.y_unobserved_lower_bound
             # the upper bound for LHS party if all the outstanding vote go in their favour
@@ -755,15 +755,15 @@ class BootstrapElectionModel(BaseElectionModel):
 
         x_train_df = self.featurizer.filter_to_active_features(x_all[:n_train])
         x_train = x_train_df.values
-        y_train = reporting_units["normalized_margin"].values.reshape(-1, 1)
+        y_train = reporting_units["results_normalized_margin"].values.reshape(-1, 1)
         z_train = reporting_units["turnout_factor"].values.reshape(-1, 1)
-        weights_train = reporting_units["weights"].values.reshape(-1, 1)
+        weights_train = reporting_units["baseline_weights"].values.reshape(-1, 1)
 
         x_test_df = self.featurizer.generate_holdout_data(x_all[n_train : (n_train + n_test)])  # noqa: 203
         x_test = x_test_df.values
         # y_test = nonreporting_units['normalized_margin'].values.reshape(-1, 1)
         # z_test = nonreporting_units['turnout_factor'].values.reshape(-1, 1)
-        weights_test = nonreporting_units["weights"].values.reshape(-1, 1)
+        weights_test = nonreporting_units["baseline_weights"].values.reshape(-1, 1)
 
         # Create a matrix of size (n_contests, n_total_units) which acts as a crosswalk
         # between unit and contest (ie. a 1 in i,j says that unit j belongs to contest i)
@@ -782,7 +782,7 @@ class BootstrapElectionModel(BaseElectionModel):
         # we compute bounds for normalized margin and turnout factor based on our results providers current estimate for expected vote
         # ie. if 95% of the votes of a unit are in, what is the max/min the normalized_margin and turnout factor could still reach?
         y_partial_reporting_lower, y_partial_reporting_upper = self._generate_nonreporting_bounds(
-            nonreporting_units, "normalized_margin"
+            nonreporting_units, "results_normalized_margin"
         )
         z_partial_reporting_lower, z_partial_reporting_upper = self._generate_nonreporting_bounds(
             nonreporting_units, "turnout_factor"
@@ -1078,11 +1078,12 @@ class BootstrapElectionModel(BaseElectionModel):
         aggregate_indicator_unexpected = aggregate_indicator[(n_train + n_test) :]  # noqa: 203
 
         # two party turnout
-        turnout_unexpected = (unexpected_units["results_dem"] + unexpected_units["results_gop"]).values.reshape(-1, 1)
+        # results weights is unexpected_units["results_dem"] + unexpected_units["results_gop"]
+        turnout_unexpected = (unexpected_units['results_weights']).values.reshape(-1, 1)
 
         aggregate_indicator_train = aggregate_indicator_expected[:n_train]
         aggregate_indicator_test = aggregate_indicator_expected[n_train:]
-        weights_train = reporting_units["weights"].values.reshape(-1, 1)
+        weights_train = reporting_units["baseline_weights"].values.reshape(-1, 1)
         z_train = reporting_units["turnout_factor"].values.reshape(-1, 1)
 
         # get turnout for aggregate (w_i * z_i)
@@ -1184,17 +1185,18 @@ class BootstrapElectionModel(BaseElectionModel):
         # this is a known quantity
         aggregate_indicator_unexpected = aggregate_indicator[(n_train + n_test) :]  # noqa: 1185
         margin_unexpected = unexpected_units["results_margin"].values.reshape(-1, 1)
-        turnout_unexpected = (unexpected_units["results_dem"] + unexpected_units["results_gop"]).values.reshape(-1, 1)
+        # results weights is unexpected_units["results_dem"] + unexpected_units["results_gop"]
+        turnout_unexpected = (unexpected_units['results_weights']).values.reshape(-1, 1)
         aggregate_z_unexpected = aggregate_indicator_unexpected.T @ turnout_unexpected
         aggregate_yz_unexpected = aggregate_indicator_unexpected.T @ margin_unexpected
 
         aggregate_indicator_train = aggregate_indicator_expected[:n_train]
         aggregate_indicator_test = aggregate_indicator_expected[n_train:]
-        weights_train = reporting_units["weights"].values.reshape(-1, 1)
+        weights_train = reporting_units["baseline_weights"].values.reshape(-1, 1)
 
         # compute turnout and unnormalized margin for reporting units.
         # this is also a known quantity with no uncertainty
-        y_train = reporting_units["normalized_margin"].values.reshape(-1, 1)
+        y_train = reporting_units["results_normalized_margin"].values.reshape(-1, 1)
         z_train = reporting_units["turnout_factor"].values.reshape(-1, 1)
         yz_train = y_train * z_train
         aggregate_z_train = aggregate_indicator_train.T @ (weights_train * z_train)

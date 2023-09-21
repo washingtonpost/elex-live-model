@@ -31,7 +31,6 @@ class CombinedDataHandler:
         self.current_data = current_data
         self.geographic_unit_type = geographic_unit_type
         data = preprocessed_data.merge(current_data, how="left", on=["postal_code", "geographic_unit_fips"])
-        import pdb; pdb.set_trace()
         data = estimandizer.add_turnout_factor(data)
         # if unreporting is 'drop' then drop units that are not reporting (ie. units where results are na)
         # this is necessary if units will not be returning results in this election,
