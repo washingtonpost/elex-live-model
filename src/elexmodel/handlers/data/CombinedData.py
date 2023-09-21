@@ -29,6 +29,7 @@ class CombinedDataHandler:
         self.current_data = current_data
         self.geographic_unit_type = geographic_unit_type
         data = preprocessed_data.merge(current_data, how="left", on=["postal_code", "geographic_unit_fips"])
+        data = estimandizer.add_turnout_factor(data)
         # if unreporting is 'drop' then drop units that are not reporting (ie. units where results are na)
         # this is necessary if units will not be returning results in this election,
         # but we didn't know that (ie. townships)
@@ -37,7 +38,7 @@ class CombinedDataHandler:
             # Drop the whole row if an estimand is not reporting
             data = data.dropna(axis=0, how="any", subset=result_cols)
         # if unreporting is 'zero' then we set the votes for non-reporting units to zero
-        # this is necessary if we are worried that there is no zero state for units (ie. some precincts)
+        # this is necessary if we are worried that there is no zero state for units (ie. some precinct states)
         elif handle_unreporting == "zero":
             indices_with_null_val = data[result_cols].isna().any(axis=1)
             data.update(data[result_cols].fillna(value=0))
@@ -45,13 +46,23 @@ class CombinedDataHandler:
 
         self.data = data
 
-    def get_reporting_units(self, percent_reporting_threshold, features_to_normalize=[], add_intercept=True):
+    def get_reporting_units(
+        self,
+        percent_reporting_threshold,
+        turnout_factor_lower=0.5,
+        turnout_factor_upper=1.5,
+        features_to_normalize=[],
+        add_intercept=True,
+    ):
         """
         Get reporting data. These are units where the expected vote is greater than the percent reporting threshold.
         """
         reporting_units = self.data[self.data.percent_expected_vote >= percent_reporting_threshold].reset_index(
             drop=True
         )
+        # if turnout factor less than 0.5 or greater than 1.5 assume AP made a mistake and don't treat those as reporting units
+        reporting_units = reporting_units[reporting_units.turnout_factor > turnout_factor_lower]
+        reporting_units = reporting_units[reporting_units.turnout_factor < turnout_factor_upper]
 
         # residualize + normalize
         for estimand in self.estimands:
@@ -64,16 +75,23 @@ class CombinedDataHandler:
 
         return reporting_units
 
-    def get_nonreporting_units(self, percent_reporting_threshold, features_to_normalize=[], add_intercept=True):
+    def get_nonreporting_units(
+        self,
+        percent_reporting_threshold,
+        turnout_factor_lower=0.5,
+        turnout_factor_upper=1.5,
+        features_to_normalize=[],
+        add_intercept=True,
+    ):
         """
         Get nonreporting data. These are units where expected vote is less than the percent reporting threshold
         """
+        # if turnout factor <= turnout_factor_lower or >= turnout_factor_upper assume the AP made a mistake and treat them as non-reporting units
         nonreporting_units = self.data.query(
-            "percent_expected_vote < @percent_reporting_threshold"
+            "(percent_expected_vote < @percent_reporting_threshold) | (turnout_factor <= @turnout_factor_lower) | (turnout_factor >= @turnout_factor_upper)"  #
         ).reset_index(  # not checking if results.isnull() anymore across multiple estimands
             drop=True
         )
-
         nonreporting_units["reporting"] = int(0)
         nonreporting_units["expected"] = True
 
