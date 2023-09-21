@@ -113,7 +113,7 @@ class CombinedDataHandler:
         """
         components = geographic_unit_fips.split("_")
         if "district" in self.geographic_unit_type:
-            return components[0]  # CHANGE BACK
+            return components[1]
         return components[0]
 
     def _get_district_from_geographic_unit_fips(self, geographic_unit_fips):
@@ -121,7 +121,7 @@ class CombinedDataHandler:
         Get district from geographic unit fips
         """
         components = geographic_unit_fips.split("_")
-        return str(int(components[1]))  # CHANGE BACK
+        return components[0]
 
     def get_unexpected_units(self, percent_reporting_threshold, aggregates):
         """
