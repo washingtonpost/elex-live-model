@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from elexmodel.handlers.data.Estimandizer import Estimandizer
 from elexmodel.utils.file_utils import create_directory, get_directory_path
 
 LOG = logging.getLogger(__name__)
@@ -24,6 +25,7 @@ class PreprocessedDataHandler:
         s3_client=None,
         historical=False,
         data=None,
+        include_results_estimand=False,
     ):
         """
         Initialize preprocessed data. If not present, download from s3.
@@ -35,11 +37,13 @@ class PreprocessedDataHandler:
         self.s3_client = s3_client
         self.estimand_baselines = estimand_baselines
         self.historical = historical
+        self.include_results_estimand = include_results_estimand
+        self.estimandizer = Estimandizer()
 
         self.local_file_path = self.get_preprocessed_data_path()
 
         if data is not None:
-            self.data = self.load_data(data, estimand_baselines)
+            self.data = self.load_data(data)
         else:
             self.data = self.get_data()
 
@@ -61,7 +65,7 @@ class PreprocessedDataHandler:
             preprocessed_data = self.local_file_path
 
         data = pd.read_csv(preprocessed_data, dtype={"geographic_unit_fips": str, "county_fips": str, "district": str})
-        return self.load_data(data, self.estimand_baselines)
+        return self.load_data(data)
 
     def get_preprocessed_data_path(self):
         directory_path = get_directory_path()
@@ -76,24 +80,19 @@ class PreprocessedDataHandler:
         )
         return data
 
-    def load_data(self, preprocessed_data, estimand_baselines):
+    def load_data(self, preprocessed_data):
         """
         Load preprocessed csv data as df
         """
         LOG.info("Loading preprocessed data: %s, %s, %s", self.election_id, self.office, self.geographic_unit_type)
+        data = self.estimandizer.add_estimand_baselines(
+            preprocessed_data,
+            self.estimand_baselines,
+            self.historical,
+            include_results_estimand=self.include_results_estimand,
+        )
 
-        if self.historical:
-            # if we are in a historical election we are only reading preprocessed data to get
-            # the historical election results of the currently reporting units.
-            # so we don't care about the total voters or the baseline election.
-            return preprocessed_data
-
-        for estimand, pointer in estimand_baselines.items():
-            baseline_name = f"baseline_{pointer}"
-            # Adding one to prevent zero divison
-            preprocessed_data[f"last_election_results_{estimand}"] = preprocessed_data[baseline_name].copy() + 1
-
-        return preprocessed_data
+        return data
 
     def save_data(self, preprocessed_data):
         if not Path(self.local_file_path).parent.exists():

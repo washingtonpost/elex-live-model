@@ -56,21 +56,27 @@ class ModelClient:
         offices = config_handler.get_offices()
         if office not in offices:
             raise ValueError(f"Office '{office}' is not valid. Please check config.")
-        valid_estimands = config_handler.get_estimands(office)
-        for estimand in estimands:
-            if estimand not in valid_estimands:
-                raise ValueError(f"Estimand: '{estimand}' is not valid. Please check config")
+
+        estimands_in_config = config_handler.get_estimands(office)
+        extra_estimands = set(estimands).difference(set(estimands_in_config))
+        if len(extra_estimands) > 0:
+            # this is ok; later they'll all be created by the Estimandizer
+            LOG.info("Found additional estimands that were not specified in the config file: %s", extra_estimands)
+
         geographic_unit_types = config_handler.get_geographic_unit_types(office)
         if geographic_unit_type not in geographic_unit_types:
             raise ValueError(f"Geographic unit type: '{geographic_unit_type}' is not valid. Please check config")
+
         model_features = config_handler.get_features(office)
-        invalid_features = [feature for feature in features if feature not in model_features]
+        invalid_features = list(set(features).difference(set(model_features)))
         if len(invalid_features) > 0:
             raise ValueError(f"Feature(s): {invalid_features} not valid. Please check config")
+
         model_aggregates = config_handler.get_aggregates(office)
         invalid_aggregates = [aggregate for aggregate in aggregates if aggregate not in model_aggregates]
         if len(invalid_aggregates) > 0:
             raise ValueError(f"Aggregate(s): {invalid_aggregates} not valid. Please check config")
+
         model_fixed_effects = config_handler.get_fixed_effects(office)
         if isinstance(fixed_effects, dict):
             invalid_fixed_effects = [
@@ -82,14 +88,16 @@ class ModelClient:
             ]
         if len(invalid_fixed_effects) > 0:
             raise ValueError(f"Fixed effect(s): {invalid_fixed_effects} not valid. Please check config")
+
         if pi_method not in {"gaussian", "nonparametric"}:
             raise ValueError(
                 f"Prediction interval method: {pi_method} is not valid. \
                     pi_method has to be either `gaussian` or `nonparametric`."
             )
+
         if not isinstance(model_parameters, dict):
             raise ValueError("model_paramters is not valid. Has to be a dict.")
-        elif model_parameters != {}:
+        if len(model_parameters) > 0:
             if "lambda_" in model_parameters and (
                 not isinstance(model_parameters["lambda_"], (float, int)) or model_parameters["lambda_"] < 0
             ):
@@ -102,8 +110,10 @@ class ModelClient:
             elif pi_method == "nonparametric":
                 if "robust" in model_parameters and not isinstance(model_parameters["robust"], bool):
                     raise ValueError("robust is not valid. Has to be a boolean.")
+
         if handle_unreporting not in {"drop", "zero"}:
             raise ValueError("handle_unreporting must be either `drop` or `zero`")
+
         return True
 
     def get_aggregate_list(self, office, aggregate):
@@ -381,6 +391,19 @@ class HistoricalModelClient(ModelClient):
         """
         Formats data for historical model run
         """
+
+        # What does the historical model client do?
+        #     - If we are running the election in 2024 and 100 counties are reporting, we want to see what
+        #         our model error would have been in 2020 with these counties reporting
+        #     - To do that we need to merge the 2020 results onto the 2024 reporting counties
+
+        #     - So for 2020 (cli) this means -> we have 2020 data and we pick 100 random counties reporting
+        #       in the MockLiveDataHandler
+        #     - in this function we get the 2016 results and merge that to the 100 reporting counties in 2020
+
+        # running election id: 2020-11-03_USA_G --historical
+        #     -> historical election id: 2016-11-08_USA_G, 2012, ...
+
         formatted_data = current_data[["postal_code", "geographic_unit_fips", "percent_expected_vote"]]
         print(f"Getting data for historical election: {historical_election_id}")
         preprocessed_data_handler = PreprocessedDataHandler(
@@ -391,6 +414,7 @@ class HistoricalModelClient(ModelClient):
             estimand_baselines,
             s3_client=s3.S3CsvUtil(TARGET_BUCKET),
             historical=True,
+            include_results_estimand=True,
         )
 
         results_to_return = [f"results_{estimand}" for estimand in estimands]
