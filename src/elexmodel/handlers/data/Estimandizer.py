@@ -24,6 +24,14 @@ class Estimandizer:
                     data_df = globals()[estimand](data_df, RESULTS_PREFIX)
                 except KeyError as e:
                     if historical:
+                        # A historical run is one where we pull in data from a past election
+                        # and use it as though it were a current, live election.
+                        # Live elections don't have results since they haven't happened yet.
+                        # However, when we run the model from the CLI, we use the
+                        # MockLiveDataHandler to generate the current set of reporting units,
+                        # and that data handler expects a results_ column for every estimand specified.
+                        # Hence, this is the only special case in which we'd want to add
+                        # an empty results_ column.
                         data_df[results_col] = nan
                     else:
                         raise e
@@ -56,6 +64,11 @@ class Estimandizer:
                 data_df[f"last_election_results_{estimand}"] = data_df[baseline_col].copy() + 1
 
         if include_results_estimand:
+            # In the situation where we're combining Preprocessed and (Mock)Live data,
+            # we are most likely measuring performance, and it's possible we may not
+            # have the baseline_ columns or the results_ columns that we need.
+            # Since this method is only called by the PreprocessedDataHandler, for historical runs,
+            # we need to add the results from the historical election as well.
             data_df, ___ = self.add_estimand_results(data_df, estimand_baselines.keys(), historical)
 
         return data_df
