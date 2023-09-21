@@ -151,7 +151,7 @@ class MockLiveDataHandler:
         expected_n = n - self.unexpected_rows
         self.data_reporting = self.data[:expected_n].copy()
         self.data_nonreporting = self.data[expected_n:].copy()
-        
+
         for estimand in self.estimands:
             self.data_reporting[f"raw_results_{estimand}"] = self.data[f"results_{estimand}"]
             self.data_nonreporting[f"raw_results_{estimand}"] = self.data_nonreporting[f"results_{estimand}"]

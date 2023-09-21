@@ -1,5 +1,3 @@
-import numpy as np
-
 from elexmodel.handlers import s3
 from elexmodel.handlers.data.Estimandizer import Estimandizer
 from elexmodel.utils.file_utils import S3_FILE_PATH, TARGET_BUCKET, convert_df_to_csv

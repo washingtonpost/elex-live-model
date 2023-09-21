@@ -68,17 +68,21 @@ class Estimandizer:
 
         data_df = self.add_weights(data_df, BASELINE_PREFIX)
         return data_df
-    
+
     def add_weights(self, data_df, col_prefix):
-        import pdb; pdb.set_trace()
+        import pdb
+
+        pdb.set_trace()
         data_df[f"{col_prefix}weights"] = data_df[f"{col_prefix}turnout"]
         return data_df
-    
+
     def add_turnout_factor(self, data_df):
         data_df["turnout_factor"] = np.nan_to_num(data_df.results_weights / data_df.baseline_weights)
         return data_df
 
+
 # custom estimands
+
 
 def party_vote_share_dem(data_df, col_prefix):
     numer = f"{col_prefix}dem"
@@ -89,6 +93,7 @@ def party_vote_share_dem(data_df, col_prefix):
     )
 
     return data_df, []
+
 
 def margin(data_df, col_prefix):
     # in the margin case we are overwriting baseline_weights with two party turnout

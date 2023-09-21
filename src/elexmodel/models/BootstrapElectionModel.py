@@ -1079,7 +1079,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         # two party turnout
         # results weights is unexpected_units["results_dem"] + unexpected_units["results_gop"]
-        turnout_unexpected = (unexpected_units['results_weights']).values.reshape(-1, 1)
+        turnout_unexpected = (unexpected_units["results_weights"]).values.reshape(-1, 1)
 
         aggregate_indicator_train = aggregate_indicator_expected[:n_train]
         aggregate_indicator_test = aggregate_indicator_expected[n_train:]
@@ -1186,7 +1186,7 @@ class BootstrapElectionModel(BaseElectionModel):
         aggregate_indicator_unexpected = aggregate_indicator[(n_train + n_test) :]  # noqa: 1185
         margin_unexpected = unexpected_units["results_margin"].values.reshape(-1, 1)
         # results weights is unexpected_units["results_dem"] + unexpected_units["results_gop"]
-        turnout_unexpected = (unexpected_units['results_weights']).values.reshape(-1, 1)
+        turnout_unexpected = (unexpected_units["results_weights"]).values.reshape(-1, 1)
         aggregate_z_unexpected = aggregate_indicator_unexpected.T @ turnout_unexpected
         aggregate_yz_unexpected = aggregate_indicator_unexpected.T @ margin_unexpected
 
