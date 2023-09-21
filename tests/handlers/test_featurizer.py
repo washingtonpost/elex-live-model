@@ -450,9 +450,6 @@ def test_generate_fixed_effects_not_all_reporting(va_governor_county_data):
     reporting_data_features = featurizer.filter_to_active_features(x_all[:n_train])
     nonreporting_data_features = featurizer.generate_holdout_data(x_all[n_train:])
 
-    reporting_data_features = featurizer.filter_to_active_features(x_all[:n_train])
-    nonreporting_data_features = featurizer.generate_holdout_data(x_all[n_train:])
-
     assert combined_data_handler.data.shape == (133, 35)
 
     n_expected_columns = (n - 1) + 1  # minus 1 for dropped fixed effect, plus 1 for intercept
@@ -517,9 +514,6 @@ def test_generate_fixed_effects_mixed_reporting(va_governor_precinct_data):
     all_units = pd.concat([reporting_data, nonreporting_data], axis=0)
 
     x_all = featurizer.prepare_data(all_units, center_features=False, scale_features=False, add_intercept=True)
-
-    reporting_data_features = featurizer.filter_to_active_features(x_all[:n_train])
-    nonreporting_data_features = featurizer.generate_holdout_data(x_all[n_train:])
 
     reporting_data_features = featurizer.filter_to_active_features(x_all[:n_train])
     nonreporting_data_features = featurizer.generate_holdout_data(x_all[n_train:])
