@@ -49,8 +49,8 @@ class CombinedDataHandler:
     def get_reporting_units(
         self,
         percent_reporting_threshold,
-        turnout_factor_lower,
-        turnout_factor_upper,
+        turnout_factor_lower=0.5,
+        turnout_factor_upper=1.5,
         features_to_normalize=[],
         add_intercept=True,
     ):
@@ -78,17 +78,17 @@ class CombinedDataHandler:
     def get_nonreporting_units(
         self,
         percent_reporting_threshold,
-        turnout_factor_lower,
-        turnout_factor_upper,
+        turnout_factor_lower=0.5,
+        turnout_factor_upper=1.5,
         features_to_normalize=[],
         add_intercept=True,
     ):
         """
         Get nonreporting data. These are units where expected vote is less than the percent reporting threshold
         """
-        # if turnout factor <= 0.2 assume the AP made a mistake and treat them as non-reporting units
+        # if turnout factor <= turnout_factor_lower or >= turnout_factor_upper assume the AP made a mistake and treat them as non-reporting units
         nonreporting_units = self.data.query(
-            "(percent_expected_vote < @percent_reporting_threshold) | (turnout_factor <= @turnout_factor_upper) | (turnout_factor >= @turnout_factor_lower)"  #
+            "(percent_expected_vote < @percent_reporting_threshold) | (turnout_factor <= @turnout_factor_lower) | (turnout_factor >= @turnout_factor_upper)"  #
         ).reset_index(  # not checking if results.isnull() anymore across multiple estimands
             drop=True
         )

@@ -13,8 +13,8 @@ class Estimandizer:
         columns_to_return = []
         for estimand in estimands:
             results_col = f"{RESULTS_PREFIX}{estimand}"
-            # always adding turnout since we will want to generate weights
-            additional_columns_added = [f"{RESULTS_PREFIX}turnout"]
+            turnout_col = f"{RESULTS_PREFIX}turnout"
+            additional_columns_added = []
             if results_col not in data_df.columns:
                 # will raise a KeyError if a function with the same name as `estimand` doesn't exist
                 try:
@@ -34,7 +34,10 @@ class Estimandizer:
                         # If this is not a historical run, then this is a live election
                         # so we are expecting that there will be actual results data
                         raise e
-            columns_to_return.extend([results_col] + additional_columns_added)
+                    
+            # always adding turnout since we will want to generate weights
+            # but if turnout is the estimand, then we only want to add it once
+            columns_to_return.extend(list(set([results_col, turnout_col])) + additional_columns_added)
 
         data_df = self.add_weights(data_df, RESULTS_PREFIX)
 
@@ -70,9 +73,6 @@ class Estimandizer:
         return data_df
 
     def add_weights(self, data_df, col_prefix):
-        import pdb
-
-        pdb.set_trace()
         data_df[f"{col_prefix}weights"] = data_df[f"{col_prefix}turnout"]
         return data_df
 
