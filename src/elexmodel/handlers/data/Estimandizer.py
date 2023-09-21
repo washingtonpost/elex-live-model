@@ -1,4 +1,4 @@
-from numpy import nan
+import numpy as np
 
 RESULTS_PREFIX = "results_"
 BASELINE_PREFIX = "baseline_"
@@ -13,10 +13,11 @@ class Estimandizer:
         columns_to_return = []
         for estimand in estimands:
             results_col = f"{RESULTS_PREFIX}{estimand}"
+            added_column_names = []
             if results_col not in data_df.columns:
                 # will raise a KeyError if a function with the same name as `estimand` doesn't exist
                 try:
-                    data_df = globals()[estimand](data_df, RESULTS_PREFIX)
+                    data_df, added_column_names = globals()[estimand](data_df, RESULTS_PREFIX)
                 except KeyError as e:
                     if historical:
                         # A historical run is one where we pull in data from a past election
@@ -27,12 +28,13 @@ class Estimandizer:
                         # and that data handler expects a results_ column for every estimand specified.
                         # Hence, this is the only special case in which we'd want to add
                         # an empty results_ column.
-                        data_df[results_col] = nan
+                        data_df[results_col] = np.nan
                     else:
                         # If this is not a historical run, then this is a live election
                         # so we are expecting that there will be actual results data
                         raise e
-            columns_to_return.append(results_col)
+    
+            columns_to_return.extend(added_column_names)
 
         return data_df, columns_to_return
 
@@ -49,7 +51,7 @@ class Estimandizer:
             baseline_col = f"{BASELINE_PREFIX}{pointer}"
 
             if baseline_col not in data_df.columns:
-                data_df = globals()[estimand](data_df, BASELINE_PREFIX)
+                data_df, added_column_names= globals()[estimand](data_df, BASELINE_PREFIX)
 
             if not historical:
                 data_df[f"last_election_results_{estimand}"] = data_df[baseline_col].copy() + 1
@@ -63,17 +65,29 @@ class Estimandizer:
             data_df, ___ = self.add_estimand_results(data_df, estimand_baselines.keys(), historical)
 
         return data_df
-
+    
+    def add_turnout_factor(self, data_df):
+        data_df["turnout_factor"] = np.nan_to_num(data_df.results_weights / data_df.baseline_weights)
+        return data_df
 
 # custom estimands
-
 
 def party_vote_share_dem(data_df, col_prefix):
     numer = f"{col_prefix}dem"
     denom = f"{col_prefix}turnout"
 
-    data_df[f"{col_prefix}party_vote_share_dem"] = data_df.apply(
+    generated_party_vote_share_column_name = f"{col_prefix}party_vote_share_dem"
+    data_df[generated_party_vote_share_column_name] = data_df.apply(
         lambda x: 0 if x[numer] == 0 or x[denom] == 0 else x[numer] / x[denom], axis=1
     )
 
-    return data_df
+    return data_df, [generated_party_vote_share_column_name]
+
+def margin(data_df, col_prefix):
+    generated_weights_column_name = f"{col_prefix}weights"
+    generated_margin_column_name = f"{col_prefix}margin"
+    generated_normalized_margin_column_name = f"{col_prefix}normalized_margin"
+    data_df[generated_weights_column_name] = data_df[f"{col_prefix}dem"] + data_df[f"{col_prefix}gop"]
+    data_df[generated_margin_column_name] = data_df[f"{col_prefix}dem"] - data_df[f"{col_prefix}gop"]
+    data_df[generated_normalized_margin_column_name] = data_df[f"{col_prefix}margin"] / data_df[f"{col_prefix}weights"]
+    return data_df, [generated_weights_column_name, generated_margin_column_name, generated_normalized_margin_column_name]
