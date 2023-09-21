@@ -34,7 +34,7 @@ class Estimandizer:
                         # If this is not a historical run, then this is a live election
                         # so we are expecting that there will be actual results data
                         raise e
-                    
+
             # always adding turnout since we will want to generate weights
             # but if turnout is the estimand, then we only want to add it once
             columns_to_return.extend(list(set([results_col, turnout_col])) + additional_columns_added)
