@@ -88,7 +88,6 @@ class MockLiveDataHandler:
         columns_to_return += more_columns
 
         self.shuffle_dataframe = data[self.shuffle_columns].copy()
-
         return data[columns_to_return].copy()
 
     def shuffle(self, seed=None, upweight={}, enforce=[]):
@@ -152,6 +151,7 @@ class MockLiveDataHandler:
         expected_n = n - self.unexpected_rows
         self.data_reporting = self.data[:expected_n].copy()
         self.data_nonreporting = self.data[expected_n:].copy()
+        
         for estimand in self.estimands:
             self.data_reporting[f"raw_results_{estimand}"] = self.data[f"results_{estimand}"]
             self.data_nonreporting[f"raw_results_{estimand}"] = self.data_nonreporting[f"results_{estimand}"]
