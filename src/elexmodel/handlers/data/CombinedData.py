@@ -35,12 +35,6 @@ class CombinedDataHandler:
         # if unreporting is 'drop' then drop units that are not reporting (ie. units where results are na)
         # this is necessary if units will not be returning results in this election,
         # but we didn't know that (ie. townships)
-        
-        # TODO DELETE
-        # result_cols = [f"results_{estimand}" for estimand in estimands]
-        # if "margin" in estimands:
-            # result_cols.extend(["normalized_margin"])
-        
         result_cols = [f"results_{estimand}" for estimand in self.estimands]
         if handle_unreporting == "drop":
             # Drop the whole row if an estimand is not reporting
@@ -51,14 +45,6 @@ class CombinedDataHandler:
             indices_with_null_val = data[result_cols].isna().any(axis=1)
             data.update(data[result_cols].fillna(value=0))
             data.loc[indices_with_null_val, "percent_expected_vote"] = 0
-
-        # TODO DELETE
-        # TODO: move to estimandizer
-        # assumes that data.weights > 0, which means we cannot have units where turnout (or two party turnout) was zero
-        # data["turnout_factor"] = data.results_turnout / data.weights
-        # if "margin" in estimands:
-            # overwrite to make two party comparison fair
-            # data["turnout_factor"] = np.nan_to_num((data.results_dem + data.results_gop) / data.weights)
 
         self.data = data
 

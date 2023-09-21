@@ -84,19 +84,6 @@ class MockLiveDataHandler:
     def load_data(self, data):
         columns_to_return = ["postal_code", "geographic_unit_fips"]
 
-        # TODO: DELETE
-        # estimands_to_use = ["turnout"]  # in any case we want the turnout in order to compute turnout_factor
-        # if "margin" in estimands:
-        #     estimands_to_use = estimands_to_use + ["dem", "gop"]
-        #     columns_to_return.extend(["results_margin", "normalized_margin"])
-        # else:
-        #     estimands_to_use = list(set(estimands + estimands_to_use))
-
-        # # TODO: move to estimandizer
-        # if "margin" in estimands:
-        #     data["results_margin"] = data.results_dem - data.results_gop
-        #     data["normalized_margin"] = (data.results_dem - data.results_gop) / (data.results_dem + data.results_gop)
-
         (data, more_columns) = self.estimandizer.add_estimand_results(data, self.estimands, self.historical)
         columns_to_return += more_columns
 

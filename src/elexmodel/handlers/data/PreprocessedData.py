@@ -93,25 +93,6 @@ class PreprocessedDataHandler:
             include_results_estimand=self.include_results_estimand,
         )
 
-        # TODO: DELETE
-        # preprocessed_data["weights"] = preprocessed_data.baseline_turnout
-
-        # # TODO: move to estimandizer
-        # if "margin" in estimand_baselines:
-        #     # if margin then we want to overwrite with two party turnout rather than actual turnout to make normalization below fair
-        #     preprocessed_data["weights"] = preprocessed_data.baseline_dem + preprocessed_data.baseline_gop
-        #     preprocessed_data["baseline_margin"] = preprocessed_data.baseline_dem - preprocessed_data.baseline_gop
-        #     preprocessed_data["baseline_normalized_margin"] = np.nan_to_num(
-        #         (preprocessed_data.baseline_dem - preprocessed_data.baseline_gop) / preprocessed_data.weights
-        #     )
-
-        # for estimand, pointer in estimand_baselines.items():
-        #     baseline_name = f"baseline_{pointer}"
-        #     # Adding one to prevent zero divison
-        #     preprocessed_data[f"last_election_results_{estimand}"] = preprocessed_data[baseline_name].copy() + 1
-
-        # return preprocessed_data
-
         return data
 
     def save_data(self, preprocessed_data):
