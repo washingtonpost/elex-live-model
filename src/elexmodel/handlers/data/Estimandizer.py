@@ -1,6 +1,5 @@
 from numpy import nan
 
-
 RESULTS_PREFIX = "results_"
 BASELINE_PREFIX = "baseline_"
 
