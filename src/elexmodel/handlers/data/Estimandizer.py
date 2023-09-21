@@ -1,10 +1,6 @@
 from numpy import nan
 
 
-class EstimandException(Exception):
-    pass
-
-
 RESULTS_PREFIX = "results_"
 BASELINE_PREFIX = "baseline_"
 
@@ -34,14 +30,10 @@ class Estimandizer:
                         # an empty results_ column.
                         data_df[results_col] = nan
                     else:
+                        # If this is not a historical run, then this is a live election
+                        # so we are expecting that there will be actual results data
                         raise e
             columns_to_return.append(results_col)
-
-        results_column_names = [x for x in data_df.columns if x.startswith(RESULTS_PREFIX)]
-        # If this is not a historical run, then this is a live election
-        # so we are expecting that there will be actual results data
-        if not historical and len(results_column_names) == 0:
-            raise EstimandException("This is not a test election, it is missing results data")
 
         return data_df, columns_to_return
 
