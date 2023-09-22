@@ -17,7 +17,12 @@ def test_load(va_governor_county_data):
     )
     current_data = live_data_handler.data
     preprocessed_data_handler = PreprocessedDataHandler(
-        election_id, office_id, geographic_unit_type, estimand_baselines=estimand_baselines, estimands=["turnout"], data=va_governor_county_data
+        election_id,
+        office_id,
+        geographic_unit_type,
+        estimand_baselines=estimand_baselines,
+        estimands=estimands,
+        data=va_governor_county_data,
     )
     preprocessed_data = preprocessed_data_handler.data
 
@@ -32,21 +37,37 @@ def test_zero_unreporting_missing_single_estimand_value(va_governor_county_data)
     """
     Set the value for one estimand (dem) as na to test unreporting = "zero"
     """
+    election_id = "2017-11-07_VA_G"
+    office_id = "G"
+    geographic_unit_type = "county"
+    estimand_baselines = {"turnout": "turnout", "dem": "dem"}
     estimands = ["turnout", "dem"]
-    live_data_handler = MockLiveDataHandler("2017-11-07_VA_G", "G", "county", estimands, data=va_governor_county_data)
+    live_data_handler = MockLiveDataHandler(
+        election_id, office_id, geographic_unit_type, estimands, data=va_governor_county_data
+    )
     current_data = live_data_handler.data
     current_data["percent_expected_vote"] = 100
     current_data.loc[0, "results_dem"] = np.nan
 
+    preprocessed_data_handler = PreprocessedDataHandler(
+        election_id,
+        office_id,
+        geographic_unit_type,
+        estimand_baselines=estimand_baselines,
+        estimands=estimands,
+        data=va_governor_county_data,
+    )
+    preprocessed_data = preprocessed_data_handler.data
+
     combined_data_handler = CombinedDataHandler(
-        va_governor_county_data, current_data, estimands, "county", handle_unreporting="zero"
+        preprocessed_data, current_data, estimands, "county", handle_unreporting="zero"
     )
     assert combined_data_handler.data["results_dem"].iloc[0] == 0.0  # value with na result has been set to zero
     assert combined_data_handler.data["results_turnout"].iloc[0] != 0  # has not been set to zero
     assert (
         combined_data_handler.data["percent_expected_vote"].iloc[0] == 0
     )  # percent expected vote with na result has been set to zero
-    assert combined_data_handler.data.shape == (133, 35)  # didn't drop any
+    assert combined_data_handler.data.shape == (133, 36)  # didn't drop any
     assert combined_data_handler.data["results_dem"].iloc[1] != 0  # didn't accidentally set other to zero
 
 
@@ -54,20 +75,36 @@ def test_zero_unreporting_missing_multiple_estimands_value(va_governor_county_da
     """
     Set the value for multiple estimands (dem, turnout) as na to test unreporting = "zero"
     """
+    election_id = "2017-11-07_VA_G"
+    office_id = "G"
+    geographic_unit_type = "county"
+    estimand_baselines = {"turnout": "turnout", "dem": "dem"}
     estimands = ["turnout", "dem"]
-    live_data_handler = MockLiveDataHandler("2017-11-07_VA_G", "G", "county", estimands, data=va_governor_county_data)
+    live_data_handler = MockLiveDataHandler(
+        election_id, office_id, geographic_unit_type, estimands, data=va_governor_county_data
+    )
     current_data = live_data_handler.data
     current_data["percent_expected_vote"] = 100
     current_data.loc[0, "results_dem"] = np.nan
     current_data.loc[0, "results_turnout"] = np.nan
 
+    preprocessed_data_handler = PreprocessedDataHandler(
+        election_id,
+        office_id,
+        geographic_unit_type,
+        estimand_baselines=estimand_baselines,
+        estimands=estimands,
+        data=va_governor_county_data,
+    )
+    preprocessed_data = preprocessed_data_handler.data
+
     combined_data_handler = CombinedDataHandler(
-        va_governor_county_data, current_data, estimands, "county", handle_unreporting="zero"
+        preprocessed_data, current_data, estimands, "county", handle_unreporting="zero"
     )
     assert combined_data_handler.data["results_dem"].iloc[0] == 0.0
     assert combined_data_handler.data["results_turnout"].iloc[0] == 0.0
     assert combined_data_handler.data["percent_expected_vote"].iloc[0] == 0.0
-    assert combined_data_handler.data.shape == (133, 35)
+    assert combined_data_handler.data.shape == (133, 36)
     assert combined_data_handler.data["results_dem"].iloc[1] != 0  # didn't accidentally set other to zero
     assert combined_data_handler.data["results_turnout"].iloc[1] != 0  # didn't accidentally set other to zero
 
@@ -76,19 +113,35 @@ def test_zero_unreporting_missing_percent_expected_vote_value(va_governor_county
     """
     Set the value and percent reporting for one estimand (dem) as na to test unreporting = "zero"
     """
+    election_id = "2017-11-07_VA_G"
+    office_id = "G"
+    geographic_unit_type = "county"
+    estimand_baselines = {"turnout": "turnout", "dem": "dem"}
     estimands = ["turnout", "dem"]
-    live_data_handler = MockLiveDataHandler("2017-11-07_VA_G", "G", "county", estimands, data=va_governor_county_data)
+    live_data_handler = MockLiveDataHandler(
+        election_id, office_id, geographic_unit_type, estimands, data=va_governor_county_data
+    )
     current_data = live_data_handler.data
     current_data["percent_expected_vote"] = 100
     current_data.loc[0, "percent_expected_vote"] = np.nan
     current_data.loc[0, "results_dem"] = np.nan
 
+    preprocessed_data_handler = PreprocessedDataHandler(
+        election_id,
+        office_id,
+        geographic_unit_type,
+        estimand_baselines=estimand_baselines,
+        estimands=estimands,
+        data=va_governor_county_data,
+    )
+    preprocessed_data = preprocessed_data_handler.data
+
     combined_data_handler = CombinedDataHandler(
-        va_governor_county_data, current_data, estimands, "county", handle_unreporting="zero"
+        preprocessed_data, current_data, estimands, "county", handle_unreporting="zero"
     )
     assert combined_data_handler.data["results_dem"].iloc[0] == 0.0
     assert combined_data_handler.data["percent_expected_vote"].iloc[0] == 0.0
-    assert combined_data_handler.data.shape == (133, 35)
+    assert combined_data_handler.data.shape == (133, 36)
     assert combined_data_handler.data["results_dem"].iloc[1] != 0  # didn't accidentally set other to zero
 
 
@@ -96,18 +149,34 @@ def test_zero_unreporting_random_percent_expected_vote_value(va_governor_county_
     """
     Set the value for one estimand (dem) as na to test unreporting = "zero"
     """
+    election_id = "2017-11-07_VA_G"
+    office_id = "G"
+    geographic_unit_type = "county"
+    estimand_baselines = {"turnout": "turnout", "dem": "dem"}
     estimands = ["turnout", "dem"]
-    live_data_handler = MockLiveDataHandler("2017-11-07_VA_G", "G", "county", estimands, data=va_governor_county_data)
+    live_data_handler = MockLiveDataHandler(
+        election_id, office_id, geographic_unit_type, estimands, data=va_governor_county_data
+    )
     current_data = live_data_handler.data
     current_data["percent_expected_vote"] = np.random.randint(1, 100, current_data.shape[0])
     current_data.loc[0, "results_dem"] = np.nan
 
+    preprocessed_data_handler = PreprocessedDataHandler(
+        election_id,
+        office_id,
+        geographic_unit_type,
+        estimand_baselines=estimand_baselines,
+        estimands=estimands,
+        data=va_governor_county_data,
+    )
+    preprocessed_data = preprocessed_data_handler.data
+
     combined_data_handler = CombinedDataHandler(
-        va_governor_county_data, current_data, estimands, "county", handle_unreporting="zero"
+        preprocessed_data, current_data, estimands, "county", handle_unreporting="zero"
     )
     assert combined_data_handler.data["results_dem"].iloc[0] == 0.0  # all values set to 0.0
     assert combined_data_handler.data["percent_expected_vote"].iloc[0] == 0.0
-    assert combined_data_handler.data.shape == (133, 35)
+    assert combined_data_handler.data.shape == (133, 36)
     assert combined_data_handler.data["results_dem"].iloc[1] != 0  # didn't accidentally set other to zero
 
 
@@ -115,16 +184,32 @@ def test_drop_unreporting_missing_single_estimand_value(va_governor_county_data)
     """
     Set the value for one estimand (dem) as na to test unreporting = "drop"
     """
+    election_id = "2017-11-07_VA_G"
+    office_id = "G"
+    geographic_unit_type = "county"
+    estimand_baselines = {"turnout": "turnout", "dem": "dem"}
     estimands = ["turnout", "dem"]
-    live_data_handler = MockLiveDataHandler("2017-11-07_VA_G", "G", "county", estimands, data=va_governor_county_data)
+    live_data_handler = MockLiveDataHandler(
+        election_id, office_id, geographic_unit_type, estimands, data=va_governor_county_data
+    )
     current_data = live_data_handler.data
     current_data["percent_expected_vote"] = 100
     current_data.loc[0, "results_dem"] = np.nan
 
-    combined_data_handler = CombinedDataHandler(
-        va_governor_county_data, current_data, estimands, "county", handle_unreporting="drop"
+    preprocessed_data_handler = PreprocessedDataHandler(
+        election_id,
+        office_id,
+        geographic_unit_type,
+        estimand_baselines=estimand_baselines,
+        estimands=estimands,
+        data=va_governor_county_data,
     )
-    assert combined_data_handler.data.shape == (132, 35)  # dropped one
+    preprocessed_data = preprocessed_data_handler.data
+
+    combined_data_handler = CombinedDataHandler(
+        preprocessed_data, current_data, estimands, "county", handle_unreporting="drop"
+    )
+    assert combined_data_handler.data.shape == (132, 36)  # dropped one
     assert combined_data_handler.data["results_dem"].iloc[0] != 0  # didn't accidentally set other to zero
 
 

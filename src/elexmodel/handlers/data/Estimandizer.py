@@ -36,14 +36,13 @@ class Estimandizer:
                         # so we are expecting that there will be actual results data
                         raise e
 
-
             columns_to_return.extend([results_col] + additional_columns_added)
 
         # always adding turnout since we will want to generate weights
         # but if turnout is the estimand, then we only want to add it once
         if turnout_col not in columns_to_return:
             columns_to_return.append(turnout_col)
-        
+
         data_df = self.add_weights(data_df, RESULTS_PREFIX)
 
         return data_df, columns_to_return
