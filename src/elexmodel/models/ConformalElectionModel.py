@@ -157,7 +157,7 @@ class ConformalElectionModel(BaseElectionModel.BaseElectionModel, ABC):
 
         # apply to conformalization data. Conformalization bounds will later tell us how much to adjust lower/upper
         # bounds for nonreporting data.
-        conformalization_data = reporting_units_shuffled[train_rows:]
+        conformalization_data = reporting_units_shuffled[train_rows:].reset_index(drop=True)
 
         # all_data starts with reporting_units_shuffled, so the rows between train_rows and n_train are the
         # conformalization set
