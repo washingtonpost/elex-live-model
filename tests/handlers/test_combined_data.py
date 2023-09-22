@@ -238,6 +238,90 @@ def test_get_reporting_data(va_governor_county_data):
     assert observed_data.reporting.sum() == 20
 
 
+def test_get_reporting_data_dropping_with_turnout_factor(va_governor_county_data):
+    election_id = "2017-11-07_VA_G"
+    office = "G"
+    geographic_unit_type = "county"
+    estimands = ["turnout"]
+    estimand_baseline = {"turnout": "turnout"}
+
+    live_data_handler = MockLiveDataHandler(
+        election_id, office, geographic_unit_type, estimands, data=va_governor_county_data
+    )
+    current_data = live_data_handler.get_n_fully_reported(n=20)
+    preprocessed_data_handler = PreprocessedDataHandler(
+        election_id, office, geographic_unit_type, estimands, estimand_baseline, data=va_governor_county_data
+    )
+
+    combined_data_handler = CombinedDataHandler(
+        preprocessed_data_handler.data, current_data, estimands, geographic_unit_type
+    )
+
+    turnout_factor_lower = 0.95
+    turnout_factor_upper = 1.2
+    reporting_units_above_turnout_factor_threshold = combined_data_handler.data[
+        combined_data_handler.data.turnout_factor > turnout_factor_upper
+    ].shape[0]
+    reporting_units_below_turnout_factor_threshold = combined_data_handler.data[
+        (combined_data_handler.data.percent_expected_vote == 100)
+        & (combined_data_handler.data.turnout_factor < turnout_factor_lower)
+    ].shape[0]
+
+    observed_data = combined_data_handler.get_reporting_units(
+        100, turnout_factor_lower=turnout_factor_lower, turnout_factor_upper=turnout_factor_upper
+    )
+
+    # 20 units should be reporting, but the additional ones are dropped to nonreporting because they are above/below threshold
+    # and so are subtracted from the reporting ones
+    assert observed_data.shape[0] == 20 - (
+        reporting_units_above_turnout_factor_threshold + reporting_units_below_turnout_factor_threshold
+    )
+
+
+def test_get_nonreporting_adding_with_turnout_factor(va_governor_county_data):
+    election_id = "2017-11-07_VA_G"
+    office = "G"
+    geographic_unit_type = "county"
+    estimands = ["turnout"]
+    estimand_baseline = {"turnout": "turnout"}
+
+    live_data_handler = MockLiveDataHandler(
+        election_id, office, geographic_unit_type, estimands, data=va_governor_county_data
+    )
+    n = 20
+    current_data = live_data_handler.get_n_fully_reported(n=n)
+    preprocessed_data_handler = PreprocessedDataHandler(
+        election_id, office, geographic_unit_type, estimands, estimand_baseline, data=va_governor_county_data
+    )
+
+    combined_data_handler = CombinedDataHandler(
+        preprocessed_data_handler.data, current_data, estimands, geographic_unit_type
+    )
+
+    turnout_factor_lower = 0.95
+    turnout_factor_upper = 1.2
+
+    reporting_units_above_turnout_factor_threshold = combined_data_handler.data[
+        combined_data_handler.data.turnout_factor > turnout_factor_upper
+    ].shape[0]
+    reporting_units_below_turnout_factor_threshold = combined_data_handler.data[
+        (combined_data_handler.data.percent_expected_vote == 100)
+        & (combined_data_handler.data.turnout_factor < turnout_factor_lower)
+    ].shape[0]
+
+    nonreporting_data = combined_data_handler.get_nonreporting_units(
+        100, turnout_factor_lower=turnout_factor_lower, turnout_factor_upper=turnout_factor_upper
+    )
+
+    assert (
+        nonreporting_data.shape[0]
+        == va_governor_county_data.shape[0]
+        - n
+        + reporting_units_above_turnout_factor_threshold
+        + reporting_units_below_turnout_factor_threshold
+    )
+
+
 def test_get_unexpected_units_county_district(va_assembly_county_data):
     election_id = "2017-11-07_VA_G"
     office = "Y"
