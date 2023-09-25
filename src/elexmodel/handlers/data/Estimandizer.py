@@ -52,7 +52,7 @@ class Estimandizer:
         # if we are in a historical election we are only reading preprocessed data to get
         # the historical election results of the currently reporting units.
         # so we don't care about the total voters or the baseline election.
-        
+
         data_df = self.add_weights(data_df, BASELINE_PREFIX)
 
         for estimand, pointer in estimand_baselines.items():
