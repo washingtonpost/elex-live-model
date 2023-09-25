@@ -1,6 +1,9 @@
-import numpy as np
+import pytest
 
-from elexmodel.models.BootstrapElectionModel import OLSRegression
+import numpy as np
+import pandas as pd
+
+from elexmodel.models.BootstrapElectionModel import OLSRegressionSolver
 
 
 def test_cross_validation(bootstrap_election_model, rng):
@@ -9,6 +12,7 @@ def test_cross_validation(bootstrap_election_model, rng):
     TODO: figure out how to force it to find a different lambda also
     """
     x = rng.normal(loc=2, scale=5, size=(100, 5))
+    x[:, 0] = 1
     beta = rng.integers(low=-100, high=100, size=(5, 1))
     y = x @ beta + rng.normal(loc=0, scale=1, size=(100, 1))
     lambdas = [0, 1, 100]
@@ -45,9 +49,10 @@ def test_estimate_delta(bootstrap_election_model):
 
 def test_estimate_model_error(bootstrap_election_model, rng):
     x = rng.normal(loc=2, scale=5, size=(100, 5))
+    x[:, 0] = 1
     beta = rng.integers(low=-100, high=100, size=(5, 1))
     y = x @ beta
-    ols_regression = OLSRegression()
+    ols_regression = OLSRegressionSolver()
     ols_regression.fit(x, y)
     aggregate_indicator = rng.multivariate_hypergeometric([1] * 5, 1, size=100)
     residuals, epsilon_hat, delta_hat = bootstrap_election_model._estimate_model_errors(
@@ -56,3 +61,49 @@ def test_estimate_model_error(bootstrap_election_model, rng):
     y_hat = ols_regression.predict(x)
     np.testing.assert_array_almost_equal(ols_regression.residuals(y, y_hat, loo=True, center=True), residuals)
     # epsilon_hat and delta_hat are tested above
+
+def test_get_strata(bootstrap_election_model, rng):
+    reporting_units = pd.DataFrame([['a', True, True], ['b', True, True], ['c', True, True]], columns=['county_classification', 'reporting', 'expected'])
+    nonreporting_units = pd.DataFrame([['c', False, True], ['d', False, True]], columns=['county_classification', 'reporting', 'expected'])
+    x_train_strata, x_test_strata = bootstrap_election_model._get_strata(reporting_units, nonreporting_units)
+
+    assert 'intercept' in x_train_strata.columns
+    # a has been dropped
+    assert 'county_classification_b' in x_train_strata.columns
+    assert 'county_classification_c' in x_train_strata.columns
+    assert 'county_classification_d' in x_train_strata.columns
+    np.testing.assert_array_almost_equal(x_train_strata.values, np.asarray([[1, 0, 0, 0], [1, 1, 0, 0], [1, 0, 1, 0]]))
+
+    assert 'intercept' in x_test_strata.columns
+    assert 'county_classification_b' in x_test_strata.columns
+    assert 'county_classification_c' in x_test_strata.columns
+    assert 'county_classification_d' in x_test_strata.columns
+
+    np.testing.assert_array_almost_equal(x_test_strata.values, np.asarray([[1, 0, 1, 0], [1, 0, 0, 1]]))
+
+
+def test_estimate_strata_dist(bootstrap_election_model, rng):
+    x_train, x_test = None, None
+    x_train_strata = pd.DataFrame([[1, 0, 0], [1, 0, 0], [1, 1, 0], [1, 1, 0], [1, 1, 0]])
+    x_test_strata = pd.DataFrame([[1, 1, 0], [1, 0, 1], [1, 0, 1]])
+    delta_hat = np.asarray([-0.3, 0.5, 0.2, 0.25, 0.28])
+    lb = 0.1
+    ub = 0.3
+    ppf, cdf = bootstrap_election_model._estimate_strata_dist(x_train, x_train_strata, x_test, x_test_strata, delta_hat, lb, ub)
+
+    # assert ppf[(1, 0, 0)](0.01) == pytest.approx(delta_hat[:2].min())
+    # import pdb; pdb.set_trace()
+    # assert ppf[(1, 0, 0)](0.49) == pytest.approx(delta_hat[:2].min())
+    # assert ppf[(1, 0, 0)](0.51) == pytest.approx(delta_hat[:2].max())
+    # assert ppf[(1, 0, 0)](0.99) == pytest.approx(delta_hat[:2].max())
+    # import pdb; pdb.set_trace()
+    # since all elements of the second strata are > 0.1 and < 0.3 we use the lb and ub for the first
+    # quantiles
+    # assert ppf[(1, 1, 0)](0.01) == lb
+    # assert ppf[(1, 1, 0)](0.25) == lb
+    # assert ppf[(1, 1, 0)](0.26) == pytest.approx(delta_hat[2:].min())
+    # assert ppf[(1, 1, 0)](0.50) == pytest.approx(np.median(delta_hat[2:]))
+    # assert ppf[(1, 1, 0)](0.51) == pytest.approx(delta_hat[2:].max())
+    # assert ppf[(1, 1, 0)](0.74) == pytest.approx(delta_hat[2:].max())
+    # assert ppf[(1, 1, 0)](0.75) == ub
+    # assert ppf[(1, 1, 0)](0.99) == ub

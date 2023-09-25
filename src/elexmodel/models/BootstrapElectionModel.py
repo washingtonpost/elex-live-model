@@ -255,27 +255,25 @@ class BootstrapElectionModel(BaseElectionModel):
             delta_aug_lb = np.concatenate([delta_hat, [lb]])
             delta_aug_ub = np.concatenate([delta_hat, [ub]])
 
-        # fit the regressions to create the probability distributions
-        # for a single regression beta[i] is the tau-th (e.g. median or 30th percentile)
-        # for where dummy variable position i is equal to 1
-        # since we are fitting many quantile regressions at the same time, our beta is
-        # beta[tau, i] where tau stretches from 0.01 to 0.99
-        qr_lower = QuantileRegressionSolver()
-        qr_lower.fit(x_train_aug, delta_aug_lb, self.taus_lower, fit_intercept=False)
-        betas_lower = qr_lower.coefficients
+            # fit the regressions to create the probability distributions
+            # for a single regression beta[i] is the tau-th (e.g. median or 30th percentile)
+            # for where dummy variable position i is equal to 1
+            # since we are fitting many quantile regressions at the same time, our beta is
+            # beta[tau, i] where tau stretches from 0.01 to 0.99
+            qr_lower = QuantileRegressionSolver()
+            qr_lower.fit(x_train_aug, delta_aug_lb, self.taus_lower, fit_intercept=False)
+            betas_lower = qr_lower.coefficients
 
-        qr_upper = QuantileRegressionSolver()
-        qr_upper.fit(x_train_aug, delta_aug_ub, self.taus_upper, fit_intercept=False)
-        betas_upper = qr_upper.coefficients
+            qr_upper = QuantileRegressionSolver()
+            qr_upper.fit(x_train_aug, delta_aug_ub, self.taus_upper, fit_intercept=False)
+            betas_upper = qr_upper.coefficients
 
-        betas = np.concatenate([betas_lower, betas_upper])
+            betas = np.concatenate([betas_lower, betas_upper])
 
-        # we do two separate for-loops because that is faster than computing the quantile regression
-        # within the for-loop.
-        # for each strata, we take the betas that belong to that stratum
-        # ie. for stratum [0, 1, 0] we take the betas (there is one for each tau between 0.01, 0.99])
-        # at position 1 (0-indexed)
-        for x_stratum in x_strata:
+            # for each strata, we take the betas that belong to that stratum
+            # ie. for stratum [0, 1, 0] we take the betas (there is one for each tau between 0.01, 0.99])
+            # at position 1 (0-indexed)
+
             # get all the betas for where x_stratum has a 1 (ie [1, 0, 0] position 0, [0, 1, 0] position 1 etc.)
             betas_stratum = betas[:, np.where(x_stratum == 1)[0]].sum(axis=1)
 
@@ -645,7 +643,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
     def _get_strata(
         self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame
-    ) -> tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
         """
         Gets strata for stratified bootstrap sampling
         """
@@ -657,6 +655,7 @@ class BootstrapElectionModel(BaseElectionModel):
         # rural: 0, 0 urban: 1, 0 and rural: 0, 1
         strata_featurizer = Featurizer([], self.strata)
         all_units = pd.concat([reporting_units, nonreporting_units], axis=0)
+
         strata_all = strata_featurizer.prepare_data(
             all_units, center_features=False, scale_features=False, add_intercept=self.add_intercept
         )
@@ -1265,7 +1264,6 @@ class BootstrapElectionModel(BaseElectionModel):
         ).T
         interval_upper = interval_upper.reshape(-1, 1)
         interval_lower = interval_lower.reshape(-1, 1)
-
         return PredictionIntervals(interval_lower, interval_upper)
 
     def get_national_summary_estimates(
