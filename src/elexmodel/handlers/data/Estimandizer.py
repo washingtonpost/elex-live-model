@@ -97,5 +97,7 @@ class Estimandizer:
 
 
 def party_vote_share_dem(data_df, col_prefix):
-    data_df[f"{col_prefix}party_vote_share_dem"] = np.nan_to_num(data_df[f"{col_prefix}dem"] /data_df[f"{col_prefix}turnout"])
+    data_df[f"{col_prefix}party_vote_share_dem"] = np.nan_to_num(
+        data_df[f"{col_prefix}dem"] / data_df[f"{col_prefix}turnout"]
+    )
     return data_df, []

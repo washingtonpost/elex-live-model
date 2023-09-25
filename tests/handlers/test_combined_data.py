@@ -3,7 +3,6 @@ import pandas as pd
 
 from elexmodel.handlers.data.CombinedData import CombinedDataHandler
 from elexmodel.handlers.data.LiveData import MockLiveDataHandler
-from elexmodel.handlers.data.PreprocessedData import PreprocessedDataHandler
 
 
 def test_load(va_governor_county_data):
@@ -11,12 +10,11 @@ def test_load(va_governor_county_data):
     office_id = "G"
     geographic_unit_type = "county"
     estimands = ["turnout"]
-    estimand_baselines = {"turnout": "turnout"}
     live_data_handler = MockLiveDataHandler(
         election_id, office_id, geographic_unit_type, estimands=["turnout"], data=va_governor_county_data
     )
     current_data = live_data_handler.data
-    va_governor_county_data['baseline_weights'] = va_governor_county_data.baseline_turnout
+    va_governor_county_data["baseline_weights"] = va_governor_county_data.baseline_turnout
 
     combined_data_handler = CombinedDataHandler(
         va_governor_county_data, current_data, estimands, "county", handle_unreporting="drop"
@@ -32,7 +30,6 @@ def test_zero_unreporting_missing_single_estimand_value(va_governor_county_data)
     election_id = "2017-11-07_VA_G"
     office_id = "G"
     geographic_unit_type = "county"
-    estimand_baselines = {"turnout": "turnout", "dem": "dem"}
     estimands = ["turnout", "dem"]
     live_data_handler = MockLiveDataHandler(
         election_id, office_id, geographic_unit_type, estimands, data=va_governor_county_data
@@ -41,7 +38,7 @@ def test_zero_unreporting_missing_single_estimand_value(va_governor_county_data)
     current_data["percent_expected_vote"] = 100
     current_data.loc[0, "results_dem"] = np.nan
 
-    va_governor_county_data['baseline_weights'] = va_governor_county_data.baseline_turnout
+    va_governor_county_data["baseline_weights"] = va_governor_county_data.baseline_turnout
 
     combined_data_handler = CombinedDataHandler(
         va_governor_county_data, current_data, estimands, "county", handle_unreporting="zero"
@@ -62,7 +59,6 @@ def test_zero_unreporting_missing_multiple_estimands_value(va_governor_county_da
     election_id = "2017-11-07_VA_G"
     office_id = "G"
     geographic_unit_type = "county"
-    estimand_baselines = {"turnout": "turnout", "dem": "dem"}
     estimands = ["turnout", "dem"]
     live_data_handler = MockLiveDataHandler(
         election_id, office_id, geographic_unit_type, estimands, data=va_governor_county_data
@@ -72,7 +68,7 @@ def test_zero_unreporting_missing_multiple_estimands_value(va_governor_county_da
     current_data.loc[0, "results_dem"] = np.nan
     current_data.loc[0, "results_turnout"] = np.nan
 
-    va_governor_county_data['baseline_weights'] = va_governor_county_data.baseline_turnout
+    va_governor_county_data["baseline_weights"] = va_governor_county_data.baseline_turnout
 
     combined_data_handler = CombinedDataHandler(
         va_governor_county_data, current_data, estimands, "county", handle_unreporting="zero"
@@ -92,7 +88,6 @@ def test_zero_unreporting_missing_percent_expected_vote_value(va_governor_county
     election_id = "2017-11-07_VA_G"
     office_id = "G"
     geographic_unit_type = "county"
-    estimand_baselines = {"turnout": "turnout", "dem": "dem"}
     estimands = ["turnout", "dem"]
     live_data_handler = MockLiveDataHandler(
         election_id, office_id, geographic_unit_type, estimands, data=va_governor_county_data
@@ -102,7 +97,7 @@ def test_zero_unreporting_missing_percent_expected_vote_value(va_governor_county
     current_data.loc[0, "percent_expected_vote"] = np.nan
     current_data.loc[0, "results_dem"] = np.nan
 
-    va_governor_county_data['baseline_weights'] = va_governor_county_data.baseline_turnout
+    va_governor_county_data["baseline_weights"] = va_governor_county_data.baseline_turnout
 
     combined_data_handler = CombinedDataHandler(
         va_governor_county_data, current_data, estimands, "county", handle_unreporting="zero"
@@ -120,7 +115,6 @@ def test_zero_unreporting_random_percent_expected_vote_value(va_governor_county_
     election_id = "2017-11-07_VA_G"
     office_id = "G"
     geographic_unit_type = "county"
-    estimand_baselines = {"turnout": "turnout", "dem": "dem"}
     estimands = ["turnout", "dem"]
     live_data_handler = MockLiveDataHandler(
         election_id, office_id, geographic_unit_type, estimands, data=va_governor_county_data
@@ -129,7 +123,7 @@ def test_zero_unreporting_random_percent_expected_vote_value(va_governor_county_
     current_data["percent_expected_vote"] = np.random.randint(1, 100, current_data.shape[0])
     current_data.loc[0, "results_dem"] = np.nan
 
-    va_governor_county_data['baseline_weights'] = va_governor_county_data.baseline_turnout
+    va_governor_county_data["baseline_weights"] = va_governor_county_data.baseline_turnout
 
     combined_data_handler = CombinedDataHandler(
         va_governor_county_data, current_data, estimands, "county", handle_unreporting="zero"
@@ -147,7 +141,6 @@ def test_drop_unreporting_missing_single_estimand_value(va_governor_county_data)
     election_id = "2017-11-07_VA_G"
     office_id = "G"
     geographic_unit_type = "county"
-    estimand_baselines = {"turnout": "turnout", "dem": "dem"}
     estimands = ["turnout", "dem"]
     live_data_handler = MockLiveDataHandler(
         election_id, office_id, geographic_unit_type, estimands, data=va_governor_county_data
@@ -156,7 +149,7 @@ def test_drop_unreporting_missing_single_estimand_value(va_governor_county_data)
     current_data["percent_expected_vote"] = 100
     current_data.loc[0, "results_dem"] = np.nan
 
-    va_governor_county_data['baseline_weights'] = va_governor_county_data.baseline_turnout
+    va_governor_county_data["baseline_weights"] = va_governor_county_data.baseline_turnout
 
     combined_data_handler = CombinedDataHandler(
         va_governor_county_data, current_data, estimands, "county", handle_unreporting="drop"
@@ -170,20 +163,17 @@ def test_get_reporting_data(va_governor_county_data):
     office = "G"
     geographic_unit_type = "county"
     estimands = ["turnout"]
-    estimand_baseline = {"turnout": "turnout"}
 
     live_data_handler = MockLiveDataHandler(
         election_id, office, geographic_unit_type, estimands, data=va_governor_county_data
     )
     current_data = live_data_handler.get_n_fully_reported(n=20)
 
-    va_governor_county_data['baseline_weights'] = va_governor_county_data.baseline_turnout
-    va_governor_county_data['last_election_results_turnout'] = va_governor_county_data.baseline_turnout + 1
+    va_governor_county_data["baseline_weights"] = va_governor_county_data.baseline_turnout
+    va_governor_county_data["last_election_results_turnout"] = va_governor_county_data.baseline_turnout + 1
 
     # no fixed effects
-    combined_data_handler = CombinedDataHandler(
-        va_governor_county_data, current_data, estimands, geographic_unit_type
-    )
+    combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
     observed_data = combined_data_handler.get_reporting_units(100)
     assert observed_data.shape[0] == 20
     assert observed_data.reporting.iloc[0] == 1
@@ -195,19 +185,16 @@ def test_get_reporting_data_dropping_with_turnout_factor(va_governor_county_data
     office = "G"
     geographic_unit_type = "county"
     estimands = ["turnout"]
-    estimand_baseline = {"turnout": "turnout"}
 
     live_data_handler = MockLiveDataHandler(
         election_id, office, geographic_unit_type, estimands, data=va_governor_county_data
     )
     current_data = live_data_handler.get_n_fully_reported(n=20)
-    
-    va_governor_county_data['baseline_weights'] = va_governor_county_data.baseline_turnout
-    va_governor_county_data['last_election_results_turnout'] = va_governor_county_data.baseline_turnout + 1
 
-    combined_data_handler = CombinedDataHandler(
-        va_governor_county_data, current_data, estimands, geographic_unit_type
-    )
+    va_governor_county_data["baseline_weights"] = va_governor_county_data.baseline_turnout
+    va_governor_county_data["last_election_results_turnout"] = va_governor_county_data.baseline_turnout + 1
+
+    combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
 
     turnout_factor_lower = 0.95
     turnout_factor_upper = 1.2
@@ -235,20 +222,17 @@ def test_get_nonreporting_adding_with_turnout_factor(va_governor_county_data):
     office = "G"
     geographic_unit_type = "county"
     estimands = ["turnout"]
-    estimand_baseline = {"turnout": "turnout"}
 
     live_data_handler = MockLiveDataHandler(
         election_id, office, geographic_unit_type, estimands, data=va_governor_county_data
     )
     n = 20
     current_data = live_data_handler.get_n_fully_reported(n=n)
-    
-    va_governor_county_data['baseline_weights'] = va_governor_county_data.baseline_turnout
-    va_governor_county_data['last_election_results_turnout'] = va_governor_county_data.baseline_turnout + 1
 
-    combined_data_handler = CombinedDataHandler(
-        va_governor_county_data, current_data, estimands, geographic_unit_type
-    )
+    va_governor_county_data["baseline_weights"] = va_governor_county_data.baseline_turnout
+    va_governor_county_data["last_election_results_turnout"] = va_governor_county_data.baseline_turnout + 1
+
+    combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
 
     turnout_factor_lower = 0.95
     turnout_factor_upper = 1.2
@@ -280,7 +264,6 @@ def test_get_unexpected_units_county_district(va_assembly_county_data):
     geographic_unit_type = "county-district"
     estimands = ["turnout"]
     unexpected_units = 5
-    estimand_baseline = {"turnout": "turnout"}
 
     live_data_handler = MockLiveDataHandler(
         election_id,
@@ -291,13 +274,11 @@ def test_get_unexpected_units_county_district(va_assembly_county_data):
         unexpected_units=unexpected_units,
     )
     current_data = live_data_handler.get_n_fully_reported(n=20)
-    
-    va_assembly_county_data['baseline_weights'] = va_assembly_county_data.baseline_turnout
-    va_assembly_county_data['last_election_results_turnout'] = va_assembly_county_data.baseline_turnout + 1
 
-    combined_data_handler = CombinedDataHandler(
-        va_assembly_county_data, current_data, estimands, geographic_unit_type
-    )
+    va_assembly_county_data["baseline_weights"] = va_assembly_county_data.baseline_turnout
+    va_assembly_county_data["last_election_results_turnout"] = va_assembly_county_data.baseline_turnout + 1
+
+    combined_data_handler = CombinedDataHandler(va_assembly_county_data, current_data, estimands, geographic_unit_type)
     unexpected_data = combined_data_handler.get_unexpected_units(100, ["county_fips", "district"])
     assert unexpected_data.shape[0] == unexpected_units
     assert unexpected_data[unexpected_data.county_fips == ""].shape[0] == 0
@@ -312,7 +293,6 @@ def test_get_unexpected_units_county(va_governor_county_data):
     geographic_unit_type = "county"
     estimands = ["turnout"]
     reporting_unexpected_units = 5
-    estimand_baseline = {"turnout": "turnout"}
 
     live_data_handler = MockLiveDataHandler(
         election_id,
@@ -329,12 +309,10 @@ def test_get_unexpected_units_county(va_governor_county_data):
     extra_row["percent_expected_vote"] = 50
     current_data = pd.concat([current_data, extra_row])
 
-    va_governor_county_data['baseline_weights'] = va_governor_county_data.baseline_turnout
-    va_governor_county_data['last_election_results_turnout'] = va_governor_county_data.baseline_turnout + 1
+    va_governor_county_data["baseline_weights"] = va_governor_county_data.baseline_turnout
+    va_governor_county_data["last_election_results_turnout"] = va_governor_county_data.baseline_turnout + 1
 
-    combined_data_handler = CombinedDataHandler(
-        va_governor_county_data, current_data, estimands, geographic_unit_type
-    )
+    combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
     unexpected_data = combined_data_handler.get_unexpected_units(100, ["county_fips"])
     assert unexpected_data.shape[0] == reporting_unexpected_units + 1
     assert unexpected_data[unexpected_data.county_fips == ""].shape[0] == 0
