@@ -85,37 +85,37 @@ def va_config(get_fixture):
     return get_fixture(path, load=True, pandas=False)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def tx_primary_governor_config(get_fixture):
     path = os.path.join("config", "2018-03-06_TX_R.json")
     return get_fixture(path, load=True, pandas=False)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def va_governor_precinct_data(get_fixture):
     path = os.path.join("data", "2017-11-07_VA_G", "G", "data_precinct.csv")
     return get_fixture(path, load=False, pandas=True)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def va_governor_county_data(get_fixture):
     path = os.path.join("data", "2017-11-07_VA_G", "G", "data_county.csv")
     return get_fixture(path, load=False, pandas=True)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def va_assembly_county_data(get_fixture):
     path = os.path.join("data", "2017-11-07_VA_G", "Y", "data_county-district.csv")
     return get_fixture(path, load=False, pandas=True)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def va_assembly_precinct_data(get_fixture):
     path = os.path.join("data", "2017-11-07_VA_G", "Y", "data_precinct-district.csv")
     return get_fixture(path, load=False, pandas=True)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def az_assembly_precinct_data(get_fixture):
     path = os.path.join("data", "2020-08-04_AZ_R", "S", "data_precinct.csv")
     return get_fixture(path, load=False, pandas=True)

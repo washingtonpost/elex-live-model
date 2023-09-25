@@ -408,7 +408,7 @@ def test_fit_model():
     """
     model_settings = {}
     model = NonparametricElectionModel.NonparametricElectionModel(model_settings)
-    qr = QuantileRegressionSolver(solver="ECOS")
+    qr = QuantileRegressionSolver()
 
     df_X = pd.DataFrame({"a": [1, 1, 1, 1], "b": [1, 1, 1, 2]})
 
@@ -416,8 +416,8 @@ def test_fit_model():
     weights = pd.DataFrame({"weights": [1, 1, 1, 1]}).weights
     model.fit_model(qr, df_X, df_y, 0.5, weights, True)
 
-    assert all(np.abs(qr.predict(df_X) - [8, 8, 8, 15]) <= TOL)
-    assert all(np.abs(qr.coefficients - [1, 7]) <= TOL)
+    np.testing.assert_allclose(qr.predict(df_X), [[8, 8, 8, 15]], rtol=TOL)
+    np.testing.assert_allclose(qr.coefficients, [[1, 7]], rtol=TOL)
 
 
 def test_get_unit_predictions():
