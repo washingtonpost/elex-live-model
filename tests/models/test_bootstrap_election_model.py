@@ -1,7 +1,6 @@
-import pytest
-
 import numpy as np
 import pandas as pd
+import pytest
 
 from elexmodel.models.BootstrapElectionModel import OLSRegressionSolver
 
@@ -62,22 +61,28 @@ def test_estimate_model_error(bootstrap_election_model, rng):
     np.testing.assert_array_almost_equal(ols_regression.residuals(y, y_hat, loo=True, center=True), residuals)
     # epsilon_hat and delta_hat are tested above
 
+
 def test_get_strata(bootstrap_election_model):
-    reporting_units = pd.DataFrame([['a', True, True], ['b', True, True], ['c', True, True]], columns=['county_classification', 'reporting', 'expected'])
-    nonreporting_units = pd.DataFrame([['c', False, True], ['d', False, True]], columns=['county_classification', 'reporting', 'expected'])
+    reporting_units = pd.DataFrame(
+        [["a", True, True], ["b", True, True], ["c", True, True]],
+        columns=["county_classification", "reporting", "expected"],
+    )
+    nonreporting_units = pd.DataFrame(
+        [["c", False, True], ["d", False, True]], columns=["county_classification", "reporting", "expected"]
+    )
     x_train_strata, x_test_strata = bootstrap_election_model._get_strata(reporting_units, nonreporting_units)
 
-    assert 'intercept' in x_train_strata.columns
+    assert "intercept" in x_train_strata.columns
     # a has been dropped
-    assert 'county_classification_b' in x_train_strata.columns
-    assert 'county_classification_c' in x_train_strata.columns
-    assert 'county_classification_d' in x_train_strata.columns
+    assert "county_classification_b" in x_train_strata.columns
+    assert "county_classification_c" in x_train_strata.columns
+    assert "county_classification_d" in x_train_strata.columns
     np.testing.assert_array_almost_equal(x_train_strata.values, np.asarray([[1, 0, 0, 0], [1, 1, 0, 0], [1, 0, 1, 0]]))
 
-    assert 'intercept' in x_test_strata.columns
-    assert 'county_classification_b' in x_test_strata.columns
-    assert 'county_classification_c' in x_test_strata.columns
-    assert 'county_classification_d' in x_test_strata.columns
+    assert "intercept" in x_test_strata.columns
+    assert "county_classification_b" in x_test_strata.columns
+    assert "county_classification_c" in x_test_strata.columns
+    assert "county_classification_d" in x_test_strata.columns
 
     np.testing.assert_array_almost_equal(x_test_strata.values, np.asarray([[1, 0, 1, 0], [1, 0, 0, 1]]))
 
@@ -89,7 +94,9 @@ def test_estimate_strata_dist(bootstrap_election_model, rng):
     delta_hat = np.asarray([-0.3, 0.5, 0.2, 0.25, 0.28])
     lb = 0.1
     ub = 0.3
-    ppf, cdf = bootstrap_election_model._estimate_strata_dist(x_train, x_train_strata, x_test, x_test_strata, delta_hat, lb, ub)
+    ppf, cdf = bootstrap_election_model._estimate_strata_dist(
+        x_train, x_train_strata, x_test, x_test_strata, delta_hat, lb, ub
+    )
 
     # assert ppf[(1, 0, 0)](0.01) == pytest.approx(delta_hat[:2].min())
     # import pdb; pdb.set_trace()
@@ -108,19 +115,25 @@ def test_estimate_strata_dist(bootstrap_election_model, rng):
     # assert ppf[(1, 1, 0)](0.75) == ub
     # assert ppf[(1, 1, 0)](0.99) == ub
 
+
 def test_generate_nonreporting_bounds(bootstrap_election_model, rng):
-    nonreporting_units = pd.DataFrame([[0.1, 1.2, 75], [0.8, 0.8, 24], [0.1, 0.01, 0], [-0.2, 0.8, 99], [-0.3, 0.9, 100]], columns=['results_normalized_margin', 'turnout_factor', 'percent_expected_vote'])
-    
+    nonreporting_units = pd.DataFrame(
+        [[0.1, 1.2, 75], [0.8, 0.8, 24], [0.1, 0.01, 0], [-0.2, 0.8, 99], [-0.3, 0.9, 100]],
+        columns=["results_normalized_margin", "turnout_factor", "percent_expected_vote"],
+    )
+
     # assumes that all outstanding vote will go to one of the two parties
-    lower, upper = bootstrap_election_model._generate_nonreporting_bounds(nonreporting_units, 'results_normalized_margin')
+    lower, upper = bootstrap_election_model._generate_nonreporting_bounds(
+        nonreporting_units, "results_normalized_margin"
+    )
 
     # hand checked in excel
     assert lower[0] == pytest.approx(-0.175)
     assert upper[0] == pytest.approx(0.325)
-    
+
     assert lower[1] == pytest.approx(-0.568)
     assert upper[1] == pytest.approx(0.952)
-    
+
     # if expected vote is close to 0 or 1 we set the bounds to be the extreme case
     assert lower[2] == bootstrap_election_model.y_unobserved_lower_bound
     assert upper[2] == bootstrap_election_model.y_unobserved_upper_bound
@@ -131,4 +144,6 @@ def test_generate_nonreporting_bounds(bootstrap_election_model, rng):
     assert lower[4] == bootstrap_election_model.y_unobserved_lower_bound
     assert upper[4] == bootstrap_election_model.y_unobserved_upper_bound
 
-    lower, upper = bootstrap_election_model._generate_nonreporting_bounds(nonreporting_units, 'results_normalized_margin')
+    lower, upper = bootstrap_election_model._generate_nonreporting_bounds(
+        nonreporting_units, "results_normalized_margin"
+    )

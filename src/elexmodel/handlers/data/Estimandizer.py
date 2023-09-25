@@ -12,7 +12,7 @@ class Estimandizer:
     def add_estimand_results(self, data_df, estimands, historical):
         columns_to_return = []
         turnout_col = f"{RESULTS_PREFIX}turnout"
-    
+
         data_df = self.add_weights(data_df, RESULTS_PREFIX)
 
         for estimand in estimands:
@@ -45,7 +45,7 @@ class Estimandizer:
         # but if turnout is the estimand, then we only want to add it once
         if turnout_col not in columns_to_return:
             columns_to_return.append(turnout_col)
-        
+
         return data_df, columns_to_return
 
     def add_estimand_baselines(self, data_df, estimand_baselines, historical, include_results_estimand=False):
