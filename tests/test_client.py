@@ -785,7 +785,6 @@ def test_estimandizer_input(model_client, va_governor_county_data, va_config):
 
     preprocessed_data = va_governor_county_data.copy()
     preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
-
     try:
         model_client.get_estimates(
             data,

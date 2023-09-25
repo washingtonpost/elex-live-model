@@ -416,8 +416,8 @@ class HistoricalModelClient(ModelClient):
             historical=True,
             include_results_estimand=True,
         )
-
-        results_to_return = [f"results_{estimand}" for estimand in estimands]
+        # we always want to pass turnout so that we can generate results weights
+        results_to_return = list(set([f"results_{estimand}" for estimand in estimands] + ["results_turnout"]))
         geo_columns = set(["geographic_unit_fips", "postal_code"] + [a for a in self.aggregates if a != "unit"])
         preprocessed_data = preprocessed_data_handler.data[list(geo_columns) + results_to_return].copy()
         historical_current_data = preprocessed_data.merge(formatted_data, on=["postal_code", "geographic_unit_fips"])

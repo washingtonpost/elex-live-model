@@ -22,7 +22,6 @@ LOG = logging.getLogger(__name__)
 class ConformalElectionModel(BaseElectionModel.BaseElectionModel, ABC):
     def __init__(self, model_settings: dict):
         super(ConformalElectionModel, self).__init__(model_settings)
-        self.qr = QuantileRegressionSolver(solver="ECOS")
         self.lambda_ = model_settings.get("lambda_", 0)
 
     @classmethod
@@ -56,11 +55,10 @@ class ConformalElectionModel(BaseElectionModel.BaseElectionModel, ABC):
             model.fit(
                 X,
                 y,
-                tau_value=tau,
+                taus=tau,
                 weights=weights,
                 lambda_=self.lambda_,
                 fit_intercept=self.add_intercept,
-                normalize_weights=normalize_weights,
             )
         except (UserWarning, cvxpy.error.SolverError):
             LOG.warning("Warning: solution was inaccurate or solver broke. Re-running with normalize_weights=False.")
@@ -88,10 +86,11 @@ class ConformalElectionModel(BaseElectionModel.BaseElectionModel, ABC):
             x_all[self.n_train : self.n_train + n_test]  # noqa: E203
         )
 
-        self.fit_model(self.qr, reporting_units_features, reporting_units_residuals, 0.5, weights, True)
-        self.features_to_coefficients = dict(zip(featurizer.complete_features, self.qr.coefficients))
+        qr = QuantileRegressionSolver()
+        self.fit_model(qr, reporting_units_features, reporting_units_residuals, 0.5, weights, True)
+        self.features_to_coefficients = dict(zip(featurizer.complete_features, qr.coefficients))
 
-        preds = self.qr.predict(nonreporting_units_features)
+        preds = qr.predict(nonreporting_units_features.values).flatten()
 
         # multiply by total voters to get unnormalized residuals
         preds = preds * nonreporting_units[f"last_election_results_{estimand}"]
@@ -150,15 +149,15 @@ class ConformalElectionModel(BaseElectionModel.BaseElectionModel, ABC):
         train_data_weights = train_data[f"last_election_results_{estimand}"]
 
         # fit lower and upper model to training data. ECOS solver is better than SCS.
-        lower_qr = QuantileRegressionSolver(solver="ECOS")
+        lower_qr = QuantileRegressionSolver()
         self.fit_model(lower_qr, train_data_features, train_data_residuals, lower_bound, train_data_weights, True)
 
-        upper_qr = QuantileRegressionSolver(solver="ECOS")
+        upper_qr = QuantileRegressionSolver()
         self.fit_model(upper_qr, train_data_features, train_data_residuals, upper_bound, train_data_weights, True)
 
         # apply to conformalization data. Conformalization bounds will later tell us how much to adjust lower/upper
         # bounds for nonreporting data.
-        conformalization_data = reporting_units_shuffled[train_rows:]
+        conformalization_data = reporting_units_shuffled[train_rows:].reset_index(drop=True)
 
         # all_data starts with reporting_units_shuffled, so the rows between train_rows and n_train are the
         # conformalization set
@@ -169,10 +168,12 @@ class ConformalElectionModel(BaseElectionModel.BaseElectionModel, ABC):
         # we are interested in f(X) - r
         # since later conformity scores care about deviation of bounds from residuals
         conformalization_lower_bounds = (
-            lower_qr.predict(conformalization_data_features) - conformalization_data[f"residuals_{estimand}"].values
+            lower_qr.predict(conformalization_data_features.values).flatten()
+            - conformalization_data[f"residuals_{estimand}"].values
         )
-        conformalization_upper_bounds = conformalization_data[f"residuals_{estimand}"].values - upper_qr.predict(
-            conformalization_data_features
+        conformalization_upper_bounds = (
+            conformalization_data[f"residuals_{estimand}"].values
+            - upper_qr.predict(conformalization_data_features.values).flatten()
         )
 
         # save conformalization bounds for later
@@ -185,8 +186,8 @@ class ConformalElectionModel(BaseElectionModel.BaseElectionModel, ABC):
         # are the same accross train_data, conformalization_data and nonreporting_units
         nonreporting_units_features = interval_featurizer.generate_holdout_data(x_all[self.n_train :])  # noqa: E203
 
-        nonreporting_lower_bounds = lower_qr.predict(nonreporting_units_features)
-        nonreporting_upper_bounds = upper_qr.predict(nonreporting_units_features)
+        nonreporting_lower_bounds = lower_qr.predict(nonreporting_units_features.values).flatten()
+        nonreporting_upper_bounds = upper_qr.predict(nonreporting_units_features.values).flatten()
 
         return PredictionIntervals(nonreporting_lower_bounds, nonreporting_upper_bounds, conformalization_data)
 

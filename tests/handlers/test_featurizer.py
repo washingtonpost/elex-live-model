@@ -360,8 +360,7 @@ def test_generate_fixed_effects(va_governor_county_data):
     reporting_data_features = featurizer.filter_to_active_features(x_all[:n_train])
     nonreporting_data_features = featurizer.generate_holdout_data(x_all[n_train:])
 
-    assert combined_data_handler.data.shape == (133, 32)
-
+    assert combined_data_handler.data.shape == (133, 35)
     n_expected_columns = 6  # (6 - 1) fixed effects + 1 intercept
     assert reporting_data_features.shape == (133, n_expected_columns)
     assert nonreporting_data_features.shape == (0, n_expected_columns)
@@ -394,7 +393,7 @@ def test_generate_fixed_effects(va_governor_county_data):
     reporting_data_features = featurizer.filter_to_active_features(x_all[:n_train])
     nonreporting_data_features = featurizer.generate_holdout_data(x_all[n_train:])
 
-    assert combined_data_handler.data.shape == (133, 32)
+    assert combined_data_handler.data.shape == (133, 35)
 
     n_expected_columns = 138  # (6 - 1) + (133 - 1) fixed effects + 1 intercept
     assert reporting_data_features.shape == (133, n_expected_columns)
@@ -451,7 +450,7 @@ def test_generate_fixed_effects_not_all_reporting(va_governor_county_data):
     reporting_data_features = featurizer.filter_to_active_features(x_all[:n_train])
     nonreporting_data_features = featurizer.generate_holdout_data(x_all[n_train:])
 
-    assert combined_data_handler.data.shape == (133, 32)
+    assert combined_data_handler.data.shape == (133, 35)
 
     n_expected_columns = (n - 1) + 1  # minus 1 for dropped fixed effect, plus 1 for intercept
     assert reporting_data_features.shape == (n, n_expected_columns)
@@ -519,7 +518,7 @@ def test_generate_fixed_effects_mixed_reporting(va_governor_precinct_data):
     reporting_data_features = featurizer.filter_to_active_features(x_all[:n_train])
     nonreporting_data_features = featurizer.generate_holdout_data(x_all[n_train:])
 
-    assert combined_data_handler.data.shape == (2360, 32)
+    assert combined_data_handler.data.shape == (2360, 35)
 
     n_expected_columns = 7  # when n = 100 we get to county 51013 (minus dropped fixed effect, plus intercept)
     assert reporting_data_features.shape == (n_train, n_expected_columns)  # use n_train since dropping columns
