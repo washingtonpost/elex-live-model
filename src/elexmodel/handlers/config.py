@@ -76,7 +76,8 @@ class ConfigHandler:
     def get_estimands(self, office):
         baseline_pointer = self.get_baseline_pointer(office)
         estimands = list(baseline_pointer.keys())
-        estimands += ["margin"]  # would otherwise need to add margin to every single config
+        if self.election_id.endswith("G"):
+            estimands += ["margin"]  # would otherwise need to add margin to every single config
         return estimands
 
     def get_states(self, office):
@@ -96,7 +97,8 @@ class ConfigHandler:
 
     def get_features(self, office):
         features = self._get_office_subconfig(office).get("features", [])
-        features += ["baseline_normalized_margin"]  # would otherwise need to add baseline_margin to every single config
+        if self.election_id.endswith("G"):
+            features += ["baseline_normalized_margin"]  # would otherwise need to add baseline_margin to every single config
         return features
 
     def get_aggregates(self, office):

@@ -79,7 +79,7 @@ def rng():
     return np.random.default_rng(seed=seed)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def va_config(get_fixture):
     path = os.path.join("config", "2017-11-07_VA_G.json")
     return get_fixture(path, load=True, pandas=False)

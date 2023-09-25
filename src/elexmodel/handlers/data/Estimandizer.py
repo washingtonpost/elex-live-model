@@ -12,6 +12,8 @@ class Estimandizer:
     def add_estimand_results(self, data_df, estimands, historical):
         columns_to_return = []
         turnout_col = f"{RESULTS_PREFIX}turnout"
+    
+        data_df = self.add_weights(data_df, RESULTS_PREFIX)
 
         for estimand in estimands:
             results_col = f"{RESULTS_PREFIX}{estimand}"
@@ -43,7 +45,7 @@ class Estimandizer:
         # but if turnout is the estimand, then we only want to add it once
         if turnout_col not in columns_to_return:
             columns_to_return.append(turnout_col)
-
+        
         return data_df, columns_to_return
 
     def add_estimand_baselines(self, data_df, estimand_baselines, historical, include_results_estimand=False):
@@ -94,7 +96,13 @@ class Estimandizer:
         return data_df
 
     def add_turnout_factor(self, data_df):
-        data_df["turnout_factor"] = np.nan_to_num(data_df.results_weights / data_df.baseline_weights)
+        # posinf and neginf are also set to zero because dividing by zero can lead to nan/posinf/neginf depending
+        # on the type of the numeric in the numpy array. Assume that if baseline_weights is zero then turnout
+        # would be incredibly low in this election too (ie. this is effectively an empty precinct) and so setting
+        # the turnout factor to zero is fine
+        data_df["turnout_factor"] = np.nan_to_num(
+            data_df.results_weights / data_df.baseline_weights, nan=0, posinf=0, neginf=0
+        )
         return data_df
 
 
