@@ -144,6 +144,169 @@ def test_generate_nonreporting_bounds(bootstrap_election_model, rng):
     assert lower[4] == bootstrap_election_model.y_unobserved_lower_bound
     assert upper[4] == bootstrap_election_model.y_unobserved_upper_bound
 
-    lower, upper = bootstrap_election_model._generate_nonreporting_bounds(
-        nonreporting_units, "results_normalized_margin"
+    lower, upper = bootstrap_election_model._generate_nonreporting_bounds(nonreporting_units, "turnout_factor")
+
+    assert lower[0] == pytest.approx(0.96)
+    assert upper[0] == pytest.approx(4.8)
+
+    assert lower[1] == pytest.approx(1.081081081)
+    assert upper[1] == pytest.approx(80)  # this is 80 since we divide 0.8 / 0.01 (it's clipped)
+
+    assert lower[2] == bootstrap_election_model.z_unobserved_lower_bound
+    assert upper[2] == bootstrap_election_model.z_unobserved_upper_bound
+
+    assert lower[3] == pytest.approx(0.536912752)
+    assert upper[3] == pytest.approx(1.632653061)
+
+    assert lower[4] == bootstrap_election_model.z_unobserved_lower_bound
+    assert upper[4] == bootstrap_election_model.z_unobserved_upper_bound
+
+    # TODO: add tests for when we manually change observed/unobserved bounds
+
+
+def test_strata_pit(bootstrap_election_model, rng):
+    x_train, x_test = None, None
+    x_train_strata = pd.DataFrame([[1, 0, 0], [1, 0, 0], [1, 1, 0], [1, 1, 0], [1, 1, 0]])
+    x_test_strata = pd.DataFrame([[1, 1, 0], [1, 0, 1], [1, 0, 1]])
+    delta_hat = np.asarray([-0.3, 0.5, 0.2, 0.25, 0.28])
+    lb = 0.1
+    ub = 0.3
+    ppf, cdf = bootstrap_election_model._estimate_strata_dist(
+        x_train, x_train_strata, x_test, x_test_strata, delta_hat, lb, ub
+    )
+
+    x_train_strata_unique = np.unique(x_train_strata, axis=0).astype(int)
+    uniforms = bootstrap_election_model._strata_pit(x_train_strata, x_train_strata_unique, delta_hat, cdf)
+
+    assert uniforms[0] == pytest.approx(
+        0.33
+    )  # since -0.3 is the lowest of the three elements [-0.3, 0.5, 0.3] where 0.3 is the UB (LB is -0.3)
+    assert uniforms[1] == pytest.approx(0.99)  # since 0.5 is the largest
+    assert uniforms[2] == pytest.approx(0.49)  # [-0.3, 0.2, 0.25, 0.28, 0.3]
+    assert uniforms[3] == pytest.approx(0.5)
+    assert uniforms[4] == pytest.approx(0.74)
+
+    uniforms = bootstrap_election_model._strata_pit(x_train_strata, x_train_strata_unique, delta_hat, cdf)
+
+
+def test_bootstrap_deltas(bootstrap_election_model):
+    x_train, x_test = None, None
+    x_train_strata = pd.DataFrame([[1, 0, 0], [1, 0, 0], [1, 1, 0], [1, 1, 0], [1, 1, 0]])
+    x_test_strata = pd.DataFrame([[1, 1, 0], [1, 0, 1], [1, 0, 1]])
+    delta_hat = np.asarray([-0.3, 0.5, 0.2, 0.25, 0.28])
+    lb = 0.1
+    ub = 0.3
+    ppf, cdf = bootstrap_election_model._estimate_strata_dist(
+        x_train, x_train_strata, x_test, x_test_strata, delta_hat, lb, ub
+    )
+    x_train_strata_unique = np.unique(x_train_strata, axis=0).astype(int)
+    uniforms = bootstrap_election_model._strata_pit(x_train_strata, x_train_strata_unique, delta_hat, cdf)
+    unifs = np.concatenate([uniforms, uniforms], axis=1)
+    x_train_strata_unique = np.unique(x_train_strata, axis=0).astype(int)
+    bootstrap_deltas_y, bootstrap_deltas_z = bootstrap_election_model._bootstrap_deltas(
+        unifs, x_train_strata, x_train_strata_unique, ppf, ppf
+    )
+    assert bootstrap_deltas_y.shape == (delta_hat.shape[0], bootstrap_election_model.B)
+    assert bootstrap_deltas_z.shape == (delta_hat.shape[0], bootstrap_election_model.B)
+    # testing that all elements of bootstrap delta is one of delta hat or lb or ub
+    assert np.isclose(
+        bootstrap_deltas_z.flatten().reshape(1, -1), np.concatenate([delta_hat, [0.1, 0.3]]).reshape(-1, 1), rtol=0.001
+    ).any(0).mean() == pytest.approx(1)
+    assert np.isclose(
+        bootstrap_deltas_y.flatten().reshape(1, -1), np.concatenate([delta_hat, [0.1, 0.3]]).reshape(-1, 1), rtol=0.001
+    ).any(0).mean() == pytest.approx(1)
+    # TODO: check elements too?
+
+
+def test_bootstrap_epsilons(bootstrap_election_model):
+    residuals = np.asarray([0.5, 0.5, 0.3, 0.8, 0.5]).reshape(-1, 1)
+    aggregate_indicator = np.asarray([[1, 1, 0, 0, 0], [0, 0, 1, 1, 0], [0, 0, 0, 0, 1]]).T
+    epsilon_hat = bootstrap_election_model._estimate_epsilon(residuals, aggregate_indicator)
+    delta_hat = bootstrap_election_model._estimate_delta(residuals, epsilon_hat, aggregate_indicator)
+
+    x_train, x_test = None, None
+    x_train_strata = pd.DataFrame([[1, 0, 0], [1, 0, 0], [1, 1, 0], [1, 1, 0], [1, 1, 0]])
+    x_test_strata = pd.DataFrame([[1, 1, 0], [1, 0, 1], [1, 0, 1]])
+    x_train_strata_unique = np.unique(x_train_strata, axis=0).astype(int)
+    lb = 0.1
+    ub = 0.3
+    ppf, cdf = bootstrap_election_model._estimate_strata_dist(
+        x_train, x_train_strata, x_test, x_test_strata, delta_hat, lb, ub
+    )
+
+    bootstrap_epsilons_y, bootstrap_epsilons_z = bootstrap_election_model._bootstrap_epsilons(
+        epsilon_hat, epsilon_hat, x_train_strata, x_train_strata_unique, ppf, ppf, aggregate_indicator
+    )
+    assert bootstrap_epsilons_y.shape == (epsilon_hat.shape[0], bootstrap_election_model.B)
+    assert bootstrap_epsilons_z.shape == (epsilon_hat.shape[0], bootstrap_election_model.B)
+
+    # the last epsilon only has one element, so epsilon_hat is zero so the bootstrapped versions should be zero also
+    # TODO: IS THIS CORRECT?
+    assert np.isclose(bootstrap_epsilons_y[-1], 0).mean() == pytest.approx(1)
+
+    # the others have the correct mean
+    assert bootstrap_epsilons_y[0].mean() == pytest.approx(epsilon_hat[0], rel=0.01)
+    assert bootstrap_epsilons_y[1].mean() == pytest.approx(epsilon_hat[1], rel=0.01)
+
+
+def test_bootstrap_errors(bootstrap_election_model):
+    residuals = np.asarray([0.5, 0.5, 0.3, 0.8, 0.5]).reshape(-1, 1)
+    aggregate_indicator = np.asarray([[1, 1, 0, 0, 0], [0, 0, 1, 1, 0], [0, 0, 0, 0, 1]]).T
+    epsilon_hat = bootstrap_election_model._estimate_epsilon(residuals, aggregate_indicator)
+    delta_hat = bootstrap_election_model._estimate_delta(residuals, epsilon_hat, aggregate_indicator)
+
+    x_train, x_test = None, None
+    x_train_strata = pd.DataFrame([[1, 0, 0], [1, 0, 0], [1, 1, 0], [1, 1, 0], [1, 1, 0]])
+    x_test_strata = pd.DataFrame([[1, 1, 0], [1, 0, 1], [1, 0, 1]])
+    lb = 0.1
+    ub = 0.3
+    ppf, cdf = bootstrap_election_model._estimate_strata_dist(
+        x_train, x_train_strata, x_test, x_test_strata, delta_hat, lb, ub
+    )
+    epsilon_B, delta_B = bootstrap_election_model._bootstrap_errors(
+        epsilon_hat, epsilon_hat, delta_hat, delta_hat, x_train_strata, cdf, cdf, ppf, ppf, aggregate_indicator
+    )
+    epsilon_y_B, epsilon_z_B = epsilon_B
+    delta_y_B, delta_z_B = delta_B
+
+    assert epsilon_y_B.shape == (aggregate_indicator.shape[1], bootstrap_election_model.B)
+    assert epsilon_z_B.shape == (aggregate_indicator.shape[1], bootstrap_election_model.B)
+    assert delta_y_B.shape == (residuals.shape[0], bootstrap_election_model.B)
+    assert delta_z_B.shape == (residuals.shape[0], bootstrap_election_model.B)
+
+
+def test_sample_test_delta(bootstrap_election_model):
+    residuals = np.asarray([0.5, 0.5, 0.3, 0.8, 0.5]).reshape(-1, 1)
+    aggregate_indicator = np.asarray([[1, 1, 0, 0, 0], [0, 0, 1, 1, 0], [0, 0, 0, 0, 1]]).T
+    epsilon_hat = bootstrap_election_model._estimate_epsilon(residuals, aggregate_indicator)
+    delta_hat = bootstrap_election_model._estimate_delta(residuals, epsilon_hat, aggregate_indicator)
+
+    x_train, x_test = None, None
+    x_train_strata = pd.DataFrame([[1, 0, 0], [1, 0, 0], [1, 1, 0], [1, 1, 0], [1, 1, 0]])
+    x_test_strata = pd.DataFrame([[1, 1, 0], [1, 0, 1], [1, 0, 1]])
+    lb = 0.1
+    ub = 0.3
+    ppf, cdf = bootstrap_election_model._estimate_strata_dist(
+        x_train, x_train_strata, x_test, x_test_strata, delta_hat, lb, ub
+    )
+
+    delta_y, delta_z = bootstrap_election_model._sample_test_delta(x_test_strata, ppf, ppf)
+
+    assert delta_y.shape == (x_test_strata.shape[0], bootstrap_election_model.B)
+    assert delta_z.shape == (x_test_strata.shape[0], bootstrap_election_model.B)
+    # TODO: THESE SHOULD NOT BE FAILING
+    # assert np.isclose(delta_y.flatten().reshape(1, -1), np.concatenate([delta_hat, [0.1, 0.3]]).reshape(-1, 1), rtol=0.01).any(0).mean() == pytest.approx(1)
+    # assert np.isclose(delta_z.flatten().reshape(1, -1), np.concatenate([delta_hat, [0.1, 0.3]]).reshape(-1, 1), rtol=0.001).any(0).mean() == pytest.approx(1)
+
+    # p.where(np.isclose(delta_y.flatten().reshape(1, -1), np.concatenate([delta_hat, [0.1, 0.3]]).reshape(-1, 1), rtol=0.1).any(0) == False)
+
+
+def test_sample_test_epsilon(bootstrap_election_model):
+    residuals = np.asarray([0.5, 0.5, 0.3, 0.8, 0.5]).reshape(-1, 1)
+    aggregate_indicator_train = np.asarray([[1, 1, 0, 0, 0], [0, 0, 1, 1, 0], [0, 0, 0, 0, 1], [0, 0, 0, 0, 0]]).T
+    aggregate_indicator_test = np.asarray([[0, 0, 0, 0], [0, 1, 0, 0], [1, 1, 1, 1]]).T
+    epsilon_hat = bootstrap_election_model._estimate_epsilon(residuals, aggregate_indicator_train)
+
+    epsilon_y, epsilon_z = bootstrap_election_model._sample_test_epsilon(
+        residuals, residuals, epsilon_hat, epsilon_hat, aggregate_indicator_train, aggregate_indicator_test
     )

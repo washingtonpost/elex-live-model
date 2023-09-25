@@ -580,7 +580,7 @@ class BootstrapElectionModel(BaseElectionModel):
         epsilon_z_hat: np.ndarray,
         aggregate_indicator_train: np.ndarray,
         aggregate_indicator_test: np.ndarray,
-    ):
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         This function generates new test epsilons (contest level random effects)
         NOTE: for now we are sampling from a normal with mean zero and tiny variance. This is
@@ -614,7 +614,6 @@ class BootstrapElectionModel(BaseElectionModel):
 
         test_epsilon_y = aggregate_indicator_test[:, contests_that_need_random_effect] @ test_epsilon[:, :, 0]
         test_epsilon_z = aggregate_indicator_test[:, contests_that_need_random_effect] @ test_epsilon[:, :, 1]
-
         return test_epsilon_y, test_epsilon_z
 
     def _sample_test_errors(
