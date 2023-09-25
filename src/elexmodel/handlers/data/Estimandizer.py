@@ -13,8 +13,6 @@ class Estimandizer:
         columns_to_return = []
         turnout_col = f"{RESULTS_PREFIX}turnout"
 
-        data_df = self.add_weights(data_df, RESULTS_PREFIX)
-
         for estimand in estimands:
             results_col = f"{RESULTS_PREFIX}{estimand}"
             additional_columns_added = []
@@ -46,14 +44,14 @@ class Estimandizer:
         if turnout_col not in columns_to_return:
             columns_to_return.append(turnout_col)
 
+        data_df = self.add_weights(data_df, RESULTS_PREFIX)
+
         return data_df, columns_to_return
 
     def add_estimand_baselines(self, data_df, estimand_baselines, historical, include_results_estimand=False):
         # if we are in a historical election we are only reading preprocessed data to get
         # the historical election results of the currently reporting units.
         # so we don't care about the total voters or the baseline election.
-
-        data_df = self.add_weights(data_df, BASELINE_PREFIX)
 
         for estimand, pointer in estimand_baselines.items():
             if pointer is None:
@@ -75,6 +73,8 @@ class Estimandizer:
             # Since this method is only called by the PreprocessedDataHandler, for historical runs,
             # we need to add the results from the historical election as well.
             data_df, ___ = self.add_estimand_results(data_df, estimand_baselines.keys(), historical)
+        
+        data_df = self.add_weights(data_df, BASELINE_PREFIX)
 
         return data_df
 
