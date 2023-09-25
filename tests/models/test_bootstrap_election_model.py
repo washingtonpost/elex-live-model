@@ -62,7 +62,7 @@ def test_estimate_model_error(bootstrap_election_model, rng):
     np.testing.assert_array_almost_equal(ols_regression.residuals(y, y_hat, loo=True, center=True), residuals)
     # epsilon_hat and delta_hat are tested above
 
-def test_get_strata(bootstrap_election_model, rng):
+def test_get_strata(bootstrap_election_model):
     reporting_units = pd.DataFrame([['a', True, True], ['b', True, True], ['c', True, True]], columns=['county_classification', 'reporting', 'expected'])
     nonreporting_units = pd.DataFrame([['c', False, True], ['d', False, True]], columns=['county_classification', 'reporting', 'expected'])
     x_train_strata, x_test_strata = bootstrap_election_model._get_strata(reporting_units, nonreporting_units)
@@ -107,3 +107,28 @@ def test_estimate_strata_dist(bootstrap_election_model, rng):
     # assert ppf[(1, 1, 0)](0.74) == pytest.approx(delta_hat[2:].max())
     # assert ppf[(1, 1, 0)](0.75) == ub
     # assert ppf[(1, 1, 0)](0.99) == ub
+
+def test_generate_nonreporting_bounds(bootstrap_election_model, rng):
+    nonreporting_units = pd.DataFrame([[0.1, 1.2, 75], [0.8, 0.8, 24], [0.1, 0.01, 0], [-0.2, 0.8, 99], [-0.3, 0.9, 100]], columns=['results_normalized_margin', 'turnout_factor', 'percent_expected_vote'])
+    
+    # assumes that all outstanding vote will go to one of the two parties
+    lower, upper = bootstrap_election_model._generate_nonreporting_bounds(nonreporting_units, 'results_normalized_margin')
+
+    # hand checked in excel
+    assert lower[0] == pytest.approx(-0.175)
+    assert upper[0] == pytest.approx(0.325)
+    
+    assert lower[1] == pytest.approx(-0.568)
+    assert upper[1] == pytest.approx(0.952)
+    
+    # if expected vote is close to 0 or 1 we set the bounds to be the extreme case
+    assert lower[2] == bootstrap_election_model.y_unobserved_lower_bound
+    assert upper[2] == bootstrap_election_model.y_unobserved_upper_bound
+
+    assert lower[3] == pytest.approx(-0.208)
+    assert upper[3] == pytest.approx(-0.188)
+
+    assert lower[4] == bootstrap_election_model.y_unobserved_lower_bound
+    assert upper[4] == bootstrap_election_model.y_unobserved_upper_bound
+
+    lower, upper = bootstrap_election_model._generate_nonreporting_bounds(nonreporting_units, 'results_normalized_margin')
