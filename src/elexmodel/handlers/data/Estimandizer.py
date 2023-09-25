@@ -73,7 +73,7 @@ class Estimandizer:
             # Since this method is only called by the PreprocessedDataHandler, for historical runs,
             # we need to add the results from the historical election as well.
             data_df, ___ = self.add_estimand_results(data_df, estimand_baselines.keys(), historical)
-        
+
         data_df = self.add_weights(data_df, BASELINE_PREFIX)
 
         return data_df
