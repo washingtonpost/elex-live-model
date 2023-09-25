@@ -66,9 +66,6 @@ def test_add_turnout_factor(va_governor_county_data):
 
     # check that nan turns into 0
     output_df.loc[0, "baseline_weights"] = 0.0
-    import pdb
-
-    pdb.set_trace()
     output_df = estimandizer.add_turnout_factor(output_df)
 
     assert "turnout_factor" in output_df.columns
