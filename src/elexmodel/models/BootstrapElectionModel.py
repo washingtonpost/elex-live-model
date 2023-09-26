@@ -136,11 +136,11 @@ class BootstrapElectionModel(BaseElectionModel):
         return lambdas_[np.argmin(errors)]
 
     def get_minimum_reporting_units(self, alpha: float) -> int:
+        # arbitrary, just enough to fit coefficients
         return 10
-        # return math.ceil(-1 * (alpha + 1) / (alpha - 1))
 
     def _estimate_epsilon(
-        self, residuals: np.ndarray, aggregate_indicator: np.ndarray, shrinkage: bool = False
+        self, residuals: np.ndarray, aggregate_indicator: np.ndarray
     ) -> np.ndarray:
         """
         This function estimates the epsilon (contest level random effects)
@@ -151,17 +151,6 @@ class BootstrapElectionModel(BaseElectionModel):
         # be made equal to zero by setting the random effect to that value
         epsilon_hat[aggregate_indicator.sum(axis=0) < 2] = 0
 
-        if shrinkage:
-            # shrinkage code
-            epsilon_hat_centered = (aggregate_indicator * (aggregate_indicator * residuals - epsilon_hat.T)) ** 2
-            epsilon_hat_var = epsilon_hat_centered.sum(axis=0) / aggregate_indicator.sum(axis=0)
-            epsilon_hat_var = np.apply_along_axis(lambda v: np.median(v[np.nonzero(v)]), 0, epsilon_hat_centered)
-            epsilon_hat_var = np.nan_to_num(epsilon_hat_var)  # get rid of divide by zero nan
-            epsilon_hat_var = epsilon_hat_var.reshape(-1, 1)
-            shrinkage_factor = (
-                1 - (epsilon_hat.shape[0] - 2) * epsilon_hat_var / np.linalg.norm(epsilon_hat) ** 2
-            ).clip(min=0)
-            return shrinkage_factor * epsilon_hat
         return epsilon_hat
 
     def _estimate_delta(
@@ -190,7 +179,7 @@ class BootstrapElectionModel(BaseElectionModel):
         # compute residuals
         residuals_y = model.residuals(y, y_pred, loo=True, center=True)
         # estimate contest level effect (the average residual in units of a contest)
-        epsilon_y_hat = self._estimate_epsilon(residuals_y, aggregate_indicator, shrinkage=False)
+        epsilon_y_hat = self._estimate_epsilon(residuals_y, aggregate_indicator)
         # compute delta, which is the left over residual after removing the contest level effect
         delta_y_hat = self._estimate_delta(residuals_y, epsilon_y_hat, aggregate_indicator)
         return residuals_y, epsilon_y_hat, delta_y_hat
@@ -285,6 +274,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         return stratum_ppfs_delta, stratum_cdfs_delta
 
+    # TODO: figure out how to better estimate margin_upper/lower_bound
     def _generate_nonreporting_bounds(
         self, nonreporting_units: pd.DataFrame, bootstrap_estimand: str, n_bins: int = 10
     ) -> tuple[np.ndarray, np.ndarray]:
@@ -292,7 +282,6 @@ class BootstrapElectionModel(BaseElectionModel):
         This function creates upper and lower bounds for y and z based on the expected vote
         that we have for each unit. This is used to clip our predictions
         """
-        # TODO: figure out how to better estimate margin_upper/lower_bound
 
         # turn expected for nonreporting units into decimal (also clip at 100)
         nonreporting_expected_vote_frac = nonreporting_units.percent_expected_vote.values.clip(max=100) / 100
@@ -336,17 +325,6 @@ class BootstrapElectionModel(BaseElectionModel):
         ] = unobserved_upper_bound
 
         return lower_bound.values.reshape(-1, 1), upper_bound.values.reshape(-1, 1)
-        # quantiles = np.linspace(0, 1, num=n_bins+1) # linspace returns the start, but we want to upper bound
-
-        # upper_quantiles = np.quantile(upper_bound, q=quantiles[1:])
-        # upper_quantiles[-1] += 1e-6 # lol wtf
-        # upper_bins = upper_quantiles[np.digitize(upper_bound, bins=upper_quantiles)]
-        # lower_quantiles = np.quantile(lower_bound, q=quantiles)
-        # lower_bins = lower_quantiles[np.digitize(lower_bound, bins=lower_quantiles[1:])]
-
-        # nonreporting_units[f'{bootstrap_estimand}_upper'] = upper_bins
-        # nonreporting_units[f'{bootstrap_estimand}_lower'] = lower_bins
-        # return np.unique(nonreporting_units[[f'{bootstrap_estimand}_lower', f'{bootstrap_estimand}_upper']].values, axis=0)
 
     def _strata_pit(
         self,
@@ -599,7 +577,7 @@ class BootstrapElectionModel(BaseElectionModel):
             contests_not_in_reporting_units, contests_in_nonreporting_units
         )
 
-        # TODO: replace gaussian model with quantile regression
+        # NOTE: this model currently doesn't do very much (we effectively treat unseen random effects as zero)
 
         # \epsilon ~ N(0, \Sigma)
         mu_hat = [0, 0]
@@ -640,13 +618,13 @@ class BootstrapElectionModel(BaseElectionModel):
         test_error_z = test_epsilon_z + test_delta_z
         return test_error_y, test_error_z
 
+    # TODO: potentially generalize binning features for strata
     def _get_strata(
         self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
         """
         Gets strata for stratified bootstrap sampling
         """
-        # TODO: potentially generalize binning features for strata
         n_train = reporting_units.shape[0]
         # we can use the featurizer, since strata are defined by dummy variables in the same way that
         # fixed effects are (ie. rural could be (1, 0, 0) while urban could be (0, 1, 0) while suburban could be (0, 0, 1))
@@ -662,8 +640,6 @@ class BootstrapElectionModel(BaseElectionModel):
         x_test_strata = strata_all[n_train:]
         return x_train_strata, x_test_strata
 
-    #  TODO : more robust sampling scheme for test epsilons
-    #  TODO: less conservative accounting of partial reporting (unit level predictions should adapt and not just snap to lower/upper bounds)
     def compute_bootstrap_errors(
         self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, unexpected_units: pd.DataFrame
     ):
@@ -759,8 +735,6 @@ class BootstrapElectionModel(BaseElectionModel):
 
         x_test_df = self.featurizer.generate_holdout_data(x_all[n_train : (n_train + n_test)])  # noqa: 203
         x_test = x_test_df.values
-        # y_test = nonreporting_units['normalized_margin'].values.reshape(-1, 1)
-        # z_test = nonreporting_units['turnout_factor'].values.reshape(-1, 1)
         weights_test = nonreporting_units["baseline_weights"].values.reshape(-1, 1)
 
         # Create a matrix of size (n_contests, n_total_units) which acts as a crosswalk
@@ -789,20 +763,6 @@ class BootstrapElectionModel(BaseElectionModel):
         # we use k-fold cross validation to find the optimal lambda for our OLS regression
         optimal_lambda_y = self.cv_lambda(x_train, y_train, np.logspace(-3, 2, 20), weights=weights_train)
         optimal_lambda_z = self.cv_lambda(x_train, z_train, np.logspace(-3, 2, 20), weights=weights_train)
-
-        # nonreporting_units_to_keep = ((y_partial_reporting_upper - y_partial_reporting_lower) < 0.1).flatten()
-        # x_all = np.concatenate([x_train, x_test[nonreporting_units_to_keep]], axis=0)
-        # y_all = np.concatenate([y_train, y_test[nonreporting_units_to_keep]])
-        # z_all = np.concatenate([z_train, z_test[nonreporting_units_to_keep]])
-        # weights_all_y = np.concatenate([weights_train, weights_test[nonreporting_units_to_keep]])
-        # weights_all_z = np.concatenate([weights_train, weights_test[nonreporting_units_to_keep]])
-        # weights_bound_y = (1 / ((y_partial_reporting_upper - y_partial_reporting_lower)**2 + 1))[nonreporting_units_to_keep]
-        # weights_bound_z = (1 / ((z_partial_reporting_upper - z_partial_reporting_lower)**2 + 1))[nonreporting_units_to_keep]
-        # weights_all_y[n_train:] *= weights_bound_y
-        # weights_all_z[n_train:] *= weights_bound_z
-
-        # ols_y_all = OLSRegression().fit(x_all, y_all, weights=weights_all_y, lambda_=optimal_lambda_y)
-        # ols_z_all = OLSRegression().fit(x_all, z_all, weights=weights_all_z, lambda_=optimal_lambda_z)
 
         # step 1) fit the initial model
         # we don't want to regularize the intercept or the coefficient for baseline_normalized_margin
@@ -1001,10 +961,6 @@ class BootstrapElectionModel(BaseElectionModel):
             min=z_partial_reporting_lower, max=z_partial_reporting_upper
         ) * weights_test
 
-        # y_test_pred_all = (ols_y_all.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat)).clip(min=y_partial_reporting_lower, max=y_partial_reporting_upper)
-        # z_test_pred_all = (ols_z_all.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat)).clip(min=z_partial_reporting_lower, max=z_partial_reporting_upper)
-        # import IPython; IPython.embed()
-
         # this is for the unit point prediction. turn into unnormalized margin
         self.weighted_yz_test_pred = yz_test_pred * weights_test
         # and turn into turnout estimate
@@ -1109,7 +1065,6 @@ class BootstrapElectionModel(BaseElectionModel):
             self.aggregate_baseline_margin = (
                 (aggregate_sum.baseline_dem - aggregate_sum.baseline_gop) / (aggregate_sum.baseline_turnout + 1)
             ).values
-
         return raw_margin_df
 
     def get_unit_prediction_intervals(
