@@ -1,3 +1,6 @@
+import numpy as np
+import pandas as pd
+
 from elexmodel.handlers import s3
 from elexmodel.handlers.data.Estimandizer import Estimandizer
 from elexmodel.utils.file_utils import S3_FILE_PATH, TARGET_BUCKET, convert_df_to_csv
@@ -46,6 +49,13 @@ class CombinedDataHandler:
 
         self.data = data
 
+    def _get_2019_uncontested_races(self):
+        no_dem_candidate_2019 = [str(x) for x in [1, 3, 5, 9, 16, 17, 19, 78]]
+        # includes Nick Freitas, who ran as GOP incumbent write-in, but makes life easier for testing
+        no_gop_candidate_2019 = [str(x) for x in [11, 30, 32, 35, 36, 37, 38, 41, 43, 45, 46, 47, 48, 49, 53, 57, 63, 67, 69, 70, 71, 74, 77, 79, 86, 89, 90, 92, 95]]
+        uncontested_races_2019 = no_dem_candidate_2019 + no_gop_candidate_2019
+        return self.data[self.data.district.isin(uncontested_races_2019)].geographic_unit_fips
+
     def get_reporting_units(
         self,
         percent_reporting_threshold,
@@ -63,7 +73,13 @@ class CombinedDataHandler:
         # if turnout factor less than 0.5 or greater than 1.5 assume AP made a mistake and don't treat those as reporting units
         reporting_units = reporting_units[reporting_units.turnout_factor > turnout_factor_lower]
         reporting_units = reporting_units[reporting_units.turnout_factor < turnout_factor_upper]
+    
+        unexpected_units = self._get_unexpected_units()
+        reporting_units = reporting_units[~reporting_units.geographic_unit_fips.isin(unexpected_units.geographic_unit_fips)].reset_index(drop=True)
 
+        uncontested_races = self._get_2019_uncontested_races()
+        reporting_units = reporting_units[~reporting_units.geographic_unit_fips.isin(uncontested_races)].reset_index(drop=True)
+        
         # residualize + normalize
         for estimand in self.estimands:
             reporting_units[f"residuals_{estimand}"] = (
@@ -92,6 +108,13 @@ class CombinedDataHandler:
         ).reset_index(  # not checking if results.isnull() anymore across multiple estimands
             drop=True
         )
+
+        uncontested_races = self._get_2019_uncontested_races()
+        nonreporting_units = pd.concat([nonreporting_units, self.data[self.data.geographic_unit_fips.isin(uncontested_races)]]).reset_index(drop=True)
+
+        unexpected_units = self._get_unexpected_units()
+        nonreporting_units = nonreporting_units[~nonreporting_units.geographic_unit_fips.isin(unexpected_units.geographic_unit_fips)].reset_index(drop=True)
+
         nonreporting_units["reporting"] = int(0)
         nonreporting_units["expected"] = True
 
@@ -103,6 +126,9 @@ class CombinedDataHandler:
         """
         # data is only expected units since left join of preprocessed data in initialization
         return self.data.geographic_unit_fips
+
+    def _get_units_without_baseline(self):
+        return self.data[np.isclose(self.data.baseline_weights, 0)].geographic_unit_fips
 
     def _get_county_fips_from_geographic_unit_fips(self, geographic_unit_fips):
         """
@@ -121,18 +147,25 @@ class CombinedDataHandler:
         Get district from geographic unit fips
         """
         components = geographic_unit_fips.split("_")
-        return components[0]
+        return str(int(components[1])) # TODO: CHANGE BACK!!!!
 
+    def _get_unexpected_units(self):
+        expected_geographic_units = self._get_expected_geographic_unit_fips().tolist()
+        no_baseline_units = self._get_units_without_baseline()
+        # Note: this uses current_data because self.data drops unexpected units
+        unexpected_units = self.current_data[
+            ~self.current_data["geographic_unit_fips"].isin(expected_geographic_units) | self.current_data.geographic_unit_fips.isin(no_baseline_units)
+        ].reset_index(drop=True)
+        
+        return unexpected_units
+    
     def get_unexpected_units(self, percent_reporting_threshold, aggregates):
         """
         Gets reporting but unexpected data. These are units that are may or may not be fully
         reporting, but we have no preprocessed data for them.
         """
-        expected_geographic_units = self._get_expected_geographic_unit_fips().tolist()
-        # Note: this uses current_data because self.data drops unexpected units
-        unexpected_units = self.current_data[
-            ~self.current_data["geographic_unit_fips"].isin(expected_geographic_units)
-        ].reset_index(drop=True)
+
+        unexpected_units = self._get_unexpected_units()
 
         # since we were not expecting them, we have don't have their county or district
         # from preprocessed data. so we have to add that back in.
