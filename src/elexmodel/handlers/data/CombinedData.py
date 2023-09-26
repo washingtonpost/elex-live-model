@@ -49,13 +49,6 @@ class CombinedDataHandler:
 
         self.data = data
 
-    def _get_2019_uncontested_races(self):
-        no_dem_candidate_2019 = [str(x) for x in [1, 3, 5, 9, 16, 17, 19, 78]]
-        # includes Nick Freitas, who ran as GOP incumbent write-in, but makes life easier for testing
-        no_gop_candidate_2019 = [str(x) for x in [11, 30, 32, 35, 36, 37, 38, 41, 43, 45, 46, 47, 48, 49, 53, 57, 63, 67, 69, 70, 71, 74, 77, 79, 86, 89, 90, 92, 95]]
-        uncontested_races_2019 = no_dem_candidate_2019 + no_gop_candidate_2019
-        return self.data[self.data.district.isin(uncontested_races_2019)].geographic_unit_fips
-
     def get_reporting_units(
         self,
         percent_reporting_threshold,
@@ -76,9 +69,6 @@ class CombinedDataHandler:
     
         unexpected_units = self._get_unexpected_units()
         reporting_units = reporting_units[~reporting_units.geographic_unit_fips.isin(unexpected_units.geographic_unit_fips)].reset_index(drop=True)
-
-        uncontested_races = self._get_2019_uncontested_races()
-        reporting_units = reporting_units[~reporting_units.geographic_unit_fips.isin(uncontested_races)].reset_index(drop=True)
         
         # residualize + normalize
         for estimand in self.estimands:
@@ -108,9 +98,6 @@ class CombinedDataHandler:
         ).reset_index(  # not checking if results.isnull() anymore across multiple estimands
             drop=True
         )
-
-        uncontested_races = self._get_2019_uncontested_races()
-        nonreporting_units = pd.concat([nonreporting_units, self.data[self.data.geographic_unit_fips.isin(uncontested_races)]]).reset_index(drop=True)
 
         unexpected_units = self._get_unexpected_units()
         nonreporting_units = nonreporting_units[~nonreporting_units.geographic_unit_fips.isin(unexpected_units.geographic_unit_fips)].reset_index(drop=True)
@@ -147,7 +134,7 @@ class CombinedDataHandler:
         Get district from geographic unit fips
         """
         components = geographic_unit_fips.split("_")
-        return str(int(components[1])) # TODO: CHANGE BACK!!!!
+        return components[0]
 
     def _get_unexpected_units(self):
         expected_geographic_units = self._get_expected_geographic_unit_fips().tolist()
