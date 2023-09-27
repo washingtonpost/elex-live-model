@@ -2,6 +2,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from elexmodel.handlers.data.CombinedData import CombinedDataHandler
+from elexmodel.handlers.data.LiveData import MockLiveDataHandler
+from elexmodel.handlers.data.PreprocessedData import PreprocessedDataHandler
 from elexmodel.models.BootstrapElectionModel import OLSRegressionSolver
 
 
@@ -22,6 +25,7 @@ def test_cross_validation(bootstrap_election_model, rng):
     lambdas = [-0.1, 0, 0.01, 0.1, 1, 100]
     res = bootstrap_election_model.cv_lambda(x, y, lambdas)
     assert res == 100
+
 
 def test_estimate_epsilon(bootstrap_election_model):
     """
@@ -133,6 +137,7 @@ def test_estimate_strata_dist(bootstrap_election_model, rng):
     assert cdf[(1, 0, 1)](0.1) == pytest.approx(0.01)
     assert cdf[(1, 0, 1)](0.3) == pytest.approx(0.99)
 
+
 def test_generate_nonreporting_bounds(bootstrap_election_model, rng):
     nonreporting_units = pd.DataFrame(
         [[0.1, 1.2, 75], [0.8, 0.8, 24], [0.1, 0.01, 0], [-0.2, 0.8, 99], [-0.3, 0.9, 100]],
@@ -187,7 +192,7 @@ def test_generate_nonreporting_bounds(bootstrap_election_model, rng):
     )
     assert lower[0] == pytest.approx(-0.125)
     assert upper[0] == pytest.approx(0.275)
-    
+
     assert lower[1] == pytest.approx(-0.416)
     assert upper[1] == pytest.approx(0.8)
 
@@ -196,7 +201,7 @@ def test_generate_nonreporting_bounds(bootstrap_election_model, rng):
 
     assert lower[3] == pytest.approx(-0.206)
     assert upper[3] == pytest.approx(-0.19)
-    
+
     assert lower[4] == bootstrap_election_model.y_unobserved_lower_bound
     assert upper[4] == bootstrap_election_model.y_unobserved_upper_bound
 
@@ -209,7 +214,7 @@ def test_generate_nonreporting_bounds(bootstrap_election_model, rng):
     assert upper[0] == pytest.approx(1.846153846)
 
     assert lower[1] == pytest.approx(2.352941176)
-    assert upper[1] == pytest.approx(5.714285714) 
+    assert upper[1] == pytest.approx(5.714285714)
 
     assert lower[2] == bootstrap_election_model.z_unobserved_lower_bound
     assert upper[2] == bootstrap_election_model.z_unobserved_upper_bound
@@ -219,6 +224,7 @@ def test_generate_nonreporting_bounds(bootstrap_election_model, rng):
 
     assert lower[4] == bootstrap_election_model.z_unobserved_lower_bound
     assert upper[4] == bootstrap_election_model.z_unobserved_upper_bound
+
 
 def test_strata_pit(bootstrap_election_model, rng):
     x_train, x_test = None, None
@@ -271,7 +277,6 @@ def test_bootstrap_deltas(bootstrap_election_model):
     assert np.isclose(
         bootstrap_deltas_y.flatten().reshape(1, -1), np.concatenate([delta_hat, [0.1, 0.3]]).reshape(-1, 1), rtol=0.001
     ).any(0).mean() == pytest.approx(1)
-    # TODO: check elements too?
 
 
 def test_bootstrap_epsilons(bootstrap_election_model):
@@ -329,6 +334,7 @@ def test_bootstrap_errors(bootstrap_election_model):
     assert epsilon_z_B.shape == (aggregate_indicator.shape[1], bootstrap_election_model.B)
     assert delta_y_B.shape == (residuals.shape[0], bootstrap_election_model.B)
     assert delta_z_B.shape == (residuals.shape[0], bootstrap_election_model.B)
+    # the values of bootstrap epsilon and delta are checked above
 
 
 def test_sample_test_delta(bootstrap_election_model):
@@ -354,15 +360,162 @@ def test_sample_test_delta(bootstrap_election_model):
     # assert np.isclose(delta_y.flatten().reshape(1, -1), np.concatenate([delta_hat, [0.1, 0.3]]).reshape(-1, 1), rtol=0.01).any(0).mean() == pytest.approx(1)
     # assert np.isclose(delta_z.flatten().reshape(1, -1), np.concatenate([delta_hat, [0.1, 0.3]]).reshape(-1, 1), rtol=0.001).any(0).mean() == pytest.approx(1)
 
-    # p.where(np.isclose(delta_y.flatten().reshape(1, -1), np.concatenate([delta_hat, [0.1, 0.3]]).reshape(-1, 1), rtol=0.1).any(0) == False)
+    # np.where(np.isclose(delta_y.flatten().reshape(1, -1), np.concatenate([delta_hat, [0.1, 0.3]]).reshape(-1, 1), rtol=0.1).any(0) == False)
 
 
 def test_sample_test_epsilon(bootstrap_election_model):
     residuals = np.asarray([0.5, 0.5, 0.3, 0.8, 0.5]).reshape(-1, 1)
     aggregate_indicator_train = np.asarray([[1, 1, 0, 0, 0], [0, 0, 1, 1, 0], [0, 0, 0, 0, 1], [0, 0, 0, 0, 0]]).T
-    aggregate_indicator_test = np.asarray([[0, 0, 0, 0], [0, 1, 0, 0], [1, 1, 1, 1]]).T
+    aggregate_indicator_test = np.asarray([[0, 0, 0, 0], [0, 1, 0, 0], [1, 0, 0, 1], [0, 0, 1, 0]]).T
     epsilon_hat = bootstrap_election_model._estimate_epsilon(residuals, aggregate_indicator_train)
 
     epsilon_y, epsilon_z = bootstrap_election_model._sample_test_epsilon(
         residuals, residuals, epsilon_hat, epsilon_hat, aggregate_indicator_train, aggregate_indicator_test
     )
+    # TODO: confirm that sample test epsilon function is doin the right thing!!
+
+    # column 3 doesn't have any units that are reporting
+    #
+
+
+def test_sample_test_errors(bootstrap_election_model):
+    residuals = np.asarray([0.5, 0.5, 0.3, 0.8, 0.5]).reshape(-1, 1)
+    aggregate_indicator_train = np.asarray([[1, 1, 0, 0, 0], [0, 0, 1, 1, 0], [0, 0, 0, 0, 1], [0, 0, 0, 0, 0]]).T
+    # aggregate_indicator_test = np.asarray([[0, 0, 0, 0], [0, 1, 0, 0], [1, 0, 0, 1], [0, 0, 1, 0]]).T
+    epsilon_hat = bootstrap_election_model._estimate_epsilon(residuals, aggregate_indicator_train)
+    delta_hat = bootstrap_election_model._estimate_delta(residuals, epsilon_hat, aggregate_indicator_train)
+
+    x_train, x_test = None, None
+    x_train_strata = pd.DataFrame([[1, 0, 0], [1, 0, 0], [1, 1, 0], [1, 1, 0], [1, 1, 0]])
+    x_test_strata = pd.DataFrame([[1, 1, 0], [1, 0, 1], [1, 0, 1]])
+    lb = 0.1
+    ub = 0.3
+    ppf, cdf = bootstrap_election_model._estimate_strata_dist(
+        x_train, x_train_strata, x_test, x_test_strata, delta_hat, lb, ub
+    )
+    # TODO figure out why the aggregate_indicator things are doing weird stuff
+
+    # test_error_y, test_error_z = bootstrap_election_model._sample_test_errors(residuals, residuals, epsilon_hat, epsilon_hat, x_test_strata, ppf, ppf, aggregate_indicator_train, aggregate_indicator_test)
+    # assert test_error_y.shape == (aggregate_indicator_test.shape[0], 1)
+    # assert test_error_z.shape == (aggregate_indicator_test.shape[0], 1)
+
+
+def test_compute_bootstrap_errors(bootstrap_election_model, va_governor_county_data):
+    election_id = "2017-11-07_VA_G"
+    office_id = "G"
+    geographic_unit_type = "county"
+    estimands = ["margin"]
+    percent_reporting_threshold = 100
+
+    data_handler = MockLiveDataHandler(
+        election_id, office_id, geographic_unit_type, estimands, data=va_governor_county_data
+    )
+
+    data_handler.shuffle()
+    current_data = data_handler.get_percent_fully_reported(50)
+
+    preprocessed_data_handler = PreprocessedDataHandler(
+        election_id, office_id, geographic_unit_type, estimands, {"margin": "margin"}, data=va_governor_county_data
+    )
+
+    combined_data_handler = CombinedDataHandler(
+        preprocessed_data_handler.data, current_data, estimands, geographic_unit_type, handle_unreporting="drop"
+    )
+
+    reporting_units = combined_data_handler.get_reporting_units(percent_reporting_threshold, turnout_factor_upper=2.0)
+    nonreporting_units = combined_data_handler.get_nonreporting_units(
+        percent_reporting_threshold, turnout_factor_upper=2.0
+    )
+    unexpected_units = combined_data_handler.get_unexpected_units(percent_reporting_threshold, ["postal_code"])
+
+    assert not bootstrap_election_model.ran_bootstrap
+    bootstrap_election_model.B = 10
+    bootstrap_election_model.compute_bootstrap_errors(reporting_units, nonreporting_units, unexpected_units)
+    assert bootstrap_election_model.ran_bootstrap
+    assert bootstrap_election_model.weighted_yz_test_pred.shape == (nonreporting_units.shape[0], 1)
+    assert bootstrap_election_model.weighted_yz_test_pred.shape == bootstrap_election_model.weighted_z_test_pred.shape
+    assert bootstrap_election_model.errors_B_1.shape == (nonreporting_units.shape[0], bootstrap_election_model.B)
+    assert bootstrap_election_model.errors_B_2.shape == (nonreporting_units.shape[0], bootstrap_election_model.B)
+    assert bootstrap_election_model.errors_B_3.shape == (nonreporting_units.shape[0], bootstrap_election_model.B)
+    assert bootstrap_election_model.errors_B_4.shape == (nonreporting_units.shape[0], bootstrap_election_model.B)
+
+
+def test_get_unit_predictions(bootstrap_election_model, va_governor_county_data):
+    election_id = "2017-11-07_VA_G"
+    office_id = "G"
+    geographic_unit_type = "county"
+    estimands = ["margin"]
+    percent_reporting_threshold = 100
+
+    data_handler = MockLiveDataHandler(
+        election_id, office_id, geographic_unit_type, estimands, data=va_governor_county_data
+    )
+
+    data_handler.shuffle()
+    current_data = data_handler.get_percent_fully_reported(50)
+
+    preprocessed_data_handler = PreprocessedDataHandler(
+        election_id, office_id, geographic_unit_type, estimands, {"margin": "margin"}, data=va_governor_county_data
+    )
+
+    combined_data_handler = CombinedDataHandler(
+        preprocessed_data_handler.data, current_data, estimands, geographic_unit_type, handle_unreporting="drop"
+    )
+
+    reporting_units = combined_data_handler.get_reporting_units(percent_reporting_threshold, turnout_factor_upper=2.0)
+    nonreporting_units = combined_data_handler.get_nonreporting_units(
+        percent_reporting_threshold, turnout_factor_upper=2.0
+    )
+    unexpected_units = combined_data_handler.get_unexpected_units(percent_reporting_threshold, ["postal_code"])
+
+    bootstrap_election_model.B = 10
+    assert not bootstrap_election_model.ran_bootstrap
+    unit_predictions = bootstrap_election_model.get_unit_predictions(
+        reporting_units, nonreporting_units, estimand="margin", unexpected_units=unexpected_units
+    )
+    assert bootstrap_election_model.ran_bootstrap
+    assert unit_predictions.shape == (nonreporting_units.shape[0], 1)
+
+
+def test_is_top_level_aggregate(bootstrap_election_model):
+    assert bootstrap_election_model._is_top_level_aggregate(["postal_code"])
+    assert bootstrap_election_model._is_top_level_aggregate(["postal_code", "district"])
+
+    assert not bootstrap_election_model._is_top_level_aggregate(["postal_code", "county_fips"])
+    assert not bootstrap_election_model._is_top_level_aggregate(["postal_code", "district", "county_classification"])
+    assert not bootstrap_election_model._is_top_level_aggregate(["county_fips"])
+    assert not bootstrap_election_model._is_top_level_aggregate([])
+
+
+def test_aggregate_predictions(bootstrap_election_model, va_governor_county_data):
+    election_id = "2017-11-07_VA_G"
+    office_id = "G"
+    geographic_unit_type = "county"
+    estimands = ["margin"]
+    percent_reporting_threshold = 100
+
+    data_handler = MockLiveDataHandler(
+        election_id, office_id, geographic_unit_type, estimands, data=va_governor_county_data
+    )
+
+    data_handler.shuffle()
+    current_data = data_handler.get_percent_fully_reported(100)
+
+    preprocessed_data_handler = PreprocessedDataHandler(
+        election_id, office_id, geographic_unit_type, estimands, {"margin": "margin"}, data=va_governor_county_data
+    )
+
+    combined_data_handler = CombinedDataHandler(
+        preprocessed_data_handler.data, current_data, estimands, geographic_unit_type, handle_unreporting="drop"
+    )
+
+    reporting_units = combined_data_handler.get_reporting_units(percent_reporting_threshold, turnout_factor_upper=2.0)
+    nonreporting_units = combined_data_handler.get_nonreporting_units(
+        percent_reporting_threshold, turnout_factor_upper=2.0
+    )
+    unexpected_units = combined_data_handler.get_unexpected_units(percent_reporting_threshold, ["postal_code"])
+
+    bootstrap_election_model.B = 10
+    bootstrap_election_model.compute_bootstrap_errors(reporting_units, nonreporting_units, unexpected_units)
+    # aggregate_predictions = bootstrap_election_model.get_aggregate_predictions(reporting_units, nonreporting_units, unexpected_units, ['postal_code'], 'margin')
+    # import pdb; pdb.set_trace()

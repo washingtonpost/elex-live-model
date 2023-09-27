@@ -139,9 +139,7 @@ class BootstrapElectionModel(BaseElectionModel):
         # arbitrary, just enough to fit coefficients
         return 10
 
-    def _estimate_epsilon(
-        self, residuals: np.ndarray, aggregate_indicator: np.ndarray
-    ) -> np.ndarray:
+    def _estimate_epsilon(self, residuals: np.ndarray, aggregate_indicator: np.ndarray) -> np.ndarray:
         """
         This function estimates the epsilon (contest level random effects)
         """
@@ -566,7 +564,9 @@ class BootstrapElectionModel(BaseElectionModel):
         """
         # the contests that need a sampled contest level random effect are those that still have outstanding
         # units (since for the others, the contest level random effect is a known fixed quantity)
-        # gives us indices of contests for which we have no samples in the training set
+
+        # this gives us indices of contests for which we have no samples in the training set
+        # (ie. all counties are not-reporting)
         contests_not_in_reporting_units = np.where(np.all(aggregate_indicator_train == 0, axis=0))[0]
         # gives us contests for which there is at least one county not reporting
         contests_in_nonreporting_units = np.where(np.any(aggregate_indicator_test > 0, axis=0))[0]

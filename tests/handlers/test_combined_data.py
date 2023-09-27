@@ -319,3 +319,30 @@ def test_get_unexpected_units_county(va_governor_county_data):
     assert unexpected_data["county_fips"].map(lambda x: len(x) == 6).all()
     # test that nonreporting unexpected unit is captured here
     assert unexpected_data[unexpected_data.percent_expected_vote == 50].shape[0] == 1
+
+
+def test_zero_baseline_turnout_as_unexpected(va_governor_county_data):
+    election_id = "2017-11-07_VA_G"
+    office = "G"
+    geographic_unit_type = "county"
+    estimands = ["turnout"]
+
+    live_data_handler = MockLiveDataHandler(
+        election_id, office, geographic_unit_type, estimands, data=va_governor_county_data
+    )
+    current_data = live_data_handler.get_n_fully_reported(n=20)
+    # Add an additional row of a nonreporting unexpected unit that we test below
+    va_governor_county_data.loc[0, "baseline_turnout"] = 0
+    va_governor_county_data["baseline_weights"] = va_governor_county_data.baseline_turnout
+    va_governor_county_data["last_election_results_turnout"] = va_governor_county_data.baseline_turnout + 1
+    combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
+    unexpected_data = combined_data_handler.get_unexpected_units(100, ["county_fips"])
+    assert va_governor_county_data.loc[0].geographic_unit_fips in unexpected_data.geographic_unit_fips.tolist()
+    assert len(unexpected_data) == 1
+
+    reporting_units = combined_data_handler.get_reporting_units(100)
+    assert len(reporting_units) == 20 - 1
+    assert va_governor_county_data.loc[0].geographic_unit_fips not in reporting_units.geographic_unit_fips.tolist()
+
+    nonreporting_units = combined_data_handler.get_nonreporting_units(100)
+    assert va_governor_county_data.loc[0].geographic_unit_fips not in nonreporting_units.geographic_unit_fips.tolist()

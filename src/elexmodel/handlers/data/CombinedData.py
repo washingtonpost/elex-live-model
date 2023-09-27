@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 
 from elexmodel.handlers import s3
 from elexmodel.handlers.data.Estimandizer import Estimandizer
@@ -66,10 +65,12 @@ class CombinedDataHandler:
         # if turnout factor less than 0.5 or greater than 1.5 assume AP made a mistake and don't treat those as reporting units
         reporting_units = reporting_units[reporting_units.turnout_factor > turnout_factor_lower]
         reporting_units = reporting_units[reporting_units.turnout_factor < turnout_factor_upper]
-    
+
         unexpected_units = self._get_unexpected_units()
-        reporting_units = reporting_units[~reporting_units.geographic_unit_fips.isin(unexpected_units.geographic_unit_fips)].reset_index(drop=True)
-        
+        reporting_units = reporting_units[
+            ~reporting_units.geographic_unit_fips.isin(unexpected_units.geographic_unit_fips)
+        ].reset_index(drop=True)
+
         # residualize + normalize
         for estimand in self.estimands:
             reporting_units[f"residuals_{estimand}"] = (
@@ -100,7 +101,9 @@ class CombinedDataHandler:
         )
 
         unexpected_units = self._get_unexpected_units()
-        nonreporting_units = nonreporting_units[~nonreporting_units.geographic_unit_fips.isin(unexpected_units.geographic_unit_fips)].reset_index(drop=True)
+        nonreporting_units = nonreporting_units[
+            ~nonreporting_units.geographic_unit_fips.isin(unexpected_units.geographic_unit_fips)
+        ].reset_index(drop=True)
 
         nonreporting_units["reporting"] = int(0)
         nonreporting_units["expected"] = True
@@ -141,11 +144,12 @@ class CombinedDataHandler:
         no_baseline_units = self._get_units_without_baseline()
         # Note: this uses current_data because self.data drops unexpected units
         unexpected_units = self.current_data[
-            ~self.current_data["geographic_unit_fips"].isin(expected_geographic_units) | self.current_data.geographic_unit_fips.isin(no_baseline_units)
+            ~self.current_data["geographic_unit_fips"].isin(expected_geographic_units)
+            | self.current_data.geographic_unit_fips.isin(no_baseline_units)
         ].reset_index(drop=True)
-        
+
         return unexpected_units
-    
+
     def get_unexpected_units(self, percent_reporting_threshold, aggregates):
         """
         Gets reporting but unexpected data. These are units that are may or may not be fully
