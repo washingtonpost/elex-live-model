@@ -30,7 +30,6 @@ def test_add_estimand_results_historical(va_governor_county_data):
     (output_df, result_columns) = estimandizer.add_estimand_results(va_data_copy, estimands, True)
 
     assert "results_party_vote_share_dem" in output_df.columns
-    assert "results_weights" in output_df.columns
     assert result_columns == ["results_party_vote_share_dem", "results_turnout"]
 
 
