@@ -28,3 +28,6 @@ elexmodel 2021-11-02_VA_G --estimands=dem --office_id=Y --geographic_unit_type=p
 
 echo "Running AZ 2021 Republican Senate primary precinct model"
 elexmodel 2020-08-04_AZ_R --estimands mcsally_61631 --office_id=S --geographic_unit_type=precinct --percent_reporting 20 --aggregates=postal_code
+
+echo "Running VA Governor 2017 precinct model using the bootstrap model with model parameters "
+elexmodel 2017-11-07_VA_G --estimands=margin --office_id=G --geographic_unit_type=precinct --pi_method=bootstrap --percent_reporting=10 --aggregates=postal_code --fixed_effects=county_classification --features=baseline_normalized_margin  --model_parameters='{"B": 10}'
