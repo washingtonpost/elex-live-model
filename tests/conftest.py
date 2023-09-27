@@ -67,7 +67,7 @@ def conformal_election_model():
     return ConformalElectionModel.ConformalElectionModel(model_settings)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def bootstrap_election_model():
     model_settings = {"features": ["baseline_normalized_margin"]}
     return BootstrapElectionModel.BootstrapElectionModel(model_settings)

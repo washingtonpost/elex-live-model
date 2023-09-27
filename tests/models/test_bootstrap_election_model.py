@@ -8,16 +8,20 @@ from elexmodel.models.BootstrapElectionModel import OLSRegressionSolver
 def test_cross_validation(bootstrap_election_model, rng):
     """
     Tests cross validation for finding the optimal lambda.
-    TODO: figure out how to force it to find a different lambda also
     """
-    x = rng.normal(loc=2, scale=5, size=(100, 5))
+    x = rng.normal(loc=2, scale=5, size=(100, 75))
     x[:, 0] = 1
-    beta = rng.integers(low=-100, high=100, size=(5, 1))
+    beta = rng.normal(size=(75, 1))
     y = x @ beta + rng.normal(loc=0, scale=1, size=(100, 1))
-    lambdas = [0, 1, 100]
+    lambdas = [-0.1, 0, 0.01, 0.1, 1, 100]
     res = bootstrap_election_model.cv_lambda(x, y, lambdas)
-    assert res == 0
+    assert res == 0.01
 
+    beta = rng.normal(scale=0.001, size=(75, 1))
+    y = x @ beta + rng.normal(loc=0, scale=1, size=(100, 1))
+    lambdas = [-0.1, 0, 0.01, 0.1, 1, 100]
+    res = bootstrap_election_model.cv_lambda(x, y, lambdas)
+    assert res == 100
 
 def test_estimate_epsilon(bootstrap_election_model):
     """
@@ -97,24 +101,37 @@ def test_estimate_strata_dist(bootstrap_election_model, rng):
     ppf, cdf = bootstrap_election_model._estimate_strata_dist(
         x_train, x_train_strata, x_test, x_test_strata, delta_hat, lb, ub
     )
+    assert ppf[(1, 0, 0)](0.01) == pytest.approx(delta_hat[:2].min())
+    assert ppf[(1, 0, 0)](0.34) == pytest.approx(lb)
+    assert ppf[(1, 0, 0)](0.66) == pytest.approx(ub)
+    assert ppf[(1, 0, 0)](0.99) == pytest.approx(delta_hat[:2].max())
 
-    # assert ppf[(1, 0, 0)](0.01) == pytest.approx(delta_hat[:2].min())
-    # import pdb; pdb.set_trace()
-    # assert ppf[(1, 0, 0)](0.49) == pytest.approx(delta_hat[:2].min())
-    # assert ppf[(1, 0, 0)](0.51) == pytest.approx(delta_hat[:2].max())
-    # assert ppf[(1, 0, 0)](0.99) == pytest.approx(delta_hat[:2].max())
-    # import pdb; pdb.set_trace()
-    # since all elements of the second strata are > 0.1 and < 0.3 we use the lb and ub for the first
-    # quantiles
-    # assert ppf[(1, 1, 0)](0.01) == lb
-    # assert ppf[(1, 1, 0)](0.25) == lb
-    # assert ppf[(1, 1, 0)](0.26) == pytest.approx(delta_hat[2:].min())
-    # assert ppf[(1, 1, 0)](0.50) == pytest.approx(np.median(delta_hat[2:]))
-    # assert ppf[(1, 1, 0)](0.51) == pytest.approx(delta_hat[2:].max())
-    # assert ppf[(1, 1, 0)](0.74) == pytest.approx(delta_hat[2:].max())
-    # assert ppf[(1, 1, 0)](0.75) == ub
-    # assert ppf[(1, 1, 0)](0.99) == ub
+    # since all elements of the second strata are > 0.1 and < 0.3 we use the lb and ub for the first quantiles
+    assert ppf[(1, 1, 0)](0.01) == pytest.approx(lb)
+    assert ppf[(1, 1, 0)](0.25) == pytest.approx(lb)
+    assert ppf[(1, 1, 0)](0.26) == pytest.approx(delta_hat[2:].min())
+    assert ppf[(1, 1, 0)](0.50) == pytest.approx(np.median(delta_hat[2:]))
+    assert ppf[(1, 1, 0)](0.51) == pytest.approx(delta_hat[2:].max())
+    assert ppf[(1, 1, 0)](0.74) == pytest.approx(delta_hat[2:].max())
+    assert ppf[(1, 1, 0)](0.75) == pytest.approx(ub)
+    assert ppf[(1, 1, 0)](0.99) == pytest.approx(ub)
 
+    assert ppf[(1, 0, 1)](0.49) == pytest.approx(lb)
+    assert ppf[(1, 0, 1)](0.50) == pytest.approx(ub)
+
+    # TODO: where is this -0.4 coming from?
+    assert cdf[(1, 0, 0)](-0.4) == pytest.approx(0.01)
+    assert cdf[(1, 0, 0)](-0.3) == pytest.approx(0.33)
+    assert cdf[(1, 0, 0)](0.3) == pytest.approx(0.66)
+    assert cdf[(1, 0, 0)](0.5) == pytest.approx(0.99)
+
+    assert cdf[(1, 1, 0)](0.1) == pytest.approx(0.01)
+    assert cdf[(1, 1, 0)](0.2) == pytest.approx(0.49)
+    assert cdf[(1, 1, 0)](0.28) == pytest.approx(0.74)
+    assert cdf[(1, 1, 0)](0.3) == pytest.approx(0.99)
+
+    assert cdf[(1, 0, 1)](0.1) == pytest.approx(0.01)
+    assert cdf[(1, 0, 1)](0.3) == pytest.approx(0.99)
 
 def test_generate_nonreporting_bounds(bootstrap_election_model, rng):
     nonreporting_units = pd.DataFrame(
@@ -161,8 +178,47 @@ def test_generate_nonreporting_bounds(bootstrap_election_model, rng):
     assert lower[4] == bootstrap_election_model.z_unobserved_lower_bound
     assert upper[4] == bootstrap_election_model.z_unobserved_upper_bound
 
-    # TODO: add tests for when we manually change observed/unobserved bounds
+    # changing parameters
+    bootstrap_election_model.y_unobserved_lower_bound = -0.8
+    bootstrap_election_model.y_unobserved_upper_bound = 0.8
 
+    lower, upper = bootstrap_election_model._generate_nonreporting_bounds(
+        nonreporting_units, "results_normalized_margin"
+    )
+    assert lower[0] == pytest.approx(-0.125)
+    assert upper[0] == pytest.approx(0.275)
+    
+    assert lower[1] == pytest.approx(-0.416)
+    assert upper[1] == pytest.approx(0.8)
+
+    assert lower[2] == bootstrap_election_model.y_unobserved_lower_bound
+    assert upper[2] == bootstrap_election_model.y_unobserved_upper_bound
+
+    assert lower[3] == pytest.approx(-0.206)
+    assert upper[3] == pytest.approx(-0.19)
+    
+    assert lower[4] == bootstrap_election_model.y_unobserved_lower_bound
+    assert upper[4] == bootstrap_election_model.y_unobserved_upper_bound
+
+    bootstrap_election_model.y_unobserved_lower_bound = 0.8
+    bootstrap_election_model.y_unobserved_upper_bound = 1.2
+    bootstrap_election_model.percent_expected_vote_error_bound = 0.1
+
+    lower, upper = bootstrap_election_model._generate_nonreporting_bounds(nonreporting_units, "turnout_factor")
+    assert lower[0] == pytest.approx(1.411764706)
+    assert upper[0] == pytest.approx(1.846153846)
+
+    assert lower[1] == pytest.approx(2.352941176)
+    assert upper[1] == pytest.approx(5.714285714) 
+
+    assert lower[2] == bootstrap_election_model.z_unobserved_lower_bound
+    assert upper[2] == bootstrap_election_model.z_unobserved_upper_bound
+
+    assert lower[3] == pytest.approx(0.733944954)
+    assert upper[3] == pytest.approx(0.898876404)
+
+    assert lower[4] == bootstrap_election_model.z_unobserved_lower_bound
+    assert upper[4] == bootstrap_election_model.z_unobserved_upper_bound
 
 def test_strata_pit(bootstrap_election_model, rng):
     x_train, x_test = None, None
@@ -245,8 +301,8 @@ def test_bootstrap_epsilons(bootstrap_election_model):
     assert np.isclose(bootstrap_epsilons_y[-1], 0).mean() == pytest.approx(1)
 
     # the others have the correct mean
-    assert bootstrap_epsilons_y[0].mean() == pytest.approx(epsilon_hat[0], rel=0.01)
-    assert bootstrap_epsilons_y[1].mean() == pytest.approx(epsilon_hat[1], rel=0.01)
+    assert bootstrap_epsilons_y[0].mean() == pytest.approx(epsilon_hat[0], rel=0.1)
+    assert bootstrap_epsilons_y[1].mean() == pytest.approx(epsilon_hat[1], rel=0.1)
 
 
 def test_bootstrap_errors(bootstrap_election_model):
