@@ -487,35 +487,106 @@ def test_is_top_level_aggregate(bootstrap_election_model):
     assert not bootstrap_election_model._is_top_level_aggregate([])
 
 
-def test_aggregate_predictions(bootstrap_election_model, va_governor_county_data):
-    election_id = "2017-11-07_VA_G"
-    office_id = "G"
-    geographic_unit_type = "county"
-    estimands = ["margin"]
-    percent_reporting_threshold = 100
-
-    data_handler = MockLiveDataHandler(
-        election_id, office_id, geographic_unit_type, estimands, data=va_governor_county_data
+def test_aggregate_predictions(bootstrap_election_model):
+    reporting_units = pd.DataFrame(
+        [
+            ["a", -3, 0.2, 1, 1, 1, 1, 3, 5, 8],
+            ["a", 1, 0, 1, 1, 1, 1, 2, 1, 3],
+            ["b", 5, -0.1, 1, 1, 1, 1, 8, 3, 11],
+            ["c", 3, 0.8, 1, 1, 1, 1, 2, 4, 6],
+        ],
+        columns=[
+            "postal_code",
+            "pred_margin",
+            "results_margin",
+            "results_weights",
+            "baseline_weights",
+            "turnout_factor",
+            "reporting",
+            "baseline_dem",
+            "baseline_gop",
+            "baseline_turnout",
+        ],
+    )
+    nonreporting_units = pd.DataFrame(
+        [
+            ["a", -3, 0.2, 1, 1, 1, 0, 3, 5, 8],
+            ["b", 1, 0, 1, 1, 1, 0, 2, 1, 3],
+            ["d", 5, -0.1, 1, 1, 1, 0, 8, 3, 11],
+            ["d", 3, 0.8, 1, 1, 1, 0, 2, 4, 6],
+        ],
+        columns=[
+            "postal_code",
+            "pred_margin",
+            "results_margin",
+            "results_weights",
+            "baseline_weights",
+            "turnout_factor",
+            "reporting",
+            "baseline_dem",
+            "baseline_gop",
+            "baseline_turnout",
+        ],
+    )
+    unexpected_units = pd.DataFrame(
+        [
+            ["a", -3, 0.2, 1, 1, 1, 0, np.nan, np.nan, np.nan],
+            ["d", 1, 0, 1, 1, 1, np.nan, np.nan, np.nan],
+            ["e", 5, -0.1, 1, 1, 1, 0, np.nan, np.nan, np.nan],
+            ["e", 3, 0.8, 1, 1, 1, 0, np.nan, np.nan, np.nan],
+        ],
+        columns=[
+            "postal_code",
+            "pred_margin",
+            "results_margin",
+            "results_weights",
+            "baseline_weights",
+            "turnout_factor",
+            "reporting",
+            "baseline_dem",
+            "baseline_gop",
+            "baseline_turnout",
+        ],
     )
 
-    data_handler.shuffle()
-    current_data = data_handler.get_percent_fully_reported(100)
+    bootstrap_election_model.weighted_z_test_pred = np.asarray([1, 1, 1, 1]).reshape(-1, 1)
 
-    preprocessed_data_handler = PreprocessedDataHandler(
-        election_id, office_id, geographic_unit_type, estimands, {"margin": "margin"}, data=va_governor_county_data
+    aggregate_predictions = bootstrap_election_model.get_aggregate_predictions(
+        reporting_units, nonreporting_units, unexpected_units, ["postal_code"], "margin"
     )
 
-    combined_data_handler = CombinedDataHandler(
-        preprocessed_data_handler.data, current_data, estimands, geographic_unit_type, handle_unreporting="drop"
-    )
+    assert aggregate_predictions[aggregate_predictions.postal_code == "a"].pred_margin[0] == pytest.approx(
+        -2.6 / 4
+    )  # (-3 (pred) + 0.2 + 0 (reporting margin) + 0.2 (unexpected margin))/ 4
+    assert aggregate_predictions[aggregate_predictions.postal_code == "b"].pred_margin[1] == pytest.approx(
+        0.9 / 2
+    )  # (-0.1 + 1) / 2
+    assert aggregate_predictions[aggregate_predictions.postal_code == "c"].pred_margin[2] == pytest.approx(
+        0.8
+    )  # 0.8 / 1
+    assert aggregate_predictions[aggregate_predictions.postal_code == "d"].pred_margin[3] == pytest.approx(
+        8 / 3
+    )  # 0.8 / 3
+    assert aggregate_predictions[aggregate_predictions.postal_code == "e"].pred_margin[4] == pytest.approx(
+        0.7 / 2
+    )  # 0.8 / 3
 
-    reporting_units = combined_data_handler.get_reporting_units(percent_reporting_threshold, turnout_factor_upper=2.0)
-    nonreporting_units = combined_data_handler.get_nonreporting_units(
-        percent_reporting_threshold, turnout_factor_upper=2.0
-    )
-    unexpected_units = combined_data_handler.get_unexpected_units(percent_reporting_threshold, ["postal_code"])
+    assert aggregate_predictions[aggregate_predictions.postal_code == "a"].results_margin[0] == pytest.approx(0.6 / 4)
+    assert aggregate_predictions[aggregate_predictions.postal_code == "b"].results_margin[1] == pytest.approx(-0.1 / 2)
+    assert aggregate_predictions[aggregate_predictions.postal_code == "c"].results_margin[2] == pytest.approx(0.8)
+    assert aggregate_predictions[aggregate_predictions.postal_code == "d"].results_margin[3] == pytest.approx(0.7 / 3)
+    assert aggregate_predictions[aggregate_predictions.postal_code == "e"].results_margin[4] == pytest.approx(
+        0.7 / 2
+    )  # 0.8 / 3
 
-    bootstrap_election_model.B = 10
-    bootstrap_election_model.compute_bootstrap_errors(reporting_units, nonreporting_units, unexpected_units)
-    # aggregate_predictions = bootstrap_election_model.get_aggregate_predictions(reporting_units, nonreporting_units, unexpected_units, ['postal_code'], 'margin')
-    # import pdb; pdb.set_trace()
+    assert aggregate_predictions[aggregate_predictions.postal_code == "a"].reporting[0] == pytest.approx(2)
+    assert aggregate_predictions[aggregate_predictions.postal_code == "b"].reporting[1] == pytest.approx(1)
+    assert aggregate_predictions[aggregate_predictions.postal_code == "c"].reporting[2] == pytest.approx(1)
+    assert aggregate_predictions[aggregate_predictions.postal_code == "d"].reporting[3] == pytest.approx(0)
+    assert aggregate_predictions[aggregate_predictions.postal_code == "e"].reporting[4] == pytest.approx(0)  # 0.8 / 3
+
+    # TODO: add test where weighted_z_test_pred is more complex
+
+
+def test_get_unit_prediction_intervals(bootstrap_election_model):
+    pass
