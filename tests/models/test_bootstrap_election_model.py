@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
+import scipy as sp
 
 from elexmodel.handlers.data.CombinedData import CombinedDataHandler
 from elexmodel.handlers.data.LiveData import MockLiveDataHandler
@@ -588,5 +589,47 @@ def test_aggregate_predictions(bootstrap_election_model):
     # TODO: add test where weighted_z_test_pred is more complex
 
 
-def test_get_unit_prediction_intervals(bootstrap_election_model):
-    pass
+def test_get_quantile(bootstrap_election_model):
+    bootstrap_election_model.B = 1000
+    alpha = 0.95
+    lower_q, upper_q = bootstrap_election_model._get_quantiles(alpha)
+    assert lower_q == pytest.approx(0.025)
+    assert upper_q == pytest.approx(0.975)
+
+
+def test_get_unit_prediction_intervals(bootstrap_election_model, rng):
+    reporting_units, nonreporting_units = None, None
+    n = 10
+    B = 10000
+    alpha = 0.95
+
+    s = 2
+    bootstrap_election_model.weighted_yz_test_pred = rng.normal(scale=1, size=(n, 1))
+    bootstrap_election_model.errors_B_1 = rng.normal(scale=s, size=(n, B))
+    bootstrap_election_model.errors_B_2 = rng.normal(scale=s, size=(n, B))
+    lower, upper = bootstrap_election_model.get_unit_prediction_intervals(
+        reporting_units, nonreporting_units, alpha, "margin"
+    )
+
+    lower_alpha = (1 - alpha) / 2
+    upper_alpha = 1 - lower_alpha
+
+    lower_q = np.floor(lower_alpha * (B + 1)) / B
+    upper_q = np.ceil(upper_alpha * (B - 1)) / B
+
+    assert lower.shape == (n, 1)
+    assert upper.shape == (n, 1)
+    assert all(upper > lower)
+    assert all(upper > bootstrap_election_model.weighted_yz_test_pred)
+    assert all(bootstrap_election_model.weighted_yz_test_pred > lower)
+
+    # sqrt of variance of two errors above
+    normal_lower_q = sp.stats.norm.ppf(lower_q, scale=np.sqrt(s**2 + s**2))
+    normal_upper_q = sp.stats.norm.ppf(upper_q, scale=np.sqrt(s**2 + s**2))
+    # arbitrarily one can be off because of sampling variability and rounding
+    assert ((bootstrap_election_model.weighted_yz_test_pred - normal_upper_q).round() == lower).mean() >= 0.9
+    assert ((bootstrap_election_model.weighted_yz_test_pred - normal_lower_q).round() == upper).mean() >= 0.9
+
+    import pdb
+
+    pdb.set_trace()

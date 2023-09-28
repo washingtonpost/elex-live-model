@@ -1067,6 +1067,20 @@ class BootstrapElectionModel(BaseElectionModel):
             ).values
         return raw_margin_df
 
+    def _get_quantiles(self, alpha):
+        """
+        Given a confidence level for the prediction interval, calultes the quantiles
+        necessary to be computed
+        """
+        lower_alpha = (1 - alpha) / 2
+        upper_alpha = 1 - lower_alpha
+
+        # adjust percentiles to account for bootsrap
+        lower_q = np.floor(lower_alpha * (self.B + 1)) / self.B
+        upper_q = np.ceil(upper_alpha * (self.B - 1)) / self.B
+
+        return lower_q, upper_q
+
     def get_unit_prediction_intervals(
         self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, alpha: float, estimand: str
     ) -> PredictionIntervals:
@@ -1084,12 +1098,7 @@ class BootstrapElectionModel(BaseElectionModel):
         # error_B_2: w_i * (\hat{y_i} + \residual_{y, i}^{b}) * (\hat{z_i} + \residual_{z, i}^{b})
         errors_B = self.errors_B_1 - self.errors_B_2
 
-        lower_alpha = (1 - alpha) / 2
-        upper_alpha = 1 - lower_alpha
-
-        # adjust percentiles to account for bootsrap
-        lower_q = np.floor(lower_alpha * (self.B + 1)) / self.B
-        upper_q = np.ceil(upper_alpha * (self.B - 1)) / self.B
+        lower_q, upper_q = self._get_quantiles(alpha)
 
         # sum in the prediction to our lower and upper esimate of the error in our prediction
         interval_upper, interval_lower = (
@@ -1187,10 +1196,7 @@ class BootstrapElectionModel(BaseElectionModel):
         # subtract to get bootstrap error for estimate in our predictions
         aggregate_error_B = divided_error_B_1 - divided_error_B_2
 
-        lower_alpha = (1 - alpha) / 2
-        upper_alpha = 1 - lower_alpha
-        lower_q = np.floor(lower_alpha * (self.B + 1)) / self.B
-        upper_q = np.ceil(upper_alpha * (self.B - 1)) / self.B
+        lower_q, upper_q = self._get_quantiles(alpha)
 
         # we also need to re-compute our aggregate prediction to add to our error to get the prediction interval
         # first the turnout component
@@ -1305,10 +1311,7 @@ class BootstrapElectionModel(BaseElectionModel):
         )
         aggregate_dem_vals_pred = np.sum(nat_sum_data_dict_sorted_vals * aggregate_dem_probs_total_called)
 
-        lower_alpha = (1 - alpha) / 2
-        upper_alpha = 1 - lower_alpha
-        lower_q = np.floor(lower_alpha * (self.B + 1)) / self.B
-        upper_q = np.ceil(upper_alpha * (self.B - 1)) / self.B
+        lower_q, upper_q = self._get_quantiles(alpha)
 
         interval_upper, interval_lower = (
             aggregate_dem_vals_pred - np.quantile(aggregate_dem_vals_B, q=[lower_q, upper_q], axis=-1).T
