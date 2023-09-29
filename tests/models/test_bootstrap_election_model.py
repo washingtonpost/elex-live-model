@@ -629,7 +629,3 @@ def test_get_unit_prediction_intervals(bootstrap_election_model, rng):
     # arbitrarily one can be off because of sampling variability and rounding
     assert ((bootstrap_election_model.weighted_yz_test_pred - normal_upper_q).round() == lower).mean() >= 0.9
     assert ((bootstrap_election_model.weighted_yz_test_pred - normal_lower_q).round() == upper).mean() >= 0.9
-
-    import pdb
-
-    pdb.set_trace()
