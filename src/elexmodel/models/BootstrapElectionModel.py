@@ -1245,10 +1245,21 @@ class BootstrapElectionModel(BaseElectionModel):
             # the order does not matter since all contests have the same weight, so we can use anything as the key when sorting
             nat_sum_data_dict = {i: 1 for i in range(self.aggregate_error_B_1.shape[0])}
 
+        # if we didn't pass the right number of national summary weights (ie. the number of contests) then raise an exception
+        if len(nat_sum_data_dict) != self.aggregate_error_B_1.shape[0]:
+            raise BootstrapElectionModelException(
+                f"nat_sum_data_dict is of length {len(nat_sum_data_dict)} but there are {self.aggregate_error_B_1.shape[0]} contests"
+            )
+
         # called states is a dictionary where 1 means that the LHS party has one, 0 means that the RHS party has won
         # and -1 means that the state is not called. If called_states is None, assume that all states are not called.
         if called_states is None:
             called_states = {i: -1 for i in range(self.aggregate_error_B_1.shape[0])}
+
+        if len(called_states) != self.aggregate_error_B_1.shape[0]:
+            raise BootstrapElectionModelException(
+                f"called_states is of length {len(nat_sum_data_dict)} but there are {self.aggregate_error_B_1.shape[0]} contests"
+            )
 
         # sort in order to get in the same order as the contests, which have been sorted when getting dummies for aggregate indicators
         # in get_aggregate_prediction_intervals

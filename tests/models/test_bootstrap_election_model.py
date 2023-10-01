@@ -6,7 +6,7 @@ import scipy as sp
 from elexmodel.handlers.data.CombinedData import CombinedDataHandler
 from elexmodel.handlers.data.LiveData import MockLiveDataHandler
 from elexmodel.handlers.data.PreprocessedData import PreprocessedDataHandler
-from elexmodel.models.BootstrapElectionModel import OLSRegressionSolver
+from elexmodel.models.BootstrapElectionModel import BootstrapElectionModelException, OLSRegressionSolver
 
 
 def test_cross_validation(bootstrap_election_model, rng):
@@ -491,11 +491,11 @@ def test_is_top_level_aggregate(bootstrap_election_model):
 def test_aggregate_predictions(bootstrap_election_model):
     reporting_units = pd.DataFrame(
         [
-            ["a", -3, 0.2, 1, 1, 1, 1, 3, 5, 8],
-            ["a", 1, 0, 1, 1, 1, 1, 2, 1, 3],
-            ["b", 5, -0.1, 1, 1, 1, 1, 8, 3, 11],
-            ["c", 3, -0.2, 1, 1, 1, 1, 9, 1, 9],
-            ["c", 3, 0.8, 1, 1, 1, 1, 2, 4, 6],
+            ["a", -3, 0.2, 1, 1, 1, 1, 3, 5, 8, "c"],
+            ["a", 1, 0, 1, 1, 1, 1, 2, 1, 3, "a"],
+            ["b", 5, -0.1, 1, 1, 1, 1, 8, 3, 11, "a"],
+            ["c", 3, -0.2, 1, 1, 1, 1, 9, 1, 9, "c"],
+            ["c", 3, 0.8, 1, 1, 1, 1, 2, 4, 6, "c"],
         ],
         columns=[
             "postal_code",
@@ -508,16 +508,17 @@ def test_aggregate_predictions(bootstrap_election_model):
             "baseline_dem",
             "baseline_gop",
             "baseline_turnout",
+            "district",
         ],
     )
     nonreporting_units = pd.DataFrame(
         [
-            ["a", -3, 0.2, 1, 1, 1, 0, 3, 5, 8],
-            ["b", 1, 0, 1, 1, 1, 0, 2, 1, 3],
-            ["d", 5, -0.1, 1, 1, 1, 0, 8, 3, 11],
-            ["d", 3, 0.8, 1, 1, 1, 0, 2, 4, 6],
-            ["e", 4, 0.1, 1, 1, 1, 0, 5, 1, 9],
-            ["e", 4, 0.1, 1, 1, 1, 0, 5, 1, 9],
+            ["a", -3, 0.2, 1, 1, 1, 0, 3, 5, 8, "c"],
+            ["b", 1, 0, 1, 1, 1, 0, 2, 1, 3, "a"],
+            ["d", 5, -0.1, 1, 1, 1, 0, 8, 3, 11, "c"],
+            ["d", 3, 0.8, 1, 1, 1, 0, 2, 4, 6, "c"],
+            ["e", 4, 0.1, 1, 1, 1, 0, 5, 1, 9, "e"],
+            ["e", 4, 0.1, 1, 1, 1, 0, 5, 1, 9, "a"],
         ],
         columns=[
             "postal_code",
@@ -530,14 +531,15 @@ def test_aggregate_predictions(bootstrap_election_model):
             "baseline_dem",
             "baseline_gop",
             "baseline_turnout",
+            "district",
         ],
     )
     unexpected_units = pd.DataFrame(
         [
-            ["a", -3, 0.2, 1, 1, 1, 0, np.nan, np.nan, np.nan],
-            ["d", 1, 0, 1, 1, 1, np.nan, np.nan, np.nan],
-            ["f", 5, -0.1, 1, 1, 1, 0, np.nan, np.nan, np.nan],
-            ["f", 3, 0.8, 1, 1, 1, 0, np.nan, np.nan, np.nan],
+            ["a", -3, 0.2, 1, 1, 1, 0, np.nan, np.nan, np.nan, "c"],
+            ["d", 1, 0, 1, 1, 1, 0, np.nan, np.nan, np.nan, "c"],
+            ["f", 5, -0.1, 1, 1, 1, 0, np.nan, np.nan, np.nan, "f"],
+            ["f", 3, 0.8, 1, 1, 1, 0, np.nan, np.nan, np.nan, "f"],
         ],
         columns=[
             "postal_code",
@@ -550,14 +552,24 @@ def test_aggregate_predictions(bootstrap_election_model):
             "baseline_dem",
             "baseline_gop",
             "baseline_turnout",
+            "district",
         ],
     )
 
     bootstrap_election_model.weighted_z_test_pred = np.asarray([1, 1, 1, 1, 1, 1]).reshape(-1, 1)
 
+    # test that is top level aggregate is working
+    aggregate_predictions = bootstrap_election_model.get_aggregate_predictions(
+        reporting_units, nonreporting_units, unexpected_units, ["district"], "margin"
+    )
+    with pytest.raises(AttributeError):
+        bootstrap_election_model.aggregate_baseline_margin
+
     aggregate_predictions = bootstrap_election_model.get_aggregate_predictions(
         reporting_units, nonreporting_units, unexpected_units, ["postal_code"], "margin"
     )
+
+    assert bootstrap_election_model.aggregate_baseline_margin is not None
 
     assert aggregate_predictions[aggregate_predictions.postal_code == "a"].pred_margin[0] == pytest.approx(
         -2.6 / 4
@@ -587,11 +599,77 @@ def test_aggregate_predictions(bootstrap_election_model):
     assert aggregate_predictions[aggregate_predictions.postal_code == "b"].reporting[1] == pytest.approx(1)
     assert aggregate_predictions[aggregate_predictions.postal_code == "c"].reporting[2] == pytest.approx(2)
     assert aggregate_predictions[aggregate_predictions.postal_code == "d"].reporting[3] == pytest.approx(0)
-    assert aggregate_predictions[aggregate_predictions.postal_code == "e"].reporting[4] == pytest.approx(0)  # 0.8 / 3
-    assert aggregate_predictions[aggregate_predictions.postal_code == "f"].reporting[5] == pytest.approx(0)  # 0.8 / 3
+    assert aggregate_predictions[aggregate_predictions.postal_code == "e"].reporting[4] == pytest.approx(0)
+    assert aggregate_predictions[aggregate_predictions.postal_code == "f"].reporting[5] == pytest.approx(0)
 
-    # TODO: add test where weighted_z_test_pred is more complex
-    # TODO: add test where aggregate is more complicated (eg. postal code, district)
+    # test more complicated z predictions
+    bootstrap_election_model.weighted_z_test_pred = np.asarray([2, 3, 1, 1, 1, 1]).reshape(-1, 1)
+
+    aggregate_predictions = bootstrap_election_model.get_aggregate_predictions(
+        reporting_units, nonreporting_units, unexpected_units, ["postal_code"], "margin"
+    )
+
+    assert aggregate_predictions[aggregate_predictions.postal_code == "a"].pred_margin[0] == pytest.approx(
+        -2.6 / 5
+    )  # now divided by 5 since the a in non reporting has weight 2
+    assert aggregate_predictions[aggregate_predictions.postal_code == "b"].pred_margin[1] == pytest.approx(0.9 / 4)
+
+    # test more complicated aggregate (postal code-district)
+    bootstrap_election_model.weighted_z_test_pred = np.asarray([1, 1, 1, 1, 1, 1]).reshape(-1, 1)
+    aggregate_predictions = bootstrap_election_model.get_aggregate_predictions(
+        reporting_units, nonreporting_units, unexpected_units, ["postal_code", "district"], "margin"
+    )
+
+    assert aggregate_predictions.shape[0] == 8
+    assert aggregate_predictions[
+        (aggregate_predictions.postal_code == "a") & (aggregate_predictions.district == "a")
+    ].pred_margin[0] == pytest.approx(0)
+    assert aggregate_predictions[
+        (aggregate_predictions.postal_code == "a") & (aggregate_predictions.district == "c")
+    ].pred_margin[1] == pytest.approx(-2.6 / 3)
+    assert aggregate_predictions[
+        (aggregate_predictions.postal_code == "b") & (aggregate_predictions.district == "a")
+    ].pred_margin[2] == pytest.approx(0.9 / 2)
+    assert aggregate_predictions[
+        (aggregate_predictions.postal_code == "c") & (aggregate_predictions.district == "c")
+    ].pred_margin[3] == pytest.approx(0.6 / 2)
+    assert aggregate_predictions[
+        (aggregate_predictions.postal_code == "d") & (aggregate_predictions.district == "c")
+    ].pred_margin[4] == pytest.approx(8 / 3)
+    assert aggregate_predictions[
+        (aggregate_predictions.postal_code == "e") & (aggregate_predictions.district == "a")
+    ].pred_margin[5] == pytest.approx(4)
+    assert aggregate_predictions[
+        (aggregate_predictions.postal_code == "e") & (aggregate_predictions.district == "e")
+    ].pred_margin[6] == pytest.approx(4)
+    assert aggregate_predictions[
+        (aggregate_predictions.postal_code == "f") & (aggregate_predictions.district == "f")
+    ].pred_margin[7] == pytest.approx(0.7 / 2)
+
+    assert aggregate_predictions[
+        (aggregate_predictions.postal_code == "a") & (aggregate_predictions.district == "a")
+    ].reporting[0] == pytest.approx(1)
+    assert aggregate_predictions[
+        (aggregate_predictions.postal_code == "a") & (aggregate_predictions.district == "c")
+    ].reporting[1] == pytest.approx(1)
+    assert aggregate_predictions[
+        (aggregate_predictions.postal_code == "b") & (aggregate_predictions.district == "a")
+    ].reporting[2] == pytest.approx(1)
+    assert aggregate_predictions[
+        (aggregate_predictions.postal_code == "c") & (aggregate_predictions.district == "c")
+    ].reporting[3] == pytest.approx(2)
+    assert aggregate_predictions[
+        (aggregate_predictions.postal_code == "d") & (aggregate_predictions.district == "c")
+    ].reporting[4] == pytest.approx(0)
+    assert aggregate_predictions[
+        (aggregate_predictions.postal_code == "e") & (aggregate_predictions.district == "a")
+    ].reporting[5] == pytest.approx(0)
+    assert aggregate_predictions[
+        (aggregate_predictions.postal_code == "e") & (aggregate_predictions.district == "e")
+    ].reporting[6] == pytest.approx(0)
+    assert aggregate_predictions[
+        (aggregate_predictions.postal_code == "f") & (aggregate_predictions.district == "f")
+    ].reporting[7] == pytest.approx(0)
 
 
 def test_get_quantile(bootstrap_election_model):
@@ -639,11 +717,11 @@ def test_get_unit_prediction_intervals(bootstrap_election_model, rng):
 def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
     reporting_units = pd.DataFrame(
         [
-            ["a", -3, 0.2, 1, 1, 1, 1, 3, 5, 8],
-            ["a", 1, 0, 1, 1, 1, 1, 2, 1, 3],
-            ["b", 5, -0.1, 1, 1, 1, 1, 8, 3, 11],
-            ["c", 3, -0.2, 1, 1, 1, 1, 9, 1, 9],
-            ["c", 3, 0.8, 1, 1, 1, 1, 2, 4, 6],
+            ["a", -3, 0.2, 1, 1, 1, 1, 3, 5, 8, "c"],
+            ["a", 1, 0, 1, 1, 1, 1, 2, 1, 3, "a"],
+            ["b", 5, -0.1, 1, 1, 1, 1, 8, 3, 11, "a"],
+            ["c", 3, -0.2, 1, 1, 1, 1, 9, 1, 9, "c"],
+            ["c", 3, 0.8, 1, 1, 1, 1, 2, 4, 6, "c"],
         ],
         columns=[
             "postal_code",
@@ -656,17 +734,18 @@ def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
             "baseline_dem",
             "baseline_gop",
             "baseline_turnout",
+            "district",
         ],
     )
     reporting_units["results_normalized_margin"] = reporting_units.results_margin / reporting_units.results_weights
     nonreporting_units = pd.DataFrame(
         [
-            ["a", -3, 0.2, 1, 1, 1, 0, 3, 5, 8],
-            ["b", 1, 0, 1, 1, 1, 0, 2, 1, 3],
-            ["d", 5, -0.1, 1, 1, 1, 0, 8, 3, 11],
-            ["d", 3, 0.8, 1, 1, 1, 0, 2, 4, 6],
-            ["e", 4, 0.1, 1, 1, 1, 0, 5, 1, 9],
-            ["e", 4, 0.1, 1, 1, 1, 0, 5, 1, 9],
+            ["a", -3, 0.2, 1, 1, 1, 0, 3, 5, 8, "c"],
+            ["b", 1, 0, 1, 1, 1, 0, 2, 1, 3, "a"],
+            ["d", 5, -0.1, 1, 1, 1, 0, 8, 3, 11, "c"],
+            ["d", 3, 0.8, 1, 1, 1, 0, 2, 4, 6, "c"],
+            ["e", 4, 0.1, 1, 1, 1, 0, 5, 1, 9, "e"],
+            ["e", 4, 0.1, 1, 1, 1, 0, 5, 1, 9, "a"],
         ],
         columns=[
             "postal_code",
@@ -679,6 +758,7 @@ def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
             "baseline_dem",
             "baseline_gop",
             "baseline_turnout",
+            "district",
         ],
     )
     nonreporting_units["results_normalized_margin"] = (
@@ -686,10 +766,10 @@ def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
     )
     unexpected_units = pd.DataFrame(
         [
-            ["a", -3, 0.2, 1, 1, 1, 0, np.nan, np.nan, np.nan],
-            ["d", 1, 0, 1, 1, 1, np.nan, np.nan, np.nan],
-            ["f", 5, -0.1, 1, 1, 1, 0, np.nan, np.nan, np.nan],
-            ["f", 3, 0.8, 1, 1, 1, 0, np.nan, np.nan, np.nan],
+            ["a", -3, 0.2, 1, 1, 1, 0, np.nan, np.nan, np.nan, "c"],
+            ["d", 1, 0, 1, 1, 1, 0, np.nan, np.nan, np.nan, "c"],
+            ["f", 5, -0.1, 1, 1, 1, 0, np.nan, np.nan, np.nan, "f"],
+            ["f", 3, 0.8, 1, 1, 1, 0, np.nan, np.nan, np.nan, "f"],
         ],
         columns=[
             "postal_code",
@@ -702,6 +782,7 @@ def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
             "baseline_dem",
             "baseline_gop",
             "baseline_turnout",
+            "district",
         ],
     )
     unexpected_units["results_normalized_margin"] = unexpected_units.results_margin / unexpected_units.results_weights
@@ -728,7 +809,19 @@ def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
     assert lower[5] == pytest.approx(upper[5])  # since all f units are unexpected
     assert all(lower <= upper)
 
-    # TODO: add test where aggregate is more complicated (eg. postal code, district)
+    # test with more complicated aggregate
+    lower, upper = bootstrap_election_model.get_aggregate_prediction_intervals(
+        reporting_units, nonreporting_units, unexpected_units, ["postal_code", "district"], 0.95, None, None
+    )
+
+    assert lower.shape == (8, 1)
+    assert upper.shape == (8, 1)
+
+    assert lower[0] == pytest.approx(upper[0])  # a-a is fully reporting
+    assert lower[3] == pytest.approx(upper[3])  # c-c is fully reporting
+    assert lower[7] == pytest.approx(upper[7])  # c-c is fully reporting
+    assert lower[7] == pytest.approx(upper[7])  # f-f is fully unexpected
+    assert all(lower <= upper)
 
 
 def test_get_national_summary_estimates(bootstrap_election_model, rng):
@@ -782,3 +875,23 @@ def test_get_national_summary_estimates(bootstrap_election_model, rng):
     assert nat_sum_estimates["margin"][0] == pytest.approx(7)
     assert nat_sum_estimates["margin"][1] == pytest.approx(7)
     assert nat_sum_estimates["margin"][2] == pytest.approx(7)
+
+    # test exceptions
+    states_called = {i: 0 for i in range(n - 1)}
+    with pytest.raises(BootstrapElectionModelException):
+        nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(
+            nat_sum_data_dict, states_called, 0, 0.95
+        )
+
+    nat_sum_data_dict = {i: 3 for i in range(n - 1)}
+    with pytest.raises(BootstrapElectionModelException):
+        nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(
+            nat_sum_data_dict, states_called, 0, 0.95
+        )
+
+
+# TODO: write unit test for combined aggregation (e.g. prediction, intervals, aggregate etc.)
+# also where an unexpected or non reporting unit starts ahead of an reporting unit
+def test_total_aggregation(bootstrap_election_model):
+    pass
+    # this tests that the predictions and the intervals and the aggregates line up for more complex predictions
