@@ -265,7 +265,10 @@ class BootstrapElectionModel(BaseElectionModel):
             betas_stratum = betas[:, np.where(x_stratum == 1)[0]].sum(axis=1)
 
             # for this stratum value create ppf
-            stratum_ppfs_delta[tuple(x_stratum)] = ppf_creator(betas_stratum, self.taus, lb, ub)
+            # we want the lower bounds and upper bounds to be the actual lower and upper values taken from beta
+            stratum_ppfs_delta[tuple(x_stratum)] = ppf_creator(
+                betas_stratum, self.taus, np.min(betas_stratum), np.max(betas_stratum)
+            )
 
             # for this stratum value create cdf
             stratum_cdfs_delta[tuple(x_stratum)] = cdf_creator(betas_stratum, self.taus)
@@ -563,10 +566,10 @@ class BootstrapElectionModel(BaseElectionModel):
             basically returning zero vectors (revisit later)
         """
         # the contests that need a sampled contest level random effect are those that still have outstanding
-        # units (since for the others, the contest level random effect is a known fixed quantity)
+        # units (since for the others, the contest level random effect is a known fixed quantity) but no
+        # current estimate for the epsilon in that contest (so ones with NO training examples)
 
         # this gives us indices of contests for which we have no samples in the training set
-        # (ie. all counties are not-reporting)
         contests_not_in_reporting_units = np.where(np.all(aggregate_indicator_train == 0, axis=0))[0]
         # gives us contests for which there is at least one county not reporting
         contests_in_nonreporting_units = np.where(np.any(aggregate_indicator_test > 0, axis=0))[0]

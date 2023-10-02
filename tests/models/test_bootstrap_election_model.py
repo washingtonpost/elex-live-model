@@ -124,11 +124,16 @@ def test_estimate_strata_dist(bootstrap_election_model, rng):
     assert ppf[(1, 0, 1)](0.49) == pytest.approx(lb)
     assert ppf[(1, 0, 1)](0.50) == pytest.approx(ub)
 
-    # TODO: where is this -0.4 coming from?
+    # anything less than -0.3 returns 0.01
     assert cdf[(1, 0, 0)](-0.4) == pytest.approx(0.01)
+    # lower QR sees three datapoints: -0.3, 0.1 and 0.5, so -0.3 is at the right boundary of 0.01 and 0.33
     assert cdf[(1, 0, 0)](-0.3) == pytest.approx(0.33)
+    # upper QR sees three datapoints: -0.3, 0.3 and 0.5 and so 0.3 is that right boundary of 0.33 and 0.66
     assert cdf[(1, 0, 0)](0.3) == pytest.approx(0.66)
+    # upper QR sees three datapoints: -0.3, 0.3 and 0.5 and so 0.5 is on the right boundary of 0.66 and 0.99
     assert cdf[(1, 0, 0)](0.5) == pytest.approx(0.99)
+    # since interp keyword righ=1
+    assert cdf[(1, 0, 0)](0.51) == pytest.approx(1)
 
     assert cdf[(1, 1, 0)](0.1) == pytest.approx(0.01)
     assert cdf[(1, 1, 0)](0.2) == pytest.approx(0.49)
@@ -303,9 +308,7 @@ def test_bootstrap_epsilons(bootstrap_election_model):
     assert bootstrap_epsilons_z.shape == (epsilon_hat.shape[0], bootstrap_election_model.B)
 
     # the last epsilon only has one element, so epsilon_hat is zero so the bootstrapped versions should be zero also
-    # TODO: IS THIS CORRECT?
     assert np.isclose(bootstrap_epsilons_y[-1], 0).mean() == pytest.approx(1)
-
     # the others have the correct mean
     assert bootstrap_epsilons_y[0].mean() == pytest.approx(epsilon_hat[0], rel=0.1)
     assert bootstrap_epsilons_y[1].mean() == pytest.approx(epsilon_hat[1], rel=0.1)
@@ -346,7 +349,7 @@ def test_sample_test_delta(bootstrap_election_model):
 
     x_train, x_test = None, None
     x_train_strata = pd.DataFrame([[1, 0, 0], [1, 0, 0], [1, 1, 0], [1, 1, 0], [1, 1, 0]])
-    x_test_strata = pd.DataFrame([[1, 1, 0], [1, 0, 1], [1, 0, 1]])
+    x_test_strata = pd.DataFrame([[1, 1, 0], [1, 0, 1], [1, 0, 1], [1, 0, 0]])
     lb = 0.1
     ub = 0.3
     ppf, cdf = bootstrap_election_model._estimate_strata_dist(
@@ -357,48 +360,91 @@ def test_sample_test_delta(bootstrap_election_model):
 
     assert delta_y.shape == (x_test_strata.shape[0], bootstrap_election_model.B)
     assert delta_z.shape == (x_test_strata.shape[0], bootstrap_election_model.B)
-    # TODO: THESE SHOULD NOT BE FAILING
-    # assert np.isclose(delta_y.flatten().reshape(1, -1), np.concatenate([delta_hat, [0.1, 0.3]]).reshape(-1, 1), rtol=0.01).any(0).mean() == pytest.approx(1)
-    # assert np.isclose(delta_z.flatten().reshape(1, -1), np.concatenate([delta_hat, [0.1, 0.3]]).reshape(-1, 1), rtol=0.001).any(0).mean() == pytest.approx(1)
-
-    # np.where(np.isclose(delta_y.flatten().reshape(1, -1), np.concatenate([delta_hat, [0.1, 0.3]]).reshape(-1, 1), rtol=0.1).any(0) == False)
+    # delta_y should be either in delta_hat or lb or ub for all sampled uniforms EXCEPT when we sample exactly at a break (so between the percentiles of two samples)
+    # this should only happen ~1% of time per breakpoint, for this strata there are 5 such breakpoints (this strats is 1,1,0)
+    assert (
+        np.isclose(delta_y[0].reshape(1, -1), np.concatenate([delta_hat, [0.1, 0.3]]).reshape(-1, 1), rtol=0.01)
+        .any(0)
+        .mean()
+        >= 0.94
+    )
+    # for this strata there are 5 such breakpoints: this stratas is 1,0,0
+    assert (
+        np.isclose(delta_y[3].reshape(1, -1), np.concatenate([delta_hat, [0.1, 0.3]]).reshape(-1, 1), rtol=0.01)
+        .any(0)
+        .mean()
+        >= 0.95
+    )
+    # one breakpoint at 0.1 and 0.3 for startum (1,0,1)
+    assert (
+        np.isclose(delta_y[1].reshape(1, -1), np.concatenate([delta_hat, [0.1, 0.3]]).reshape(-1, 1), rtol=0.01)
+        .any(0)
+        .mean()
+        >= 0.98
+    )
+    assert (
+        np.isclose(delta_y[2].reshape(1, -1), np.concatenate([delta_hat, [0.1, 0.3]]).reshape(-1, 1), rtol=0.01)
+        .any(0)
+        .mean()
+        >= 0.98
+    )
 
 
 def test_sample_test_epsilon(bootstrap_election_model):
     residuals = np.asarray([0.5, 0.5, 0.3, 0.8, 0.5]).reshape(-1, 1)
-    aggregate_indicator_train = np.asarray([[1, 1, 0, 0, 0], [0, 0, 1, 1, 0], [0, 0, 0, 0, 1], [0, 0, 0, 0, 0]]).T
-    aggregate_indicator_test = np.asarray([[0, 0, 0, 0], [0, 1, 0, 0], [1, 0, 0, 1], [0, 0, 1, 0]]).T
+    aggregate_indicator_train = np.asarray([[1, 0, 0, 0], [1, 0, 0, 0], [0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 0, 1]])
+    aggregate_indicator_test = np.asarray(
+        [[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 1, 0], [0, 1, 0, 0], [0, 0, 1, 0]]
+    )
     epsilon_hat = bootstrap_election_model._estimate_epsilon(residuals, aggregate_indicator_train)
 
     epsilon_y, epsilon_z = bootstrap_election_model._sample_test_epsilon(
         residuals, residuals, epsilon_hat, epsilon_hat, aggregate_indicator_train, aggregate_indicator_test
     )
-    # TODO: confirm that sample test epsilon function is doin the right thing!!
+    assert epsilon_y.shape == (aggregate_indicator_test.shape[0], bootstrap_election_model.B)
+    assert epsilon_z.shape == (aggregate_indicator_test.shape[0], bootstrap_election_model.B)
 
-    # column 3 doesn't have any units that are reporting
-    #
+    # aggregate 3 has no elements in the training set, and rows 2,3,5 in the test set
+    # are parts of aggregate 3
+    assert np.isclose(epsilon_z[0], 0).all()
+    assert np.isclose(epsilon_z[1], 0).all()
+    assert not np.isclose(epsilon_z[2], 0).all()
+    assert not np.isclose(epsilon_z[3], 0).all()
+    assert np.isclose(epsilon_z[4], 0).all()
+    assert not np.isclose(epsilon_z[5], 0).all()
 
 
 def test_sample_test_errors(bootstrap_election_model):
     residuals = np.asarray([0.5, 0.5, 0.3, 0.8, 0.5]).reshape(-1, 1)
-    aggregate_indicator_train = np.asarray([[1, 1, 0, 0, 0], [0, 0, 1, 1, 0], [0, 0, 0, 0, 1], [0, 0, 0, 0, 0]]).T
-    # aggregate_indicator_test = np.asarray([[0, 0, 0, 0], [0, 1, 0, 0], [1, 0, 0, 1], [0, 0, 1, 0]]).T
+    aggregate_indicator_train = np.asarray([[1, 0, 0, 0], [1, 0, 0, 0], [0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 0, 1]])
+    aggregate_indicator_test = np.asarray(
+        [[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 1, 0], [0, 1, 0, 0], [0, 0, 1, 0]]
+    )
     epsilon_hat = bootstrap_election_model._estimate_epsilon(residuals, aggregate_indicator_train)
     delta_hat = bootstrap_election_model._estimate_delta(residuals, epsilon_hat, aggregate_indicator_train)
 
     x_train, x_test = None, None
     x_train_strata = pd.DataFrame([[1, 0, 0], [1, 0, 0], [1, 1, 0], [1, 1, 0], [1, 1, 0]])
-    x_test_strata = pd.DataFrame([[1, 1, 0], [1, 0, 1], [1, 0, 1]])
+    x_test_strata = pd.DataFrame([[1, 1, 0], [1, 0, 1], [1, 0, 1], [1, 1, 0], [1, 0, 1], [1, 0, 0]])
     lb = 0.1
     ub = 0.3
     ppf, cdf = bootstrap_election_model._estimate_strata_dist(
         x_train, x_train_strata, x_test, x_test_strata, delta_hat, lb, ub
     )
-    # TODO figure out why the aggregate_indicator things are doing weird stuff
-
-    # test_error_y, test_error_z = bootstrap_election_model._sample_test_errors(residuals, residuals, epsilon_hat, epsilon_hat, x_test_strata, ppf, ppf, aggregate_indicator_train, aggregate_indicator_test)
-    # assert test_error_y.shape == (aggregate_indicator_test.shape[0], 1)
-    # assert test_error_z.shape == (aggregate_indicator_test.shape[0], 1)
+    test_error_y, test_error_z = bootstrap_election_model._sample_test_errors(
+        residuals,
+        residuals,
+        epsilon_hat,
+        epsilon_hat,
+        x_test_strata,
+        ppf,
+        ppf,
+        aggregate_indicator_train,
+        aggregate_indicator_test,
+    )
+    assert test_error_y.shape == (aggregate_indicator_test.shape[0], bootstrap_election_model.B)
+    assert test_error_z.shape == (aggregate_indicator_test.shape[0], bootstrap_election_model.B)
+    # values for sampling epsilons and deltas above
 
 
 def test_compute_bootstrap_errors(bootstrap_election_model, va_governor_county_data):
@@ -928,7 +974,7 @@ def test_total_aggregation(bootstrap_election_model, va_assembly_precinct_data):
         percent_reporting_threshold, aggregates=["postal_code", "district"]
     )
 
-    bootstrap_election_model.B = 10
+    bootstrap_election_model.B = 300
 
     unit_predictions = bootstrap_election_model.get_unit_predictions(
         reporting_units, nonreporting_units, "margin", unexpected_units=unexpected_units
@@ -936,8 +982,27 @@ def test_total_aggregation(bootstrap_election_model, va_assembly_precinct_data):
     unit_lower, unit_upper = bootstrap_election_model.get_unit_prediction_intervals(
         reporting_units, nonreporting_units, alpha, "margin"
     )
+
     assert unit_predictions.shape[0] == unit_lower.shape[0]
     assert unit_predictions.shape[0] == unit_upper.shape[0]
+    assert all(unit_lower.flatten() <= unit_predictions.flatten())
+    assert all(unit_predictions.flatten() <= unit_upper.flatten())
 
-    # this fails for (array([117, 338, 344]), array([0, 0, 0])), which are all three reporting but treated as non reporting because turnout factor > 1.5
-    # assert all(unit_lower.flatten() <= unit_predictions.flatten())
+    reporting_units["pred_margin"] = reporting_units.results_margin
+    nonreporting_units["pred_margin"] = unit_predictions
+    unexpected_units["pred_margin"] = unexpected_units.results_margin
+
+    district_predictions = bootstrap_election_model.get_aggregate_predictions(
+        reporting_units, nonreporting_units, unexpected_units, ["postal_code", "district"], "margin"
+    )
+    district_lower, district_upper = bootstrap_election_model.get_aggregate_prediction_intervals(
+        reporting_units, nonreporting_units, unexpected_units, ["postal_code", "district"], alpha, None, "margin"
+    )
+    district_predictions.shape[0] == len(preprocessed_data_handler.data.district.unique())
+    import pdb
+
+    pdb.set_trace()
+    assert district_predictions.shape[0] == district_lower.shape[0]
+    assert district_predictions.shape[0] == district_upper.shape[0]
+    assert all(district_lower.flatten() <= district_predictions.pred_margin)
+    assert all(district_predictions.pred_margin <= district_upper.flatten())
