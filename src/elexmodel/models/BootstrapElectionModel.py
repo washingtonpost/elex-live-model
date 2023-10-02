@@ -1069,13 +1069,13 @@ class BootstrapElectionModel(BaseElectionModel):
 
     def _get_quantiles(self, alpha):
         """
-        Given a confidence level for the prediction interval, calultes the quantiles
+        Given a confidence level for the prediction interval, calculates the quantiles
         necessary to be computed
         """
         lower_alpha = (1 - alpha) / 2
         upper_alpha = 1 - lower_alpha
 
-        # adjust percentiles to account for bootsrap
+        # adjust percentiles to account for bootstrap
         lower_q = np.floor(lower_alpha * (self.B + 1)) / self.B
         upper_q = np.ceil(upper_alpha * (self.B - 1)) / self.B
 
