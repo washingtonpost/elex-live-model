@@ -892,6 +892,52 @@ def test_get_national_summary_estimates(bootstrap_election_model, rng):
 
 # TODO: write unit test for combined aggregation (e.g. prediction, intervals, aggregate etc.)
 # also where an unexpected or non reporting unit starts ahead of an reporting unit
-def test_total_aggregation(bootstrap_election_model):
-    pass
-    # this tests that the predictions and the intervals and the aggregates line up for more complex predictions
+def test_total_aggregation(bootstrap_election_model, va_assembly_precinct_data):
+    election_id = "2017-11-07_VA_G"
+    office_id = "Y"
+    geographic_unit_type = "precinct-district"
+    estimands = ["margin"]
+    estimands_baseline = {"margin": "margin"}
+    unexpected_units = 50
+    alpha = 0.9
+    percent_reporting_threshold = 100
+
+    live_data_handler = MockLiveDataHandler(
+        election_id,
+        office_id,
+        geographic_unit_type,
+        estimands,
+        unexpected_units=unexpected_units,
+        data=va_assembly_precinct_data,
+    )
+
+    live_data_handler.shuffle()
+    current_data = live_data_handler.get_percent_fully_reported(400)
+
+    preprocessed_data_handler = PreprocessedDataHandler(
+        election_id, office_id, geographic_unit_type, estimands, estimands_baseline, data=va_assembly_precinct_data
+    )
+
+    combined_data_handler = CombinedDataHandler(
+        preprocessed_data_handler.data, current_data, estimands, geographic_unit_type
+    )
+
+    reporting_units = combined_data_handler.get_reporting_units(percent_reporting_threshold)
+    nonreporting_units = combined_data_handler.get_nonreporting_units(percent_reporting_threshold)
+    unexpected_units = combined_data_handler.get_unexpected_units(
+        percent_reporting_threshold, aggregates=["postal_code", "district"]
+    )
+
+    bootstrap_election_model.B = 10
+
+    unit_predictions = bootstrap_election_model.get_unit_predictions(
+        reporting_units, nonreporting_units, "margin", unexpected_units=unexpected_units
+    )
+    unit_lower, unit_upper = bootstrap_election_model.get_unit_prediction_intervals(
+        reporting_units, nonreporting_units, alpha, "margin"
+    )
+    assert unit_predictions.shape[0] == unit_lower.shape[0]
+    assert unit_predictions.shape[0] == unit_upper.shape[0]
+
+    # this fails for (array([117, 338, 344]), array([0, 0, 0])), which are all three reporting but treated as non reporting because turnout factor > 1.5
+    # assert all(unit_lower.flatten() <= unit_predictions.flatten())

@@ -16,7 +16,7 @@ class Estimandizer:
         # if historical is true then we are running this only to add turnout and results
         # columns that can be empty (since this is run by the live results handler to get
         # the reporting counties. So we don't actually need to add the weights yet.
-        if not historical:
+        if not historical and f"{RESULTS_PREFIX}weights" not in data_df:
             data_df = self.add_weights(data_df, RESULTS_PREFIX)
 
         for estimand in estimands:
