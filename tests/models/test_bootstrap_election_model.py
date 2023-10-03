@@ -999,9 +999,7 @@ def test_total_aggregation(bootstrap_election_model, va_assembly_precinct_data):
         reporting_units, nonreporting_units, unexpected_units, ["postal_code", "district"], alpha, None, "margin"
     )
     district_predictions.shape[0] == len(preprocessed_data_handler.data.district.unique())
-    import pdb
 
-    pdb.set_trace()
     assert district_predictions.shape[0] == district_lower.shape[0]
     assert district_predictions.shape[0] == district_upper.shape[0]
     assert all(district_lower.flatten() <= district_predictions.pred_margin)
