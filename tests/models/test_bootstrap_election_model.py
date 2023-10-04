@@ -254,8 +254,6 @@ def test_strata_pit(bootstrap_election_model, rng):
     assert uniforms[3] == pytest.approx(0.5)
     assert uniforms[4] == pytest.approx(0.74)
 
-    uniforms = bootstrap_election_model._strata_pit(x_train_strata, x_train_strata_unique, delta_hat, cdf)
-
 
 def test_bootstrap_deltas(bootstrap_election_model):
     x_train, x_test = None, None
