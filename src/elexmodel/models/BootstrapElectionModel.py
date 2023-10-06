@@ -888,6 +888,9 @@ class BootstrapElectionModel(BaseElectionModel):
             n_feat_ignore_reg=1,
         )
 
+        print("ols coefficients, normalized margin: ", ols_y.coefficients.flatten())
+        print("bootstraped ols coefficients, normalized margin: ", ols_y_B.coefficients.mean(axis=-1))
+
         # we cannot just apply ols_y_B/old_z_B to the test units because that would be missing our contest level random effect
         # so we need to compute an bootstrapped estimate of the contest level random effect (epsilon)
         # to do that we first compute the bootstrapped leave-one-out training residuals and then use that to
@@ -969,7 +972,7 @@ class BootstrapElectionModel(BaseElectionModel):
         # and turn into turnout estimate
         self.weighted_z_test_pred = z_test_pred * weights_test
         self.ran_bootstrap = True
-
+        
     def get_unit_predictions(
         self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, estimand: str, **kwargs
     ) -> np.ndarray:
@@ -1227,6 +1230,7 @@ class BootstrapElectionModel(BaseElectionModel):
         ).T
         interval_upper = interval_upper.reshape(-1, 1)
         interval_lower = interval_lower.reshape(-1, 1)
+
         return PredictionIntervals(interval_lower, interval_upper)
 
     def get_national_summary_estimates(
