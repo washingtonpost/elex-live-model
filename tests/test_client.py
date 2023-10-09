@@ -618,7 +618,6 @@ def test_get_estimates_some_reporting(model_client, va_governor_county_data, va_
         "upper_0.9_turnout",
         "results_turnout",
     ]
-
     assert result["state_data"]["postal_code"][0] == "VA"
     assert result["state_data"]["pred_turnout"][0] == 2587563.0
     assert result["state_data"]["results_turnout"][0] == 1570077.0

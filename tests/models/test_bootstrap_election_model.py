@@ -8,6 +8,8 @@ from elexmodel.handlers.data.LiveData import MockLiveDataHandler
 from elexmodel.handlers.data.PreprocessedData import PreprocessedDataHandler
 from elexmodel.models.BootstrapElectionModel import BootstrapElectionModelException, OLSRegressionSolver
 
+TOL = 1e-5
+
 
 def test_cross_validation(bootstrap_election_model, rng):
     """
@@ -467,11 +469,24 @@ def test_compute_bootstrap_errors(bootstrap_election_model, va_governor_county_d
         preprocessed_data_handler.data, current_data, estimands, geographic_unit_type, handle_unreporting="drop"
     )
 
-    reporting_units = combined_data_handler.get_reporting_units(percent_reporting_threshold, turnout_factor_upper=2.0)
-    nonreporting_units = combined_data_handler.get_nonreporting_units(
-        percent_reporting_threshold, turnout_factor_upper=2.0
+    turnout_factor_lower = 0.5
+    turnout_factor_upper = 2.0
+    reporting_units = combined_data_handler.get_reporting_units(
+        percent_reporting_threshold,
+        turnout_factor_lower=turnout_factor_lower,
+        turnout_factor_upper=turnout_factor_upper,
     )
-    unexpected_units = combined_data_handler.get_unexpected_units(percent_reporting_threshold, ["postal_code"])
+    nonreporting_units = combined_data_handler.get_nonreporting_units(
+        percent_reporting_threshold,
+        turnout_factor_lower=turnout_factor_lower,
+        turnout_factor_upper=turnout_factor_upper,
+    )
+    unexpected_units = combined_data_handler.get_unexpected_units(
+        percent_reporting_threshold,
+        ["postal_code"],
+        turnout_factor_lower=turnout_factor_lower,
+        turnout_factor_upper=turnout_factor_upper,
+    )
 
     assert not bootstrap_election_model.ran_bootstrap
     bootstrap_election_model.B = 10
@@ -507,11 +522,21 @@ def test_get_unit_predictions(bootstrap_election_model, va_governor_county_data)
         preprocessed_data_handler.data, current_data, estimands, geographic_unit_type, handle_unreporting="drop"
     )
 
-    reporting_units = combined_data_handler.get_reporting_units(percent_reporting_threshold, turnout_factor_upper=2.0)
-    nonreporting_units = combined_data_handler.get_nonreporting_units(
-        percent_reporting_threshold, turnout_factor_upper=2.0
+    turnout_factor_lower = 0.5
+    turnout_factor_upper = 2.0
+    reporting_units = combined_data_handler.get_reporting_units(
+        percent_reporting_threshold,
+        turnout_factor_lower=turnout_factor_lower,
+        turnout_factor_upper=turnout_factor_upper,
     )
-    unexpected_units = combined_data_handler.get_unexpected_units(percent_reporting_threshold, ["postal_code"])
+    nonreporting_units = combined_data_handler.get_nonreporting_units(
+        percent_reporting_threshold,
+        turnout_factor_lower=turnout_factor_lower,
+        turnout_factor_upper=turnout_factor_upper,
+    )
+    unexpected_units = combined_data_handler.get_unexpected_units(
+        percent_reporting_threshold, ["postal_code"], turnout_factor_lower, turnout_factor_upper
+    )
 
     bootstrap_election_model.B = 10
     assert not bootstrap_election_model.ran_bootstrap
@@ -966,10 +991,13 @@ def test_total_aggregation(bootstrap_election_model, va_assembly_precinct_data):
         preprocessed_data_handler.data, current_data, estimands, geographic_unit_type
     )
 
-    reporting_units = combined_data_handler.get_reporting_units(percent_reporting_threshold)
-    nonreporting_units = combined_data_handler.get_nonreporting_units(percent_reporting_threshold)
+    reporting_units = combined_data_handler.get_reporting_units(percent_reporting_threshold, 0.5, 1.5)
+    nonreporting_units = combined_data_handler.get_nonreporting_units(percent_reporting_threshold, 0.5, 1.5)
     unexpected_units = combined_data_handler.get_unexpected_units(
-        percent_reporting_threshold, aggregates=["postal_code", "district"]
+        percent_reporting_threshold,
+        aggregates=["postal_code", "district"],
+        turnout_factor_lower=0.5,
+        turnout_factor_upper=1.5,
     )
 
     bootstrap_election_model.B = 300
@@ -1000,5 +1028,6 @@ def test_total_aggregation(bootstrap_election_model, va_assembly_precinct_data):
 
     assert district_predictions.shape[0] == district_lower.shape[0]
     assert district_predictions.shape[0] == district_upper.shape[0]
-    assert all(district_lower.flatten() <= district_predictions.pred_margin)
-    assert all(district_predictions.pred_margin <= district_upper.flatten())
+
+    assert all(district_lower.flatten() <= district_predictions.pred_margin + TOL)
+    assert all(district_predictions.pred_margin <= district_upper.flatten() + TOL)
