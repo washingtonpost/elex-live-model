@@ -583,7 +583,13 @@ class BootstrapElectionModel(BaseElectionModel):
         mu_hat = [0, 0]
 
         # the variance is the sample variance of epsilons for which we have an estimate
-        sigma_hat = np.cov(np.concatenate([epsilon_y_hat, epsilon_z_hat], axis=1)[np.nonzero(epsilon_y_hat)[0]].T)
+        non_zero_epsilon_indices = np.nonzero(epsilon_y_hat)[0]
+        # if there is only one non zero contest OR if the contest is a state level election only
+        # then just sample from nearly zero since no variance
+        if non_zero_epsilon_indices.shape[0] == 1:
+            return np.zeros((1, self.B)), np.zeros((1, self.B))
+        else:
+            sigma_hat = np.cov(np.concatenate([epsilon_y_hat, epsilon_z_hat], axis=1)[np.nonzero(epsilon_y_hat)[0]].T)
 
         # sample new test epsilons, but only for states that need tem
         test_epsilon = self.rng.multivariate_normal(

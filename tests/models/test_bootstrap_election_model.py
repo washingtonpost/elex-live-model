@@ -391,8 +391,10 @@ def test_sample_test_delta(bootstrap_election_model):
 
 
 def test_sample_test_epsilon(bootstrap_election_model):
-    residuals = np.asarray([0.5, 0.5, 0.3, 0.8, 0.5]).reshape(-1, 1)
-    aggregate_indicator_train = np.asarray([[1, 0, 0, 0], [1, 0, 0, 0], [0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 0, 1]])
+    residuals = np.asarray([0.5, 0.5, 0.3, 0.8, 0.5, 0.2]).reshape(-1, 1)
+    aggregate_indicator_train = np.asarray(
+        [[1, 0, 0, 0], [1, 0, 0, 0], [0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 0, 1], [0, 1, 0, 0]]
+    )
     aggregate_indicator_test = np.asarray(
         [[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 1, 0], [0, 1, 0, 0], [0, 0, 1, 0]]
     )
@@ -401,6 +403,7 @@ def test_sample_test_epsilon(bootstrap_election_model):
     epsilon_y, epsilon_z = bootstrap_election_model._sample_test_epsilon(
         residuals, residuals, epsilon_hat, epsilon_hat, aggregate_indicator_train, aggregate_indicator_test
     )
+
     assert epsilon_y.shape == (aggregate_indicator_test.shape[0], bootstrap_election_model.B)
     assert epsilon_z.shape == (aggregate_indicator_test.shape[0], bootstrap_election_model.B)
 
@@ -412,6 +415,15 @@ def test_sample_test_epsilon(bootstrap_election_model):
     assert not np.isclose(epsilon_z[3], 0).all()
     assert np.isclose(epsilon_z[4], 0).all()
     assert not np.isclose(epsilon_z[5], 0).all()
+
+    # testing that if there is only one element epsilon_hat that we return 0
+    epsilon_y, epsilon_z = bootstrap_election_model._sample_test_epsilon(
+        residuals, residuals, [[4]], [[4]], aggregate_indicator_train, aggregate_indicator_test
+    )
+    assert epsilon_y.shape == (1, bootstrap_election_model.B)
+    assert epsilon_z.shape == (1, bootstrap_election_model.B)
+
+    assert np.isclose(epsilon_z[0], 0).all()
 
 
 def test_sample_test_errors(bootstrap_election_model):
