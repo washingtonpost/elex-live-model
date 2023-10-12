@@ -35,12 +35,7 @@ class PythonLiteralOption(click.Option):
     "--pi_method",
     "pi_method",
     default="nonparametric",
-    type=click.Choice(
-        [
-            "gaussian",
-            "nonparametric",
-        ]
-    ),
+    type=click.Choice(["gaussian", "nonparametric", "bootstrap"]),
 )
 @click.option("--prediction_intervals", "prediction_intervals", default=[0.7, 0.9], multiple=True)
 @click.option("--percent_reporting_threshold", "percent_reporting_threshold", default=100)

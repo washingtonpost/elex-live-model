@@ -13,6 +13,12 @@ class Estimandizer:
         columns_to_return = []
         turnout_col = f"{RESULTS_PREFIX}turnout"
 
+        # if historical is true then we are running this only to add turnout and results
+        # columns that can be empty (since this is run by the live results handler to get
+        # the reporting counties. So we don't actually need to add the weights yet.
+        if not historical and f"{RESULTS_PREFIX}weights" not in data_df:
+            data_df = self.add_weights(data_df, RESULTS_PREFIX)
+
         for estimand in estimands:
             results_col = f"{RESULTS_PREFIX}{estimand}"
             additional_columns_added = []
@@ -44,14 +50,13 @@ class Estimandizer:
         if turnout_col not in columns_to_return:
             columns_to_return.append(turnout_col)
 
-        data_df = self.add_weights(data_df, RESULTS_PREFIX)
-
         return data_df, columns_to_return
 
     def add_estimand_baselines(self, data_df, estimand_baselines, historical, include_results_estimand=False):
         # if we are in a historical election we are only reading preprocessed data to get
         # the historical election results of the currently reporting units.
         # so we don't care about the total voters or the baseline election.
+        data_df = self.add_weights(data_df, BASELINE_PREFIX)
 
         for estimand, pointer in estimand_baselines.items():
             if pointer is None:
@@ -74,8 +79,20 @@ class Estimandizer:
             # we need to add the results from the historical election as well.
             data_df, ___ = self.add_estimand_results(data_df, estimand_baselines.keys(), historical)
 
-        data_df = self.add_weights(data_df, BASELINE_PREFIX)
+        return data_df
 
+    def add_weights(self, data_df, col_prefix):
+        data_df[f"{col_prefix}weights"] = data_df[f"{col_prefix}turnout"]
+        return data_df
+
+    def add_turnout_factor(self, data_df):
+        # posinf and neginf are also set to zero because dividing by zero can lead to nan/posinf/neginf depending
+        # on the type of the numeric in the numpy array. Assume that if baseline_weights is zero then turnout
+        # would be incredibly low in this election too (ie. this is effectively an empty precinct) and so setting
+        # the turnout factor to zero is fine
+        data_df["turnout_factor"] = np.nan_to_num(
+            data_df.results_weights / data_df.baseline_weights, nan=0, posinf=0, neginf=0
+        )
         return data_df
 
     def add_weights(self, data_df, col_prefix):
@@ -100,4 +117,16 @@ def party_vote_share_dem(data_df, col_prefix):
     data_df[f"{col_prefix}party_vote_share_dem"] = np.nan_to_num(
         data_df[f"{col_prefix}dem"] / data_df[f"{col_prefix}turnout"]
     )
+
     return data_df, []
+
+
+def margin(data_df, col_prefix):
+    # in the margin case we are overwriting baseline_weights with two party turnout
+    generated_weights_column_name = f"{col_prefix}weights"
+    generated_margin_column_name = f"{col_prefix}margin"
+    generated_normalized_margin_column_name = f"{col_prefix}normalized_margin"
+    data_df[generated_weights_column_name] = data_df[f"{col_prefix}dem"] + data_df[f"{col_prefix}gop"]
+    data_df[generated_margin_column_name] = data_df[f"{col_prefix}dem"] - data_df[f"{col_prefix}gop"]
+    data_df[generated_normalized_margin_column_name] = data_df[f"{col_prefix}margin"] / data_df[f"{col_prefix}weights"]
+    return data_df, [generated_weights_column_name, generated_normalized_margin_column_name]

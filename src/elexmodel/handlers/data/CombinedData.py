@@ -1,3 +1,6 @@
+import numpy as np
+import pandas as pd
+
 from elexmodel.handlers import s3
 from elexmodel.handlers.data.Estimandizer import Estimandizer
 from elexmodel.utils.file_utils import S3_FILE_PATH, TARGET_BUCKET, convert_df_to_csv
@@ -20,7 +23,6 @@ class CombinedDataHandler:
 
         estimandizer = Estimandizer()
         (current_data, _) = estimandizer.add_estimand_results(current_data.copy(), self.estimands, False)
-
         # if we're running this for a past election, drop results columns from preprocessed data
         # so we use results_{estimand} numbers from current_data
         preprocessed_results_columns = list(filter(lambda col: col.startswith("results_"), preprocessed_data.columns))
@@ -46,23 +48,22 @@ class CombinedDataHandler:
 
         self.data = data
 
-    def get_reporting_units(
-        self,
-        percent_reporting_threshold,
-        turnout_factor_lower=0.5,
-        turnout_factor_upper=1.5,
-        features_to_normalize=[],
-        add_intercept=True,
-    ):
+    def get_reporting_units(self, percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper):
         """
         Get reporting data. These are units where the expected vote is greater than the percent reporting threshold.
         """
+        # units where the expected vote is greater than the percent reporting threshold
         reporting_units = self.data[self.data.percent_expected_vote >= percent_reporting_threshold].reset_index(
             drop=True
         )
-        # if turnout factor less than 0.5 or greater than 1.5 assume AP made a mistake and don't treat those as reporting units
-        reporting_units = reporting_units[reporting_units.turnout_factor > turnout_factor_lower]
-        reporting_units = reporting_units[reporting_units.turnout_factor < turnout_factor_upper]
+
+        # remove unexpected units
+        unexpected_units = self._get_unexpected_units(
+            percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper
+        )
+        reporting_units = reporting_units[
+            ~reporting_units.geographic_unit_fips.isin(unexpected_units.geographic_unit_fips)
+        ].reset_index(drop=True)
 
         # residualize + normalize
         for estimand in self.estimands:
@@ -75,23 +76,23 @@ class CombinedDataHandler:
 
         return reporting_units
 
-    def get_nonreporting_units(
-        self,
-        percent_reporting_threshold,
-        turnout_factor_lower=0.5,
-        turnout_factor_upper=1.5,
-        features_to_normalize=[],
-        add_intercept=True,
-    ):
+    def get_nonreporting_units(self, percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper):
         """
         Get nonreporting data. These are units where expected vote is less than the percent reporting threshold
         """
-        # if turnout factor <= turnout_factor_lower or >= turnout_factor_upper assume the AP made a mistake and treat them as non-reporting units
-        nonreporting_units = self.data.query(
-            "(percent_expected_vote < @percent_reporting_threshold) | (turnout_factor <= @turnout_factor_lower) | (turnout_factor >= @turnout_factor_upper)"  #
-        ).reset_index(  # not checking if results.isnull() anymore across multiple estimands
+        # units where expected vote is less than the percent reporting threshold
+        nonreporting_units = self.data[self.data.percent_expected_vote < percent_reporting_threshold].reset_index(
             drop=True
         )
+
+        # remove unexpected units
+        unexpected_units = self._get_unexpected_units(
+            percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper
+        )
+        nonreporting_units = nonreporting_units[
+            ~nonreporting_units.geographic_unit_fips.isin(unexpected_units.geographic_unit_fips)
+        ].reset_index(drop=True)
+
         nonreporting_units["reporting"] = int(0)
         nonreporting_units["expected"] = True
 
@@ -103,6 +104,9 @@ class CombinedDataHandler:
         """
         # data is only expected units since left join of preprocessed data in initialization
         return self.data.geographic_unit_fips
+
+    def _get_units_without_baseline(self):
+        return self.data[np.isclose(self.data.baseline_weights, 0)].geographic_unit_fips
 
     def _get_county_fips_from_geographic_unit_fips(self, geographic_unit_fips):
         """
@@ -123,16 +127,36 @@ class CombinedDataHandler:
         components = geographic_unit_fips.split("_")
         return components[0]
 
-    def get_unexpected_units(self, percent_reporting_threshold, aggregates):
-        """
-        Gets reporting but unexpected data. These are units that are may or may not be fully
-        reporting, but we have no preprocessed data for them.
-        """
+    # TODO: rename unexpected units to be non-modeled units
+    def _get_unexpected_units(self, percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper):
         expected_geographic_units = self._get_expected_geographic_unit_fips().tolist()
+        no_baseline_units = self._get_units_without_baseline()
         # Note: this uses current_data because self.data drops unexpected units
         unexpected_units = self.current_data[
             ~self.current_data["geographic_unit_fips"].isin(expected_geographic_units)
+            | self.current_data.geographic_unit_fips.isin(no_baseline_units)
         ].reset_index(drop=True)
+
+        units_with_strange_turnout_factor = self.data[
+            (self.data.percent_expected_vote >= percent_reporting_threshold)
+            & ((self.data.turnout_factor <= turnout_factor_lower) | (self.data.turnout_factor >= turnout_factor_upper))
+        ][self.current_data.columns]
+
+        all_unexpected_units = pd.concat([unexpected_units, units_with_strange_turnout_factor]).reset_index(drop=True)
+        all_unexpected_units.drop_duplicates(subset="geographic_unit_fips", inplace=True)
+        return all_unexpected_units
+
+    def get_unexpected_units(self, percent_reporting_threshold, aggregates, turnout_factor_lower, turnout_factor_upper):
+        """
+        Gets units for which we will not be making predictions:
+            - unexpected units (ie. units for which we have no covariates prepared)
+            - units for which the baseline results is zero (ie. units that are tiny)
+            - units with strange turnout factors (ie. units that are likely precinct mismatches)
+        """
+
+        unexpected_units = self._get_unexpected_units(
+            percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper
+        )
 
         # since we were not expecting them, we have don't have their county or district
         # from preprocessed data. so we have to add that back in.
@@ -146,7 +170,7 @@ class CombinedDataHandler:
                 self._get_district_from_geographic_unit_fips
             )
 
-        unexpected_units["reporting"] = int(1)
+        unexpected_units["reporting"] = int(0)
         unexpected_units["expected"] = False
 
         return unexpected_units
