@@ -27,7 +27,7 @@ class BaseElectionModel(ABC):
 
     @classmethod
     def get_unit_predictions(
-        self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, estimand: str, *kwargs
+        cls, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, estimand: str, *kwargs
     ) -> np.ndarray:
         """
         Generates and returns unit level predictions
@@ -143,7 +143,7 @@ class BaseElectionModel(ABC):
 
     @classmethod
     def get_unit_prediction_intervals(
-        self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, alpha: float, estimand: str
+        cls, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, alpha: float, estimand: str
     ) -> PredictionIntervals:
         """
         Generates and returns unit level prediction intervals
@@ -152,7 +152,7 @@ class BaseElectionModel(ABC):
 
     @classmethod
     def get_aggregate_prediction_intervals(
-        self,
+        cls,
         reporting_units: pd.DataFrame,
         nonreporting_units: pd.DataFrame,
         unexpected_units: pd.DataFrame,
