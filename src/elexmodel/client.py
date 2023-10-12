@@ -169,7 +169,7 @@ class ModelClient:
         raw_aggregate_list = base_aggregate + [aggregate]
         return sorted(list(set(raw_aggregate_list)), key=lambda x: AGGREGATE_ORDER.index(x))
 
-    def get_national_summary_votes_estimates(self, nat_sum_data_dict=None, called_states={}, base_to_add=0, alpha=0.9):
+    def get_national_summary_votes_estimates(self, nat_sum_data_dict=None, called_states={}, base_to_add=0, alpha=0.99):
         return self.model.get_national_summary_estimates(nat_sum_data_dict, called_states, base_to_add, alpha=alpha)
 
     def get_estimates(
@@ -270,8 +270,8 @@ class ModelClient:
             handle_unreporting=handle_unreporting,
         )
 
-        turnout_factor_lower = model_parameters.get("turnout_factor_lower", 0.5)
-        turnout_factor_upper = model_parameters.get("turnout_factor_upper", 1.5)
+        turnout_factor_lower = model_parameters.get("turnout_factor_lower", 0.2)
+        turnout_factor_upper = model_parameters.get("turnout_factor_upper", 2.5)
 
         reporting_units = data.get_reporting_units(
             percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper

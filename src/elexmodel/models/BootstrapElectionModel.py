@@ -562,8 +562,7 @@ class BootstrapElectionModel(BaseElectionModel):
     ) -> tuple[np.ndarray, np.ndarray]:
         """
         This function generates new test epsilons (contest level random effects)
-        NOTE: for now we are sampling from a normal with mean zero and tiny variance. This is
-            basically returning zero vectors (revisit later)
+        NOTE: for now we are sampling from a normal with mean zero and sample variance.
         """
         # the contests that need a sampled contest level random effect are those that still have outstanding
         # units (since for the others, the contest level random effect is a known fixed quantity) but no
@@ -580,13 +579,11 @@ class BootstrapElectionModel(BaseElectionModel):
             contests_not_in_reporting_units, contests_in_nonreporting_units
         )
 
-        # NOTE: this model currently doesn't do very much (we effectively treat unseen random effects as zero)
-
         # \epsilon ~ N(0, \Sigma)
         mu_hat = [0, 0]
 
-        # nearly zero variance
-        sigma_hat = 1e-5 * np.eye(2)
+        # the variance is the sample variance of epsilons for which we have an estimate
+        sigma_hat = np.cov(np.concatenate([epsilon_y_hat, epsilon_z_hat], axis=1)[np.nonzero(epsilon_y_hat)[0]].T)
 
         # sample new test epsilons, but only for states that need tem
         test_epsilon = self.rng.multivariate_normal(
