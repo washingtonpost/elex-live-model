@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.0.0 (10/13/2023)
+- fix: improved fixed effect features [#69](https://github.com/washingtonpost/elex-live-model/pull/69)
+- fix: with the CLI, model-specific parameters passed in as a dictionary [#70](https://github.com/washingtonpost/elex-live-model/pull/70)
+- fix: additional logic in the CLI to find the `.env` file [#71](https://github.com/washingtonpost/elex-live-model/pull/71)
+- feat: all models are now subclasses of `BaseElectionModel` [#72](https://github.com/washingtonpost/elex-live-model/pull/72)
+- feat: ability to create custom estimands [#75](https://github.com/washingtonpost/elex-live-model/pull/75)
+- feat: conformal bootstrap model [#76](https://github.com/washingtonpost/elex-live-model/pull/76)
+- feat: conformal election model uses new faster quantile regression provided by `elex-solver` [#77](https://github.com/washingtonpost/elex-live-model/pull/77)
+
 ## 1.0.11 (08/14/2023)
 - fix: upgrade to python 3.10 [#65] (https://github.com/washingtonpost/elex-live-model/pull/65)
 - feat: generalize parameter checks [#64] (https://github.com/washingtonpost/elex-live-model/pull/64)
@@ -8,7 +17,7 @@
 - fix: clean up tox errors [#57] (https://github.com/washingtonpost/elex-live-model/pull/57)
 - refactor: remove model settings [#54] (https://github.com/washingtonpost/elex-live-model/pull/54)
 - refactor: dynamically create default aggregates [#53] (https://github.com/washingtonpost/elex-live-model/pull/53)
-- feat: add better default aggregates [#52] (https://github.com/washingtonpost/elex-live-model/pull/52) 
+- feat: add better default aggregates [#52] (https://github.com/washingtonpost/elex-live-model/pull/52)
 
 ## 1.0.10 (06/07/2023)
 - fix: fixing a fixed effect bug [#35](https://github.com/washingtonpost/elex-live-model/pull/35)
