@@ -1,4 +1,4 @@
-import numpy as np
+import numpy as np  # pylint: disable=too-many-lines
 import pandas as pd
 import pytest
 import scipy as sp
@@ -65,9 +65,7 @@ def test_estimate_model_error(bootstrap_election_model, rng):
     ols_regression = OLSRegressionSolver()
     ols_regression.fit(x, y)
     aggregate_indicator = rng.multivariate_hypergeometric([1] * 5, 1, size=100)
-    residuals, epsilon_hat, delta_hat = bootstrap_election_model._estimate_model_errors(
-        ols_regression, x, y, aggregate_indicator
-    )
+    residuals, _, _ = bootstrap_election_model._estimate_model_errors(ols_regression, x, y, aggregate_indicator)
     y_hat = ols_regression.predict(x)
     np.testing.assert_array_almost_equal(ols_regression.residuals(y, y_hat, loo=True, center=True), residuals)
     # epsilon_hat and delta_hat are tested above
@@ -241,7 +239,7 @@ def test_strata_pit(bootstrap_election_model, rng):
     delta_hat = np.asarray([-0.3, 0.5, 0.2, 0.25, 0.28])
     lb = 0.1
     ub = 0.3
-    ppf, cdf = bootstrap_election_model._estimate_strata_dist(
+    _, cdf = bootstrap_election_model._estimate_strata_dist(
         x_train, x_train_strata, x_test, x_test_strata, delta_hat, lb, ub
     )
 
@@ -297,7 +295,7 @@ def test_bootstrap_epsilons(bootstrap_election_model):
     x_train_strata_unique = np.unique(x_train_strata, axis=0).astype(int)
     lb = 0.1
     ub = 0.3
-    ppf, cdf = bootstrap_election_model._estimate_strata_dist(
+    ppf, _ = bootstrap_election_model._estimate_strata_dist(
         x_train, x_train_strata, x_test, x_test_strata, delta_hat, lb, ub
     )
 
@@ -352,7 +350,7 @@ def test_sample_test_delta(bootstrap_election_model):
     x_test_strata = pd.DataFrame([[1, 1, 0], [1, 0, 1], [1, 0, 1], [1, 0, 0]])
     lb = 0.1
     ub = 0.3
-    ppf, cdf = bootstrap_election_model._estimate_strata_dist(
+    ppf, _ = bootstrap_election_model._estimate_strata_dist(
         x_train, x_train_strata, x_test, x_test_strata, delta_hat, lb, ub
     )
 
@@ -360,8 +358,10 @@ def test_sample_test_delta(bootstrap_election_model):
 
     assert delta_y.shape == (x_test_strata.shape[0], bootstrap_election_model.B)
     assert delta_z.shape == (x_test_strata.shape[0], bootstrap_election_model.B)
-    # delta_y should be either in delta_hat or lb or ub for all sampled uniforms EXCEPT when we sample exactly at a break (so between the percentiles of two samples)
-    # this should only happen ~1% of time per breakpoint, for this strata there are 5 such breakpoints (this strats is 1,1,0)
+    # delta_y should be either in delta_hat or lb or ub for all sampled uniforms
+    # EXCEPT when we sample exactly at a break (so between the percentiles of two samples)
+    # this should only happen ~1% of time per breakpoint, for this strata there are 5 such breakpoints
+    # (this strata is 1,1,0)
     assert (
         np.isclose(delta_y[0].reshape(1, -1), np.concatenate([delta_hat, [0.1, 0.3]]).reshape(-1, 1), rtol=0.01)
         .any(0)
@@ -440,7 +440,7 @@ def test_sample_test_errors(bootstrap_election_model):
     x_test_strata = pd.DataFrame([[1, 1, 0], [1, 0, 1], [1, 0, 1], [1, 1, 0], [1, 0, 1], [1, 0, 0]])
     lb = 0.1
     ub = 0.3
-    ppf, cdf = bootstrap_election_model._estimate_strata_dist(
+    ppf, _ = bootstrap_election_model._estimate_strata_dist(
         x_train, x_train_strata, x_test, x_test_strata, delta_hat, lb, ub
     )
     test_error_y, test_error_z = bootstrap_election_model._sample_test_errors(
@@ -1036,7 +1036,7 @@ def test_total_aggregation(bootstrap_election_model, va_assembly_precinct_data):
     district_lower, district_upper = bootstrap_election_model.get_aggregate_prediction_intervals(
         reporting_units, nonreporting_units, unexpected_units, ["postal_code", "district"], alpha, None, "margin"
     )
-    district_predictions.shape[0] == len(preprocessed_data_handler.data.district.unique())
+    assert district_predictions.shape[0] == len(preprocessed_data_handler.data.district.unique())
 
     assert district_predictions.shape[0] == district_lower.shape[0]
     assert district_predictions.shape[0] == district_upper.shape[0]
