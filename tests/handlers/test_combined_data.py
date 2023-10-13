@@ -210,7 +210,8 @@ def test_get_reporting_data_dropping_with_turnout_factor(va_governor_county_data
 
     observed_data = combined_data_handler.get_reporting_units(100, turnout_factor_lower, turnout_factor_upper)
 
-    # 20 units should be reporting, but the additional ones are dropped to unexpected because they are above/below threshold
+    # 20 units should be reporting,
+    # but the additional ones are dropped to unexpected because they are above/below threshold
     # and so are subtracted from the reporting ones
     assert observed_data.shape[0] == 20 - (
         reporting_units_above_turnout_factor_threshold + reporting_units_below_turnout_factor_threshold

@@ -169,8 +169,8 @@ class ModelClient:
         raw_aggregate_list = base_aggregate + [aggregate]
         return sorted(list(set(raw_aggregate_list)), key=lambda x: AGGREGATE_ORDER.index(x))
 
-    def get_national_summary_votes_estimates(self, nat_sum_data_dict=None, called_states={}, base_to_add=0, alpha=0.99):
-        return self.model.get_national_summary_estimates(nat_sum_data_dict, called_states, base_to_add, alpha=alpha)
+    def get_national_summary_votes_estimates(self, nat_sum_data_dict=None, called_states={}, base_to_add=0):
+        return self.model.get_national_summary_estimates(nat_sum_data_dict, called_states, base_to_add)
 
     def get_estimates(
         self,

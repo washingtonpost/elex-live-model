@@ -77,7 +77,7 @@ class ModelResultsHandler:
             model.get_aggregate_prediction_intervals(); keys are alphas (prediction interval)
         """
         # require that unit data already be added
-        assert estimand in self.unit_data.keys(), "Need to first add unit predictions with add_unit_predictions()"
+        assert estimand in self.unit_data, "Need to first add unit predictions with add_unit_predictions()"
 
         for alpha in self.prediction_interval_alphas:
             estimates_df[f"lower_{alpha}_{estimand}"] = agg_interval_predictions[alpha][0]

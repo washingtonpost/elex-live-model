@@ -13,7 +13,8 @@ class Featurizer:
         if isinstance(fixed_effects, list):
             self.fixed_effect_cols = fixed_effects
             self.fixed_effect_params = {fe: ["all"] for fe in fixed_effects}
-        # fixed effects can be a dictionary from fixed effect to values that get their own column (or the string all, if we want all values)
+        # fixed effects can be a dictionary from fixed effect to values that get their own column
+        # (or the string all, if we want all values)
         else:
             self.fixed_effect_cols = list(fixed_effects.keys())
             self.fixed_effect_params = {}
@@ -43,9 +44,11 @@ class Featurizer:
         Convert fixed effect columns into dummy variables.
         """
         df = df.copy()
-        # we want to keep the original fixed effect columns since we may need them later for aggregation (ie. county fixed effect)
+        # we want to keep the original fixed effect columns since we may need them later
+        # for aggregation (ie. county fixed effect)
         original_fixed_effect_columns = df[self.fixed_effect_cols]
-        # set non-included values to 'other' as needed since we don't want their values to get a dummy variable
+        # set non-included values to 'other' as needed since we don't want their values
+        # to get a dummy variable
         for fe, params in self.fixed_effect_params.items():
             if "all" not in params:
                 df[fe] = np.where(~df[fe].isin(params), "other", df[fe])
@@ -68,9 +71,12 @@ class Featurizer:
         """
         Prepares features.
         Adds dummy variables for fixed effects, also determines which fixed effects are expanded and active.
-        if center_features is true we subtract the features by their average column value, which sets the average column value to zero
-            this allows us to interpret the intercept as the mean response given all other covariates at their average value
-        if scale_features is true we divide the features by their standard deviation, which gives them all the same scale
+        if center_features is true we subtract the features by their average column value,
+            which sets the average column value to zero
+            this allows us to interpret the intercept as the mean response
+            given all other covariates at their average value
+        if scale_features is true we divide the features by their standard deviation,
+            which gives them all the same scale
             this can improve the convergence of optimization algorithms
         if add_intercept is true an intercept column is added to the features and one fixed effect value is dropped
         """
@@ -95,21 +101,22 @@ class Featurizer:
             all_expanded_fixed_effects = [
                 x
                 for x in df.columns
-                if x.startswith(tuple([fixed_effect + "_" for fixed_effect in self.fixed_effect_cols]))
+                if x.startswith(tuple(fixed_effect + "_" for fixed_effect in self.fixed_effect_cols))
             ]
 
             df_fitting = df[(df.reporting) & (df.expected)]
-            # get the indices of all expanded fixed effects in the fitting data (active fixed effects + the fixed effect we will drop for multicolinearity)
+            # get the indices of all expanded fixed effects in the fitting data
+            # (active fixed effects + the fixed effect we will drop for multicolinearity)
             active_fixed_effect_boolean_df = df_fitting[all_expanded_fixed_effects].sum(axis=0) > 0
             # get the names of those fixed effects, since we we will want to know which fixed effect was dropped
             all_active_fixed_effects = np.asarray(all_expanded_fixed_effects)[active_fixed_effect_boolean_df]
 
-            # if we add an intercept we need to drop a value/column per fixed effect in order to avoid multicolinearity.
+            # if we add an intercept we need to drop a value/column per fixed effect
+            # in order to avoid multicolinearity.
             # the intercept column is now a stand-in for the the dropped fixed effect value/column
             if add_intercept:
-                active_fixed_effects = (
-                    []
-                )  # fixed effects that exist in the fitting_data (excluding one dropped column to avoid multicolinearity)
+                active_fixed_effects = []  # fixed effects that exist in the fitting_data
+                # (excluding one dropped column to avoid multicolinearity)
                 intercept_column = (
                     []
                 )  # we need to save the fixed effect categories that the intercept is now standing in for
@@ -131,7 +138,8 @@ class Featurizer:
                 self.expanded_fixed_effects = all_expanded_fixed_effects
 
         # all features that the model will be fit on
-        # these are all the features + the expanded fixed effects (so all fixed effect values in the complete data excluding the ones dropped for multicolinearity)
+        # these are all the features + the expanded fixed effects
+        # (so all fixed effect values in the complete data excluding the ones dropped for multicolinearity)
         self.complete_features += self.features + self.expanded_fixed_effects
         self.active_features += self.features + self.active_fixed_effects
         df = df[self.complete_features]
@@ -171,9 +179,10 @@ class Featurizer:
             # rows that have an inactive fixed effect value need to receive the treat of the average fixed effects
             df.loc[rows_w_inactive_fixed_effects, fe_active_fixed_effects] = 1 / (len(fe_active_fixed_effects) + 1)
             # This is correct because even rows with active fixed effects have an interept columns, so the coefficient
-            # of the fixed effect value column is actually the *difference* between the dropped column (for which the intercept is
-            # the stand in and the fixed effect column.
-            # Another way to think about this is that for a fixed effect value that is present the fixed effect estimate is:
+            # of the fixed effect value column is actually the *difference* between the dropped column
+            # (for which the intercept is the stand in and the fixed effect column).
+            # Another way to think about this is that for a fixed effect value that is present,
+            # the fixed effect estimate is:
             # if there are three fixed effects r, u and s where s is dropped.
             # beta_0 + beta_r * indic{r}
             # beta_0 + beta_u * indic{u}

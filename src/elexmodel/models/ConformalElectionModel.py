@@ -25,7 +25,7 @@ class ConformalElectionModel(BaseElectionModel.BaseElectionModel, ABC):
         self.lambda_ = model_settings.get("lambda_", 0)
 
     @classmethod
-    def _compute_conf_frac(self) -> float:
+    def _compute_conf_frac(cls) -> float:
         """
         Compute conformalization fraction for conformal models
         """
@@ -192,7 +192,7 @@ class ConformalElectionModel(BaseElectionModel.BaseElectionModel, ABC):
         return PredictionIntervals(nonreporting_lower_bounds, nonreporting_upper_bounds, conformalization_data)
 
     @classmethod
-    def get_all_conformalization_data_unit(self):
+    def get_all_conformalization_data_unit(cls):
         """
         Returns conformalization data at the unit level
         Conformalization data is adjustment from estimated % change from baseline
@@ -200,7 +200,7 @@ class ConformalElectionModel(BaseElectionModel.BaseElectionModel, ABC):
         raise NotImplementedError
 
     @classmethod
-    def get_all_conformalization_data_agg(self):
+    def get_all_conformalization_data_agg(cls):
         """
         Returns conformalization data at the aggregate level
         """
