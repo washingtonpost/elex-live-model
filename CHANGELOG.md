@@ -6,7 +6,7 @@
 - fix: additional logic in the CLI to find the `.env` file [#71](https://github.com/washingtonpost/elex-live-model/pull/71)
 - feat: all models are now subclasses of `BaseElectionModel` [#72](https://github.com/washingtonpost/elex-live-model/pull/72)
 - feat: ability to create custom estimands [#75](https://github.com/washingtonpost/elex-live-model/pull/75)
-- feat: conformal bootstrap model [#76](https://github.com/washingtonpost/elex-live-model/pull/76)
+- feat: bootstrap model [#76](https://github.com/washingtonpost/elex-live-model/pull/76)
 - feat: conformal election model uses new faster quantile regression provided by `elex-solver` [#77](https://github.com/washingtonpost/elex-live-model/pull/77)
 
 ## 1.0.11 (08/14/2023)
