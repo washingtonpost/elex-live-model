@@ -3,7 +3,7 @@ from codecs import open
 
 from setuptools import find_packages, setup
 
-INSTALL_REQUIRES = ("click<8.1", "elex-solver<2", "pandas<1.5.0", "boto3<2", "python-dotenv==0.19.2", "scipy==1.10.1")
+INSTALL_REQUIRES = ("click<8.1", "elex-solver<3", "pandas<1.5.0", "boto3<2", "python-dotenv==0.19.2", "scipy==1.10.1")
 
 THIS_FILE_DIR = os.path.dirname(__file__)
 
@@ -13,13 +13,13 @@ with open(os.path.join(THIS_FILE_DIR, "README.md"), encoding="utf-8") as f:
     LONG_DESCRIPTION = f.read()
 
 # The full version, including alpha/beta/rc tags
-RELEASE = "1.0.11"
+RELEASE = "2.0.0"
 # The short X.Y version
 VERSION = ".".join(RELEASE.split(".")[:2])
 
 PROJECT = "elex-model"
 AUTHOR = "The Wapo Newsroom Engineering Team"
-COPYRIGHT = "2022, {}".format(AUTHOR)
+COPYRIGHT = "2023, {}".format(AUTHOR)
 
 
 setup(
@@ -29,7 +29,8 @@ setup(
         "Intended Audience :: Developers",
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python",
-        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
     ],
     description="A package for the Washington Post's live election night model",
     long_description=LONG_DESCRIPTION,

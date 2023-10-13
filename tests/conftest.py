@@ -3,10 +3,12 @@ import logging
 import os
 import sys
 
+import numpy as np
 import pandas as pd
 import pytest
 
 from elexmodel.client import HistoricalModelClient, ModelClient
+from elexmodel.models import BaseElectionModel, BootstrapElectionModel, ConformalElectionModel
 
 _TEST_FOLDER = os.path.dirname(__file__)
 FIXTURE_DIR = os.path.join(_TEST_FOLDER, "fixtures")
@@ -25,15 +27,20 @@ def setup_logging():
 def get_fixture():
     def _get_fixture(filename, load=True, pandas=False):
         filepath = os.path.join(FIXTURE_DIR, filename)
-        fileobj = open(filepath, encoding="utf-8")
-        if load:
-            return json.load(fileobj)
-        if pandas:
-            return pd.read_csv(
-                filepath,
-                dtype={"geographic_unit_fips": str, "geographic_unit_type": str, "county_fips": str, "district": str},
-            )
-        return fileobj
+        with open(filepath, encoding="utf-8") as fileobj:
+            if load:
+                return json.load(fileobj)
+            if pandas:
+                return pd.read_csv(
+                    filepath,
+                    dtype={
+                        "geographic_unit_fips": str,
+                        "geographic_unit_type": str,
+                        "county_fips": str,
+                        "district": str,
+                    },
+                )
+            return fileobj
 
     return _get_fixture
 
@@ -49,38 +56,68 @@ def historical_model_client():
 
 
 @pytest.fixture(scope="session")
+def base_election_model():
+    model_settings = {}
+    return BaseElectionModel.BaseElectionModel(model_settings)
+
+
+@pytest.fixture(scope="session")
+def conformal_election_model():
+    model_settings = {}
+    return ConformalElectionModel.ConformalElectionModel(model_settings)
+
+
+@pytest.fixture(scope="function")
+def bootstrap_election_model():
+    model_settings = {"features": ["baseline_normalized_margin"]}
+    return BootstrapElectionModel.BootstrapElectionModel(model_settings)
+
+
+@pytest.fixture(scope="session")
+def rng():
+    seed = 1941
+    return np.random.default_rng(seed=seed)
+
+
+@pytest.fixture(scope="function")
 def va_config(get_fixture):
     path = os.path.join("config", "2017-11-07_VA_G.json")
     return get_fixture(path, load=True, pandas=False)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def tx_primary_governor_config(get_fixture):
     path = os.path.join("config", "2018-03-06_TX_R.json")
     return get_fixture(path, load=True, pandas=False)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def va_governor_precinct_data(get_fixture):
     path = os.path.join("data", "2017-11-07_VA_G", "G", "data_precinct.csv")
     return get_fixture(path, load=False, pandas=True)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def va_governor_county_data(get_fixture):
     path = os.path.join("data", "2017-11-07_VA_G", "G", "data_county.csv")
     return get_fixture(path, load=False, pandas=True)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def va_assembly_county_data(get_fixture):
     path = os.path.join("data", "2017-11-07_VA_G", "Y", "data_county-district.csv")
     return get_fixture(path, load=False, pandas=True)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def va_assembly_precinct_data(get_fixture):
     path = os.path.join("data", "2017-11-07_VA_G", "Y", "data_precinct-district.csv")
+    return get_fixture(path, load=False, pandas=True)
+
+
+@pytest.fixture(scope="function")
+def az_assembly_precinct_data(get_fixture):
+    path = os.path.join("data", "2020-08-04_AZ_R", "S", "data_precinct.csv")
     return get_fixture(path, load=False, pandas=True)
 
 

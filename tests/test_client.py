@@ -1,3 +1,5 @@
+import logging
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -5,7 +7,10 @@ import pytest
 from elexmodel.client import ModelNotEnoughSubunitsException
 from elexmodel.handlers.config import ConfigHandler
 from elexmodel.handlers.data.LiveData import MockLiveDataHandler
+from elexmodel.logging import initialize_logging
 from elexmodel.utils import math_utils
+
+initialize_logging()
 
 # A set of valid model parameters
 office = "G"
@@ -80,15 +85,15 @@ def test_check_input_parameters_pi_method(model_client, va_config):
         )
 
 
-def test_check_input_parameters_estimand(model_client, va_config):
+def test_check_input_parameters_estimand(caplog, model_client, va_config):
     election_id = "2017-11-07_VA_G"
     config_handler = ConfigHandler(election_id, config=va_config)
 
-    with pytest.raises(ValueError):
+    with caplog.at_level(logging.INFO):
         model_client._check_input_parameters(
             config_handler,
             office,
-            ["estimand"],
+            ["foo"],
             geographic_unit_type,
             features,
             aggregates,
@@ -97,6 +102,8 @@ def test_check_input_parameters_estimand(model_client, va_config):
             model_parameters,
             handle_unreporting,
         )
+
+    assert "Found additional estimands " in caplog.text
 
 
 def test_check_input_parameters_geographic_unit_type(model_client, va_config):
@@ -611,7 +618,6 @@ def test_get_estimates_some_reporting(model_client, va_governor_county_data, va_
         "upper_0.9_turnout",
         "results_turnout",
     ]
-
     assert result["state_data"]["postal_code"][0] == "VA"
     assert result["state_data"]["pred_turnout"][0] == 2587563.0
     assert result["state_data"]["results_turnout"][0] == 1570077.0
@@ -718,8 +724,8 @@ def test_conformalization_data(model_client, va_governor_county_data, va_config)
         save_output=[],
     )
 
-    conform_unit = model_client.get_all_conformalization_data_unit()
-    conform_agg = model_client.get_all_conformalization_data_agg()
+    conform_unit = model_client.all_conformalization_data_unit_dict
+    conform_agg = model_client.all_conformalization_data_agg_dict
 
     assert len(conform_unit) == 1
     assert len(conform_agg) == 1
@@ -746,8 +752,8 @@ def test_conformalization_data(model_client, va_governor_county_data, va_config)
         save_output=[],
     )
 
-    conform_unit = model_client.get_all_conformalization_data_unit()
-    conform_agg = model_client.get_all_conformalization_data_agg()
+    conform_unit = model_client.all_conformalization_data_unit_dict
+    conform_agg = model_client.all_conformalization_data_agg_dict
 
     assert len(conform_unit) == 1
     assert len(conform_agg) == 1
@@ -759,3 +765,37 @@ def test_conformalization_data(model_client, va_governor_county_data, va_config)
     assert isinstance(conform_unit[0.9]["turnout"][1], pd.DataFrame)
     assert conform_agg[0.9]["turnout"][0] is None
     assert isinstance(conform_agg[0.9]["turnout"][1], pd.DataFrame)
+
+
+def test_estimandizer_input(model_client, va_governor_county_data, va_config):
+    election_id = "2017-11-07_VA_G"
+    office_id = "G"
+    geographic_unit_type = "county"
+    estimands = ["turnout", "party_vote_share_dem"]
+    prediction_intervals = [0.9]
+    percent_reporting_threshold = 100
+
+    data_handler = MockLiveDataHandler(
+        election_id, office_id, geographic_unit_type, estimands, data=va_governor_county_data
+    )
+
+    data_handler.shuffle()
+    data = data_handler.get_percent_fully_reported(100)
+
+    preprocessed_data = va_governor_county_data.copy()
+    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
+    try:
+        model_client.get_estimates(
+            data,
+            election_id,
+            office_id,
+            estimands,
+            prediction_intervals,
+            percent_reporting_threshold,
+            geographic_unit_type,
+            raw_config=va_config,
+            preprocessed_data=preprocessed_data,
+            save_output=[],
+        )
+    except KeyError:
+        pytest.raises("Error with client input for estimandizer")

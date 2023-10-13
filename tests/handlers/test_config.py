@@ -33,7 +33,8 @@ def test_get_baseline_pointer_general(va_config):
 
     office = "G"
     baseline_pointer = config_handler.get_baseline_pointer(office)
-    assert {"dem": "dem", "gop": "gop", "turnout": "turnout"} == baseline_pointer
+    expected = {"dem": "dem", "gop": "gop", "turnout": "turnout"}
+    assert expected == baseline_pointer
 
 
 def test_get_baseline_pointer_primary(tx_primary_governor_config):
@@ -76,7 +77,8 @@ def test_get_estimands_general(va_config):
 
     office = "G"
     estimands = config_handler.get_estimands(office)
-    assert ["dem", "gop", "turnout"] == estimands
+    expected = ["dem", "gop", "turnout", "margin"]
+    assert expected == estimands
 
 
 def test_get_estimands_primary(tx_primary_governor_config):
@@ -118,9 +120,10 @@ def test_get_features(va_config):
     office = "G"
     features = config_handler.get_features(office)
 
-    assert len(features) == 13
+    assert len(features) == 14
     assert features[0] == "age_le_30"
-    assert features[-1] == "percent_bachelor_or_higher"
+    assert features[-2] == "percent_bachelor_or_higher"
+    assert features[-1] == "baseline_normalized_margin"
 
 
 def test_get_aggregates(va_config):

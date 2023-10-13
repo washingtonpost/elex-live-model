@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
@@ -9,6 +10,8 @@ from elexmodel.handlers.data.CombinedData import CombinedDataHandler
 from elexmodel.handlers.data.ModelResults import ModelResultsHandler
 from elexmodel.handlers.data.PreprocessedData import PreprocessedDataHandler
 from elexmodel.logging import initialize_logging
+from elexmodel.models.BootstrapElectionModel import BootstrapElectionModel
+from elexmodel.models.ConformalElectionModel import ConformalElectionModel
 from elexmodel.models.GaussianElectionModel import GaussianElectionModel
 from elexmodel.models.NonparametricElectionModel import NonparametricElectionModel
 from elexmodel.utils.constants import AGGREGATE_ORDER, DEFAULT_AGGREGATES, VALID_AGGREGATES_MAPPING
@@ -35,8 +38,9 @@ class ModelClient:
 
     def __init__(self):
         super().__init__()
-        self.conformalization_data_unit_dict = None
-        self.conformalization_data_agg_dict = None
+        self.all_conformalization_data_unit_dict = defaultdict(dict)
+        self.all_conformalization_data_agg_dict = defaultdict(dict)
+        self.model = None
 
     def _check_input_parameters(
         self,
@@ -54,21 +58,27 @@ class ModelClient:
         offices = config_handler.get_offices()
         if office not in offices:
             raise ValueError(f"Office '{office}' is not valid. Please check config.")
-        valid_estimands = config_handler.get_estimands(office)
-        for estimand in estimands:
-            if estimand not in valid_estimands:
-                raise ValueError(f"Estimand: '{estimand}' is not valid. Please check config")
+
+        estimands_in_config = config_handler.get_estimands(office)
+        extra_estimands = set(estimands).difference(set(estimands_in_config))
+        if len(extra_estimands) > 0:
+            # this is ok; later they'll all be created by the Estimandizer
+            LOG.info("Found additional estimands that were not specified in the config file: %s", extra_estimands)
+
         geographic_unit_types = config_handler.get_geographic_unit_types(office)
         if geographic_unit_type not in geographic_unit_types:
             raise ValueError(f"Geographic unit type: '{geographic_unit_type}' is not valid. Please check config")
+
         model_features = config_handler.get_features(office)
-        invalid_features = [feature for feature in features if feature not in model_features]
+        invalid_features = list(set(features).difference(set(model_features)))
         if len(invalid_features) > 0:
             raise ValueError(f"Feature(s): {invalid_features} not valid. Please check config")
+
         model_aggregates = config_handler.get_aggregates(office)
         invalid_aggregates = [aggregate for aggregate in aggregates if aggregate not in model_aggregates]
         if len(invalid_aggregates) > 0:
             raise ValueError(f"Aggregate(s): {invalid_aggregates} not valid. Please check config")
+
         model_fixed_effects = config_handler.get_fixed_effects(office)
         if isinstance(fixed_effects, dict):
             invalid_fixed_effects = [
@@ -80,18 +90,27 @@ class ModelClient:
             ]
         if len(invalid_fixed_effects) > 0:
             raise ValueError(f"Fixed effect(s): {invalid_fixed_effects} not valid. Please check config")
-        if pi_method not in {"gaussian", "nonparametric"}:
+        if pi_method not in {"gaussian", "nonparametric", "bootstrap"}:
             raise ValueError(
                 f"Prediction interval method: {pi_method} is not valid. \
                     pi_method has to be either `gaussian` or `nonparametric`."
             )
+
         if not isinstance(model_parameters, dict):
             raise ValueError("model_paramters is not valid. Has to be a dict.")
-        elif model_parameters != {}:
+        if len(model_parameters) > 0:
             if "lambda_" in model_parameters and (
                 not isinstance(model_parameters["lambda_"], (float, int)) or model_parameters["lambda_"] < 0
             ):
                 raise ValueError("lambda is not valid. It has to be numeric and greater than zero.")
+            if "turnout_factor_lower" in model_parameters and not isinstance(
+                model_parameters["turnout_factor_lower"], float
+            ):
+                raise ValueError("turnout_factor_lower is not valid. Has to be a float.")
+            if "turnout_factor_upper" in model_parameters and not isinstance(
+                model_parameters["turnout_factor_upper"], float
+            ):
+                raise ValueError("turnout_factor_upper is not valid. Has to be a float.")
             if pi_method == "gaussian":
                 if "beta" in model_parameters and not isinstance(model_parameters["beta"], (int, float)):
                     raise ValueError("beta is not valid. Has to be either an integer or a float.")
@@ -100,37 +119,58 @@ class ModelClient:
             elif pi_method == "nonparametric":
                 if "robust" in model_parameters and not isinstance(model_parameters["robust"], bool):
                     raise ValueError("robust is not valid. Has to be a boolean.")
+            elif pi_method == "bootstrap":
+                if "B" in model_parameters and not isinstance(model_parameters["B"], int):
+                    raise ValueError("B is not valid. Has to be either an integer.")
+                if "T" in model_parameters and not isinstance(model_parameters["T"], (int, float)):
+                    raise ValueError("T is not valid. Has to be either an integer or a float.")
+                if "strata" in model_parameters and not isinstance(model_parameters["strata"], list):
+                    raise ValueError("strata is not valid. Has to be a list.")
+                if "agg_model_hard_threshold" in model_parameters and not isinstance(
+                    model_parameters["agg_model_hard_threshold"], bool
+                ):
+                    raise ValueError("agg_model_hard_threshold is not valid. Has to be a boolean.")
+                if "y_LB" in model_parameters and not isinstance(model_parameters["y_LB"], float):
+                    raise ValueError("y_LB is not valid. Has to be a float.")
+                if "y_UB" in model_parameters and not isinstance(model_parameters["y_UB"], float):
+                    raise ValueError("y_UB is not valid. Has to be a float.")
+                if "z_LB" in model_parameters and not isinstance(model_parameters["z_LB"], float):
+                    raise ValueError("z_LB is not valid. Has to be a float.")
+                if "z_UB" in model_parameters and not isinstance(model_parameters["z_UB"], float):
+                    raise ValueError("z_UB is not valid. Has to be a float.")
+                if "y_unobserved_upper_bound" in model_parameters and not isinstance(
+                    model_parameters["y_unobserved_upper_bound"], float
+                ):
+                    raise ValueError("y_unobserved_upper_bound is not valid. Has to be a float.")
+                if "y_unobserved_lower_bound" in model_parameters and not isinstance(
+                    model_parameters["y_unobserved_lower_bound"], float
+                ):
+                    raise ValueError("y_unobserved_lower_bound is not valid. Has to be a float.")
+                if "percent_expected_vote_error_bound" in model_parameters and not isinstance(
+                    model_parameters["percent_expected_vote_error_bound"], float
+                ):
+                    raise ValueError("z_UB is not valid. Has to be a float.")
+                if "z_unobserved_upper_bound" in model_parameters and not isinstance(
+                    model_parameters["z_unobserved_upper_bound"], float
+                ):
+                    raise ValueError("z_unobserved_upper_bound is not valid. Has to be a float.")
+                if "z_unobserved_lower_bound" in model_parameters and not isinstance(
+                    model_parameters["z_unobserved_lower_bound"], float
+                ):
+                    raise ValueError("z_unobserved_lower_bound is not valid. Has to be a float.")
         if handle_unreporting not in {"drop", "zero"}:
             raise ValueError("handle_unreporting must be either `drop` or `zero`")
+
         return True
-
-    def get_all_conformalization_data_unit(self):
-        """
-        This function collects the conformalization data from a model run. It produces a dictionary
-        with two types of data (in the gaussian case): the conformalization points that a
-        distribution is fit to, and the parameters of the resulting guassian distribution.
-        In this unit-level function, the information for one distribution is returned
-        (all units combined). It returns None if get_estimates isn't called, as the
-        values they pull out are generated in that function.
-        """
-        return self.all_conformalization_data_unit_dict
-
-    def get_all_conformalization_data_agg(self):
-        """
-        This function collects the conformalization data from a model run. It produces a dictionary
-        with two types of data (in the gaussian case): the conformalization points that a distribution is
-        fit to, and the parameters of the resulting guassian distribution. In the agg case,
-        distributions for each state (in a multi-state model) are returned. This functions
-        return None if get_estimates isn't called, as the
-        values they pull out are generated in that function.
-        """
-        return self.all_conformalization_data_agg_dict
 
     def get_aggregate_list(self, office, aggregate):
         default_aggregate = DEFAULT_AGGREGATES[office]
         base_aggregate = default_aggregate[:-1]  # remove unit
         raw_aggregate_list = base_aggregate + [aggregate]
         return sorted(list(set(raw_aggregate_list)), key=lambda x: AGGREGATE_ORDER.index(x))
+
+    def get_national_summary_votes_estimates(self, nat_sum_data_dict=None, called_states={}, base_to_add=0):
+        return self.model.get_national_summary_estimates(nat_sum_data_dict, called_states, base_to_add)
 
     def get_estimates(
         self,
@@ -160,34 +200,34 @@ class ModelClient:
         aggregates = kwargs.get("aggregates", DEFAULT_AGGREGATES[office])
         fixed_effects = kwargs.get("fixed_effects", {})
         pi_method = kwargs.get("pi_method", "nonparametric")
-        beta = model_parameters.get("beta", 1)
-        winsorize = model_parameters.get("winsorize", False)
-        robust = model_parameters.get("robust", False)
-        lambda_ = model_parameters.get("lambda_", 0)
         save_output = kwargs.get("save_output", ["results"])
         save_results = "results" in save_output
         save_data = "data" in save_output
         save_config = "config" in save_output
+        # saving conformalization data only makes sense if a ConformalElectionModel is used
         save_conformalization = "conformalization" in save_output
         handle_unreporting = kwargs.get("handle_unreporting", "drop")
+
+        district_election = False
+        if office in {"H", "Y", "Z"}:
+            district_election = True
 
         model_settings = {
             "election_id": election_id,
             "office": office,
             "geographic_unit_type": geographic_unit_type,
-            "beta": beta,
-            "winsorize": winsorize,
-            "robust": robust,
-            "lambda_": lambda_,
+            "district_election": district_election,
             "features": features,
             "fixed_effects": fixed_effects,
             "save_conformalization": save_conformalization,
         }
+        model_settings.update(model_parameters)
 
         LOG.info("Getting config: %s", election_id)
         config_handler = ConfigHandler(
             election_id, config=raw_config, s3_client=s3.S3JsonUtil(TARGET_BUCKET), save=save_config
         )
+
         self._check_input_parameters(
             config_handler,
             office,
@@ -200,6 +240,7 @@ class ModelClient:
             model_parameters,
             handle_unreporting,
         )
+
         states_with_election = config_handler.get_states(office)
         estimand_baselines = config_handler.get_estimand_baselines(office, estimands)
 
@@ -229,36 +270,39 @@ class ModelClient:
             handle_unreporting=handle_unreporting,
         )
 
+        turnout_factor_lower = model_parameters.get("turnout_factor_lower", 0.2)
+        turnout_factor_upper = model_parameters.get("turnout_factor_upper", 2.5)
+
         reporting_units = data.get_reporting_units(
-            percent_reporting_threshold, features_to_normalize=features, add_intercept=True
+            percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper
         )
         nonreporting_units = data.get_nonreporting_units(
-            percent_reporting_threshold, features_to_normalize=features, add_intercept=True
+            percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper
         )
-        unexpected_units = data.get_unexpected_units(percent_reporting_threshold, aggregates)
+        unexpected_units = data.get_unexpected_units(
+            percent_reporting_threshold, aggregates, turnout_factor_lower, turnout_factor_upper
+        )
 
         LOG.info(
-            "Model parameters: \n geographic_unit_type: %s, prediction intervals: %s, \
-                percent reporting threshold: %s, features: %s, pi_method: %s, aggregates: %s, \
-                fixed effects: %s, model settings: %s",
-            geographic_unit_type,
+            "Model parameters: \n prediction intervals: %s, percent reporting threshold: %s, \
+                pi_method: %s, aggregates: %s, model settings: %s",
             prediction_intervals,
             percent_reporting_threshold,
-            features,
             pi_method,
             aggregates,
-            fixed_effects,
             model_settings,
         )
 
         if pi_method == "nonparametric":
-            model = NonparametricElectionModel(model_settings=model_settings)
+            self.model = NonparametricElectionModel(model_settings=model_settings)
         elif pi_method == "gaussian":
-            model = GaussianElectionModel(model_settings=model_settings)
+            self.model = GaussianElectionModel(model_settings=model_settings)
+        elif pi_method == "bootstrap":
+            self.model = BootstrapElectionModel(model_settings=model_settings)
 
         minimum_reporting_units_max = 0
         for alpha in prediction_intervals:
-            minimum_reporting_units = model.get_minimum_reporting_units(alpha)
+            minimum_reporting_units = self.model.get_minimum_reporting_units(alpha)
             if minimum_reporting_units > minimum_reporting_units_max:
                 minimum_reporting_units_max = minimum_reporting_units
 
@@ -289,24 +333,27 @@ class ModelClient:
             aggregates, prediction_intervals, reporting_units, nonreporting_units, unexpected_units
         )
 
-        self.all_conformalization_data_unit_dict = {alpha: {} for alpha in prediction_intervals}
-        self.all_conformalization_data_agg_dict = {alpha: {} for alpha in prediction_intervals}
         for estimand in estimands:
-            unit_predictions = model.get_unit_predictions(reporting_units, nonreporting_units, estimand)
+            unit_predictions = self.model.get_unit_predictions(
+                reporting_units, nonreporting_units, estimand, unexpected_units=unexpected_units
+            )
             results_handler.add_unit_predictions(estimand, unit_predictions)
             # gets prediciton intervals for each alpha
             alpha_to_unit_prediction_intervals = {}
             for alpha in prediction_intervals:
-                alpha_to_unit_prediction_intervals[alpha] = model.get_unit_prediction_intervals(
+                alpha_to_unit_prediction_intervals[alpha] = self.model.get_unit_prediction_intervals(
                     results_handler.reporting_units, results_handler.nonreporting_units, alpha, estimand
                 )
-                self.all_conformalization_data_unit_dict[alpha][estimand] = model.get_all_conformalization_data_unit()
+                if isinstance(self.model, ConformalElectionModel):
+                    self.all_conformalization_data_unit_dict[alpha][
+                        estimand
+                    ] = self.model.get_all_conformalization_data_unit()
 
             results_handler.add_unit_intervals(estimand, alpha_to_unit_prediction_intervals)
 
             for aggregate in results_handler.aggregates:
                 aggregate_list = self.get_aggregate_list(office, aggregate)
-                estimates_df = model.get_aggregate_predictions(
+                estimates_df = self.model.get_aggregate_predictions(
                     results_handler.reporting_units,
                     results_handler.nonreporting_units,
                     results_handler.unexpected_units,
@@ -315,16 +362,19 @@ class ModelClient:
                 )
                 alpha_to_agg_prediction_intervals = {}
                 for alpha in prediction_intervals:
-                    alpha_to_agg_prediction_intervals[alpha] = model.get_aggregate_prediction_intervals(
+                    alpha_to_agg_prediction_intervals[alpha] = self.model.get_aggregate_prediction_intervals(
                         results_handler.reporting_units,
                         results_handler.nonreporting_units,
                         results_handler.unexpected_units,
                         aggregate_list,
                         alpha,
-                        alpha_to_unit_prediction_intervals[alpha].conformalization,
+                        alpha_to_unit_prediction_intervals[alpha],
                         estimand,
                     )
-                    self.all_conformalization_data_agg_dict[alpha][estimand] = model.get_all_conformalization_data_agg()
+                    if isinstance(self.model, ConformalElectionModel):
+                        self.all_conformalization_data_agg_dict[alpha][
+                            estimand
+                        ] = self.model.get_all_conformalization_data_agg()
 
                 # get all of the prediction intervals here
                 results_handler.add_agg_predictions(
@@ -407,6 +457,19 @@ class HistoricalModelClient(ModelClient):
         """
         Formats data for historical model run
         """
+
+        # What does the historical model client do?
+        #     - If we are running the election in 2024 and 100 counties are reporting, we want to see what
+        #         our model error would have been in 2020 with these counties reporting
+        #     - To do that we need to merge the 2020 results onto the 2024 reporting counties
+
+        #     - So for 2020 (cli) this means -> we have 2020 data and we pick 100 random counties reporting
+        #       in the MockLiveDataHandler
+        #     - in this function we get the 2016 results and merge that to the 100 reporting counties in 2020
+
+        # running election id: 2020-11-03_USA_G --historical
+        #     -> historical election id: 2016-11-08_USA_G, 2012, ...
+
         formatted_data = current_data[["postal_code", "geographic_unit_fips", "percent_expected_vote"]]
         print(f"Getting data for historical election: {historical_election_id}")
         preprocessed_data_handler = PreprocessedDataHandler(
@@ -417,9 +480,10 @@ class HistoricalModelClient(ModelClient):
             estimand_baselines,
             s3_client=s3.S3CsvUtil(TARGET_BUCKET),
             historical=True,
+            include_results_estimand=True,
         )
-
-        results_to_return = [f"results_{estimand}" for estimand in estimands]
+        # we always want to pass turnout so that we can generate results weights
+        results_to_return = list(set([f"results_{estimand}" for estimand in estimands] + ["results_turnout"]))
         geo_columns = set(["geographic_unit_fips", "postal_code"] + [a for a in self.aggregates if a != "unit"])
         preprocessed_data = preprocessed_data_handler.data[list(geo_columns) + results_to_return].copy()
         historical_current_data = preprocessed_data.merge(formatted_data, on=["postal_code", "geographic_unit_fips"])
