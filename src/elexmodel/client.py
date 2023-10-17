@@ -312,11 +312,11 @@ class ModelClient:
         n_reporting_expected_units = reporting_units.shape[0]
         n_unexpected_units = unexpected_units.shape[0]
         n_nonreporting_units = nonreporting_units.shape[0]
-        print(
+        LOG.info(
             f"""Running model
-        There are {n_reporting_expected_units} reporting and expected units.
-        There are {n_unexpected_units} unexpected units.
-        There are {n_nonreporting_units} nonreporting units."""
+            There are {n_reporting_expected_units} reporting and expected units.
+            There are {n_unexpected_units} unexpected units.
+            There are {n_nonreporting_units} nonreporting units."""
         )
 
         if n_reporting_expected_units < minimum_reporting_units_max:
@@ -471,7 +471,7 @@ class HistoricalModelClient(ModelClient):
         #     -> historical election id: 2016-11-08_USA_G, 2012, ...
 
         formatted_data = current_data[["postal_code", "geographic_unit_fips", "percent_expected_vote"]]
-        print(f"Getting data for historical election: {historical_election_id}")
+        LOG.info(f"Getting data for historical election: {historical_election_id}")
         preprocessed_data_handler = PreprocessedDataHandler(
             historical_election_id,
             office,
