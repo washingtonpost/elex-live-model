@@ -32,3 +32,4 @@ def initialize_logging(logging_config=None):
         LOGGING_CONFIG["loggers"]["elexmodel"]["level"] = app_log_level
         logging_config = LOGGING_CONFIG
     logging.config.dictConfig(logging_config)
+    logging.captureWarnings(True)
