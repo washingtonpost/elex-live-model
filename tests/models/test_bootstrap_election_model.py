@@ -398,7 +398,11 @@ def test_sample_test_epsilon(bootstrap_election_model):
     aggregate_indicator_test = np.asarray(
         [[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 1, 0], [0, 1, 0, 0], [0, 0, 1, 0]]
     )
-    epsilon_hat = bootstrap_election_model._estimate_epsilon(residuals, aggregate_indicator_train)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        # Note: this line along with this data performs a division by zero, which numpy is right to warn us about.
+        # We have currently disabled the warning here, and the Jira ticket to resolve this division-by-zero
+        # circumstance is here: https://arcpublishing.atlassian.net/browse/ELEX-3431
+        epsilon_hat = bootstrap_election_model._estimate_epsilon(residuals, aggregate_indicator_train)
 
     epsilon_y, epsilon_z = bootstrap_election_model._sample_test_epsilon(
         residuals, residuals, epsilon_hat, epsilon_hat, aggregate_indicator_train, aggregate_indicator_test
@@ -432,7 +436,12 @@ def test_sample_test_errors(bootstrap_election_model):
     aggregate_indicator_test = np.asarray(
         [[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 1, 0], [0, 1, 0, 0], [0, 0, 1, 0]]
     )
-    epsilon_hat = bootstrap_election_model._estimate_epsilon(residuals, aggregate_indicator_train)
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        # Note: this line along with this data performs a division by zero, which numpy is right to warn us about.
+        # We have currently disabled the warning here, and the Jira ticket to resolve this division-by-zero
+        # circumstance is here: https://arcpublishing.atlassian.net/browse/ELEX-3431
+        epsilon_hat = bootstrap_election_model._estimate_epsilon(residuals, aggregate_indicator_train)
     delta_hat = bootstrap_election_model._estimate_delta(residuals, epsilon_hat, aggregate_indicator_train)
 
     x_train, x_test = None, None
