@@ -1415,6 +1415,4 @@ class BootstrapElectionModel(BaseElectionModel):
             ]
         }
 
-        print(national_summary_estimates)
-
         return national_summary_estimates
