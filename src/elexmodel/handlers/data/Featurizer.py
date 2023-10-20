@@ -177,6 +177,7 @@ class Featurizer:
 
             # set the values for active fixed effect in rows that have inactive fixed effect to be 1 / (n + 1)
             # rows that have an inactive fixed effect value need to receive the treat of the average fixed effects
+            df[fe_active_fixed_effects] = df[fe_active_fixed_effects].astype("float64")
             df.loc[rows_w_inactive_fixed_effects, fe_active_fixed_effects] = 1 / (len(fe_active_fixed_effects) + 1)
             # This is correct because even rows with active fixed effects have an interept columns, so the coefficient
             # of the fixed effect value column is actually the *difference* between the dropped column
