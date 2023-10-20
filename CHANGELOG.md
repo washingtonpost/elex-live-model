@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.0.1 (10/20/2023)
+- chore: updating all required packages to their latest versions and addressing some warnings that surfaced during testing [#81](https://github.com/washingtonpost/elex-live-model/pull/81)	
+
 ## 2.0.0 (10/13/2023)
 - fix: improved fixed effect features [#69](https://github.com/washingtonpost/elex-live-model/pull/69)
 - fix: with the CLI, model-specific parameters passed in as a dictionary [#70](https://github.com/washingtonpost/elex-live-model/pull/70)
