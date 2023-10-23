@@ -30,7 +30,7 @@ class PythonLiteralOption(click.Option):
 @click.option("--office_id", "office_id")
 @click.option("--fixed_effects", "fixed_effects", default={})
 @click.option("--features", default=[], multiple=True)
-@click.option("--aggregates", default=["postal_code", "unit"], multiple=True)
+@click.option("--aggregates", multiple=True)
 @click.option(
     "--pi_method",
     "pi_method",
@@ -90,6 +90,8 @@ def cli(
 
     kwargs["features"] = list(kwargs["features"])
     kwargs["aggregates"] = list(kwargs["aggregates"])
+    if len(kwargs["aggregates"]) == 0:
+        del kwargs["aggregates"]
     try:
         kwargs["fixed_effects"] = json.loads(kwargs["fixed_effects"])
     except json.decoder.JSONDecodeError:
