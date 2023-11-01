@@ -104,11 +104,11 @@ class ModelClient:
             ):
                 raise ValueError("lambda is not valid. It has to be numeric and greater than zero.")
             if "turnout_factor_lower" in model_parameters and not isinstance(
-                model_parameters["turnout_factor_lower"], float
+                model_parameters["turnout_factor_lower"], (float, int)
             ):
                 raise ValueError("turnout_factor_lower is not valid. Has to be a float.")
             if "turnout_factor_upper" in model_parameters and not isinstance(
-                model_parameters["turnout_factor_upper"], float
+                model_parameters["turnout_factor_upper"], (float, int)
             ):
                 raise ValueError("turnout_factor_upper is not valid. Has to be a float.")
             if pi_method == "gaussian":
@@ -130,32 +130,32 @@ class ModelClient:
                     model_parameters["agg_model_hard_threshold"], bool
                 ):
                     raise ValueError("agg_model_hard_threshold is not valid. Has to be a boolean.")
-                if "y_LB" in model_parameters and not isinstance(model_parameters["y_LB"], float):
+                if "y_LB" in model_parameters and not isinstance(model_parameters["y_LB"], (float, int)):
                     raise ValueError("y_LB is not valid. Has to be a float.")
-                if "y_UB" in model_parameters and not isinstance(model_parameters["y_UB"], float):
+                if "y_UB" in model_parameters and not isinstance(model_parameters["y_UB"], (float, int)):
                     raise ValueError("y_UB is not valid. Has to be a float.")
-                if "z_LB" in model_parameters and not isinstance(model_parameters["z_LB"], float):
+                if "z_LB" in model_parameters and not isinstance(model_parameters["z_LB"], (float, int)):
                     raise ValueError("z_LB is not valid. Has to be a float.")
-                if "z_UB" in model_parameters and not isinstance(model_parameters["z_UB"], float):
+                if "z_UB" in model_parameters and not isinstance(model_parameters["z_UB"], (float, int)):
                     raise ValueError("z_UB is not valid. Has to be a float.")
                 if "y_unobserved_upper_bound" in model_parameters and not isinstance(
-                    model_parameters["y_unobserved_upper_bound"], float
+                    model_parameters["y_unobserved_upper_bound"], (float, int)
                 ):
                     raise ValueError("y_unobserved_upper_bound is not valid. Has to be a float.")
                 if "y_unobserved_lower_bound" in model_parameters and not isinstance(
-                    model_parameters["y_unobserved_lower_bound"], float
+                    model_parameters["y_unobserved_lower_bound"], (float, int)
                 ):
                     raise ValueError("y_unobserved_lower_bound is not valid. Has to be a float.")
                 if "percent_expected_vote_error_bound" in model_parameters and not isinstance(
-                    model_parameters["percent_expected_vote_error_bound"], float
+                    model_parameters["percent_expected_vote_error_bound"], (float, int)
                 ):
                     raise ValueError("z_UB is not valid. Has to be a float.")
                 if "z_unobserved_upper_bound" in model_parameters and not isinstance(
-                    model_parameters["z_unobserved_upper_bound"], float
+                    model_parameters["z_unobserved_upper_bound"], (float, int)
                 ):
                     raise ValueError("z_unobserved_upper_bound is not valid. Has to be a float.")
                 if "z_unobserved_lower_bound" in model_parameters and not isinstance(
-                    model_parameters["z_unobserved_lower_bound"], float
+                    model_parameters["z_unobserved_lower_bound"], (float, int)
                 ):
                     raise ValueError("z_unobserved_lower_bound is not valid. Has to be a float.")
         if handle_unreporting not in {"drop", "zero"}:
