@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.2 (11/02/2023)
+- fix: allow bootstrap model parameters to be of type int as well as float [#86](https://github.com/washingtonpost/elex-live-model/pull/86)
+- fix: pass alpha to national summary client function [#87](https://github.com/washingtonpost/elex-live-model/pull/87)
+
 ## 2.0.1 (10/23/2023)
 - chore: updating all required packages to their latest versions and addressing some warnings that surfaced during testing [#81](https://github.com/washingtonpost/elex-live-model/pull/81)
 - fix: CLI no longer throws an error if `aggregates` are missing or specified with columns that don't exist in the data [#83](https://github.com/washingtonpost/elex-live-model/pull/83)
