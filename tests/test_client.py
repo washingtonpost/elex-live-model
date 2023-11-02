@@ -20,12 +20,7 @@ features = ["gender_f", "median_household_income"]
 aggregates = ["postal_code", "county_fips"]
 fixed_effects = []
 pi_method = "gaussian"
-model_parameters = {
-    "beta": 3,
-    "winsorize": False,
-    "robust": True,
-    "lambda_": 0,
-}
+model_parameters = {"beta": 3, "winsorize": False, "robust": True, "lambda_": 0, "y_LB": 1.0, "y_UB": 4}
 handle_unreporting = "drop"
 
 
@@ -42,6 +37,25 @@ def test_check_input_parameters(model_client, va_config):
         aggregates,
         fixed_effects,
         pi_method,
+        model_parameters,
+        handle_unreporting,
+    )
+
+
+def test_check_input_parameters_bootstrap(model_client, va_config):
+    # this is to test y_LB and y_UB
+    election_id = "2017-11-07_VA_G"
+    config_handler = ConfigHandler(election_id, config=va_config)
+
+    assert model_client._check_input_parameters(
+        config_handler,
+        office,
+        estimands,
+        geographic_unit_type,
+        features,
+        aggregates,
+        fixed_effects,
+        "bootstrap",
         model_parameters,
         handle_unreporting,
     )
@@ -293,6 +307,25 @@ def test_check_input_parameters_lambda_(model_client, va_config):
                 "robust": True,
                 "lambda_": -1,
             },
+            handle_unreporting,
+        )
+
+
+def test_check_input_parameters_y_UB_LB(model_client, va_config):
+    election_id = "2017-11-07_VA_G"
+    config_handler = ConfigHandler(election_id, config=va_config)
+
+    with pytest.raises(ValueError):
+        model_client._check_input_parameters(
+            config_handler,
+            office,
+            estimands,
+            geographic_unit_type,
+            features,
+            aggregates,
+            fixed_effects,
+            "bootstrap",
+            {"beta": 3, "winsorize": False, "robust": True, "lambda_": -1, "y_LB": "break", "y_UB": 1},
             handle_unreporting,
         )
 
