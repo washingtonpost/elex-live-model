@@ -106,7 +106,6 @@ class ModelResultsHandler:
                 lambda x, y: pd.merge(x, y, how="inner", on=merge_on), self.unit_data.values()
             )
 
-
     def write_data(self, election_id, office, geographic_unit_type):
         """
         Saves dataframe of estimates for all estimands to S3

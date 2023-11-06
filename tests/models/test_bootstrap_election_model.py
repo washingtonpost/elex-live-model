@@ -561,11 +561,12 @@ def test_get_unit_predictions(bootstrap_election_model, va_governor_county_data)
 
     bootstrap_election_model.B = 10
     assert not bootstrap_election_model.ran_bootstrap
-    unit_predictions = bootstrap_election_model.get_unit_predictions(
+    unit_predictions, unit_turnout_predictions = bootstrap_election_model.get_unit_predictions(
         reporting_units, nonreporting_units, estimand="margin", unexpected_units=unexpected_units
     )
     assert bootstrap_election_model.ran_bootstrap
     assert unit_predictions.shape == (nonreporting_units.shape[0], 1)
+    assert unit_turnout_predictions.shape == (nonreporting_units.shape[0], 1)
 
 
 def test_is_top_level_aggregate(bootstrap_election_model):
@@ -1023,7 +1024,7 @@ def test_total_aggregation(bootstrap_election_model, va_assembly_precinct_data):
 
     bootstrap_election_model.B = 300
 
-    unit_predictions = bootstrap_election_model.get_unit_predictions(
+    unit_predictions, unit_turnout_predictions = bootstrap_election_model.get_unit_predictions(
         reporting_units, nonreporting_units, "margin", unexpected_units=unexpected_units
     )
     unit_lower, unit_upper = bootstrap_election_model.get_unit_prediction_intervals(
@@ -1034,6 +1035,8 @@ def test_total_aggregation(bootstrap_election_model, va_assembly_precinct_data):
     assert unit_predictions.shape[0] == unit_upper.shape[0]
     assert all(unit_lower.flatten() <= unit_predictions.flatten())
     assert all(unit_predictions.flatten() <= unit_upper.flatten())
+
+    assert unit_turnout_predictions.shape == unit_predictions.shape
 
     reporting_units["pred_margin"] = reporting_units.results_margin
     nonreporting_units["pred_margin"] = unit_predictions
