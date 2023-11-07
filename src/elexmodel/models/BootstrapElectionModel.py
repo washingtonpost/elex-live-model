@@ -1035,7 +1035,7 @@ class BootstrapElectionModel(BaseElectionModel):
         if not self.ran_bootstrap:
             unexpected_units = kwargs["unexpected_units"]
             self.compute_bootstrap_errors(reporting_units, nonreporting_units, unexpected_units)
-        return self.weighted_yz_test_pred
+        return self.weighted_yz_test_pred, self.weighted_z_test_pred
 
     def _is_top_level_aggregate(self, aggregate: list) -> bool:
         """
@@ -1335,7 +1335,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         if len(called_states) != self.aggregate_error_B_1.shape[0]:
             raise BootstrapElectionModelException(
-                f"called_states is of length {len(nat_sum_data_dict)} but there are {self.aggregate_error_B_1.shape[0]} contests"
+                f"called_states is of length {len(called_states)} but there are {self.aggregate_error_B_1.shape[0]} contests"
             )
 
         # sort in order to get in the same order as the contests,

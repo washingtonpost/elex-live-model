@@ -334,10 +334,10 @@ class ModelClient:
         )
 
         for estimand in estimands:
-            unit_predictions = self.model.get_unit_predictions(
+            unit_predictions, unit_turnout_predictions = self.model.get_unit_predictions(
                 reporting_units, nonreporting_units, estimand, unexpected_units=unexpected_units
             )
-            results_handler.add_unit_predictions(estimand, unit_predictions)
+            results_handler.add_unit_predictions(estimand, unit_predictions, unit_turnout_predictions)
             # gets prediciton intervals for each alpha
             alpha_to_unit_prediction_intervals = {}
             for alpha in prediction_intervals:
