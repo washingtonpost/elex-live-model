@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.3 (11/06/2023)
+- fix: fix print bug for aggregate model called states error [#90](https://github.com/washingtonpost/elex-live-model/pull/90)
+- chore: add predicted turnout to predictions dataframe [#91](https://github.com/washingtonpost/elex-live-model/pull/91)
+
 ## 2.0.2 (11/02/2023)
 - fix: allow bootstrap model parameters to be of type int as well as float [#86](https://github.com/washingtonpost/elex-live-model/pull/86)
 - fix: pass alpha to national summary client function [#87](https://github.com/washingtonpost/elex-live-model/pull/87)
