@@ -1035,7 +1035,7 @@ class BootstrapElectionModel(BaseElectionModel):
         if not self.ran_bootstrap:
             unexpected_units = kwargs["unexpected_units"]
             self.compute_bootstrap_errors(reporting_units, nonreporting_units, unexpected_units)
-        return self.weighted_yz_test_pred
+        return self.weighted_yz_test_pred, self.weighted_z_test_pred
 
     def _is_top_level_aggregate(self, aggregate: list) -> bool:
         """

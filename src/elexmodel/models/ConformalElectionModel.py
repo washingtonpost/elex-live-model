@@ -102,7 +102,7 @@ class ConformalElectionModel(BaseElectionModel.BaseElectionModel, ABC):
         )
 
         # round since we don't need the artificial precision
-        return preds.round(decimals=0)
+        return preds.round(decimals=0), None
 
     def get_unit_prediction_interval_bounds(
         self,

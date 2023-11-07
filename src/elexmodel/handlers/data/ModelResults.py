@@ -30,7 +30,7 @@ class ModelResultsHandler:
         self.nonreporting_units = nonreporting_units
         self.unexpected_units = unexpected_units
 
-    def add_unit_predictions(self, estimand, unit_predictions):
+    def add_unit_predictions(self, estimand, unit_predictions, unit_turnout_predictions):
         """
         unit_predictions: data frame with unit predictions, as produced by model.get_unit_predictions
 
@@ -38,6 +38,11 @@ class ModelResultsHandler:
         self.reporting_units[f"pred_{estimand}"] = self.reporting_units[f"results_{estimand}"]
         self.nonreporting_units[f"pred_{estimand}"] = unit_predictions
         self.unexpected_units[f"pred_{estimand}"] = self.unexpected_units[f"results_{estimand}"]
+
+        if unit_turnout_predictions is not None:
+            self.reporting_units["pred_turnout"] = self.reporting_units["results_weights"]
+            self.nonreporting_units["pred_turnout"] = unit_turnout_predictions
+            self.unexpected_units["pred_turnout"] = self.unexpected_units["results_weights"]
 
     def add_unit_intervals(self, estimand, prediction_intervals_unit):
         """
@@ -57,13 +62,13 @@ class ModelResultsHandler:
             self.nonreporting_units[upper_string] = prediction_intervals_unit[alpha].upper
             self.unexpected_units[lower_string] = self.unexpected_units[f"results_{estimand}"]
             self.unexpected_units[upper_string] = self.unexpected_units[f"results_{estimand}"]
-
         self.unit_data[estimand] = pd.concat(
             [self.reporting_units, self.nonreporting_units, self.unexpected_units]
         ).sort_values("geographic_unit_fips")[
             ["postal_code", "geographic_unit_fips", f"pred_{estimand}", "reporting"]
             + interval_cols
             + [f"results_{estimand}"]
+            + (["pred_turnout"] if estimand == "margin" else [])
         ]
 
     def add_agg_predictions(self, estimand, aggregate, estimates_df, agg_interval_predictions):

@@ -62,9 +62,9 @@ intervals2_e2 = {0.7: PredictionIntervals([2000], [2200]), 0.9: PredictionInterv
 def test_model_results_handler():
     # test unit predictions/intervals methods for two estimands
     handler = ModelResultsHandler(["district", "unit", "postal_code"], [0.7, 0.9], reporting, nonreporting, notexpected)
-    handler.add_unit_predictions("e1", predictions_e1)
+    handler.add_unit_predictions("e1", predictions_e1, None)
     handler.add_unit_intervals("e1", intervals_e1)
-    handler.add_unit_predictions("e2", predictions_e2)
+    handler.add_unit_predictions("e2", predictions_e2, None)
     handler.add_unit_intervals("e2", intervals_e2)
     expected_cols = [
         "pred_e1",
@@ -106,7 +106,7 @@ def test_model_results_handler():
 
 def test_no_unit_data():
     handler = ModelResultsHandler(["postal_code"], [0.7, 0.9], reporting, nonreporting, notexpected)
-    handler.add_unit_predictions("e1", predictions_e1)
+    handler.add_unit_predictions("e1", predictions_e1, None)
     handler.add_unit_intervals("e1", intervals_e1)
 
     handler.add_agg_predictions("e1", "postal_code", agg1_e1, intervals1_e1)
