@@ -95,7 +95,7 @@ def compute_error(true, pred, type_="mae"):
         return np.mean(np.abs(true - pred)).round(decimals=0)
     if type_ == "mape":
         mask = true != 0
-        mape = np.mean((np.abs(true - pred) / true)[mask])
+        mape = np.mean((np.abs((true - pred) / true))[mask])
         # if all true values are zero, then race was uncontested and mape doesn't make sense to compute
         if math.isnan(mape):
             return mape
@@ -114,4 +114,4 @@ def compute_mean_pi_length(lower, upper, pred):
     computes average relative length of prediction interval
     """
     # we add 1 since pred can be literally zero
-    return np.mean((upper - lower) / (pred + 1)).round(decimals=2)
+    return np.mean(np.abs((upper - lower) / (pred + 1))).round(decimals=2)
