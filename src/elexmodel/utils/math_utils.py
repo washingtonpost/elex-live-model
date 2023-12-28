@@ -113,10 +113,4 @@ def compute_mean_pi_length(lower, upper, pred):
     """
     computes average relative length of prediction interval
     """
-    return np.mean(
-        np.abs(
-            np.nan_to_num(
-                (upper - lower) / pred
-            )
-        )
-    )
+    return np.mean(np.abs(np.nan_to_num((upper - lower) / pred)))
