@@ -65,6 +65,30 @@ class Featurizer:
         """
         return [x for x in list_ if x.startswith(fe)]
 
+    def select_LASSO_features(
+        self, reporting_df : pd.DataFrame, all_features : list, K : int = 5
+    ):
+        """
+        Runs LASSO on all available features with K-fold CV to estimate the feature set that delivers
+        the smallest prediction error on the hold-out fold 
+
+        We treat the label of interest as the normalized margin (not the turnout factor - who cares about that)
+        """
+        from sklearn.linear_model import LassoCV
+
+        alphas = np.logspace(-10, 1, 100)
+        lasso_cv = LassoCV(alphas=alphas, cv=K, random_state=0)
+
+        x_train = reporting_df[all_features]
+        y_train = reporting_df["results_normalized_margin"]
+
+        lasso_cv.fit(x_train, y_train)
+
+        selected_feat = [feat for i, feat in enumerate(all_features) if ~np.isclose(lasso_cv.coef_, 0)[i]]
+
+        self.features = selected_feat
+
+
     def prepare_data(
         self, df: pd.DataFrame, center_features: bool = True, scale_features: bool = True, add_intercept: bool = True
     ) -> pd.DataFrame:

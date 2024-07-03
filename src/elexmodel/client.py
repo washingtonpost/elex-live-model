@@ -10,7 +10,7 @@ from elexmodel.handlers.data.CombinedData import CombinedDataHandler
 from elexmodel.handlers.data.ModelResults import ModelResultsHandler
 from elexmodel.handlers.data.PreprocessedData import PreprocessedDataHandler
 from elexmodel.logging import initialize_logging
-from elexmodel.models.BootstrapElectionModel import BootstrapElectionModel
+from elexmodel.models.BootstrapV2ElectionModel import BootstrapElectionModel
 from elexmodel.models.ConformalElectionModel import ConformalElectionModel
 from elexmodel.models.GaussianElectionModel import GaussianElectionModel
 from elexmodel.models.NonparametricElectionModel import NonparametricElectionModel
