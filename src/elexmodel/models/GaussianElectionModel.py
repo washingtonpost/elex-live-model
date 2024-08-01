@@ -174,7 +174,8 @@ class GaussianElectionModel(ConformalElectionModel):
                         "nonreporting_weight_sum": np.sum(x[f"last_election_results_{estimand}"]),
                         "nonreporting_weight_ssum": np.sum(np.power(x[f"last_election_results_{estimand}"], 2)),
                     }
-                )
+                ),
+                include_groups=False,
             )
             .reset_index(drop=False)
         )

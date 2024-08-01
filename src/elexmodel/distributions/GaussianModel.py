@@ -112,7 +112,8 @@ class GaussianModel:
                         "sigma_upper_bound": self.beta
                         * math_utils.boot_sigma(x.upper_bounds.values, conf=(3 + alpha) / 4, winsorize=self.winsorize),
                     }
-                )
+                ),
+                include_groups=False,
             )
             .reset_index(drop=drop_index)
         )
