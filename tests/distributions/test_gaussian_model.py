@@ -74,11 +74,14 @@ def test_get_n_units_per_group_simple():
 
     # we now test this per group
     units_per_group = gaussian_model._get_n_units_per_group(df1, df2, ["c1"])
+    # setting the index to check the values
+    # since there's no way to guarantee merge order
+    units_per_group = units_per_group.set_index("c1")
 
-    assert units_per_group.iloc[0]["n"] == 1.0
-    assert units_per_group.iloc[1]["n"] == 2.0
-    assert units_per_group.iloc[2]["n"] == 0.0  # d is third since merginging df2 onto df1 and 0.0 because not in df1
-    assert units_per_group.iloc[3]["n"] == 1.0
+    assert units_per_group.loc["a"]["n"] == 1.0
+    assert units_per_group.loc["b"]["n"] == 2.0
+    assert units_per_group.loc["c"]["n"] == 1.0
+    assert units_per_group.loc["d"]["n"] == 0.0  # d is 0.0 because not in df1
 
 
 def test_get_n_units_per_group(va_governor_precinct_data):
