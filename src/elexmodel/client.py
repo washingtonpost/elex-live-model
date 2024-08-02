@@ -516,7 +516,8 @@ class HistoricalModelClient(ModelClient):
                         x[f"raw_results_{estimand}"], x[f"pred_{estimand}"], type_="mape"
                     ),
                 }
-            )
+            ),
+            include_groups=False,
         )
 
         for alpha in prediction_intervals:
@@ -532,7 +533,8 @@ class HistoricalModelClient(ModelClient):
                             x[lower_string], x[upper_string], x[f"raw_results_{estimand}"]
                         ),
                     }
-                )
+                ),
+                include_groups=False,
             )
             error_df = error_df.merge(alpha_df, left_index=True, right_index=True)
 
