@@ -95,20 +95,6 @@ class Estimandizer:
         )
         return data_df
 
-    def add_weights(self, data_df, col_prefix):
-        data_df[f"{col_prefix}weights"] = data_df[f"{col_prefix}turnout"]
-        return data_df
-
-    def add_turnout_factor(self, data_df):
-        # posinf and neginf are also set to zero because dividing by zero can lead to nan/posinf/neginf depending
-        # on the type of the numeric in the numpy array. Assume that if baseline_weights is zero then turnout
-        # would be incredibly low in this election too (ie. this is effectively an empty precinct) and so setting
-        # the turnout factor to zero is fine
-        data_df["turnout_factor"] = np.nan_to_num(
-            data_df.results_weights / data_df.baseline_weights, nan=0, posinf=0, neginf=0
-        )
-        return data_df
-
 
 # custom estimands
 
