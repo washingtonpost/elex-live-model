@@ -324,8 +324,8 @@ class ModelClient:
                 f"Currently {n_reporting_expected_units} reporting, need at least {minimum_reporting_units_max}"
             )
 
-        units_by_count = reporting_units.groupby("geographic_unit_fips").size()
-        duplicate_units = units_by_count[units_by_count > 1].tolist()
+        units_by_count = reporting_units["geographic_unit_fips"].value_counts()
+        duplicate_units = units_by_count[units_by_count > 1].to_dict()
         if len(duplicate_units) > 0:
             raise ModelClientException(f"At least one unit appears twice: {duplicate_units}")
 
