@@ -4,7 +4,7 @@ import logging
 
 import numpy as np
 import pandas as pd
-from conditionalconformal import CondConf
+# from conditionalconformal import CondConf
 from elexsolver.OLSRegressionSolver import OLSRegressionSolver
 from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
 from elexsolver.LinearSolver import LinearSolver
@@ -458,7 +458,7 @@ class BootstrapElectionModel(BaseElectionModel):
             # since we are fitting many quantile regressions at the same time, our beta is
             # beta[tau, i] where tau stretches from 0.01 to 0.99
             betas = np.zeros((len(taus), x_train_aug.shape[1]))
-
+            import pdb; pdb.set_trace()
             if len(taus_lower) > 0:
                 qr_lower = QuantileRegressionSolver()
                 qr_lower.fit(x_train_aug, residuals_aug_lb, taus_lower, fit_intercept=False)
