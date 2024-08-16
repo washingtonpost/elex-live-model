@@ -114,5 +114,7 @@ def margin(data_df, col_prefix):
     generated_normalized_margin_column_name = f"{col_prefix}normalized_margin"
     data_df[generated_weights_column_name] = data_df[f"{col_prefix}dem"] + data_df[f"{col_prefix}gop"]
     data_df[generated_margin_column_name] = data_df[f"{col_prefix}dem"] - data_df[f"{col_prefix}gop"]
-    data_df[generated_normalized_margin_column_name] = data_df[f"{col_prefix}margin"] / data_df[f"{col_prefix}weights"]
+    data_df[generated_normalized_margin_column_name] = np.nan_to_num(
+        data_df[f"{col_prefix}margin"] / data_df[f"{col_prefix}weights"], nan=0, posinf=0, neginf=0
+    )
     return data_df, [generated_weights_column_name, generated_normalized_margin_column_name]
