@@ -1352,7 +1352,7 @@ class BootstrapElectionModel(BaseElectionModel):
         # we don't want the uncalled states to have a number to max/min
         # in order for those states to keep their original computed win probability
         called_states_sorted_vals[np.isclose(called_states_sorted_vals, -1)] = np.nan
-        
+
         # technically we do not need to do this division, since the margin
         # (ie. aggregate_error_B_1 and aggregate_error_B_2)
         # are enough to know who has won a contest (we don't need the normalized margin)
@@ -1413,22 +1413,17 @@ class BootstrapElectionModel(BaseElectionModel):
         # we max and min with the fewest possible seats that the LHS party might win (ie. the total number of ones that have
         # been called in their favor already) and we min with the highest possible seats that the LHS party might win (ie. the
         # total number of ones that have been called by the RHS party).
-        
+
         # this is the total number of 1s in called_states. Which is the number of contests called for the LHS party
         called_contests_lhs = np.nansum(called_states_sorted_vals)
         # since uncalled states are NaN in called_states_sorted_vals 1 - called_states_sorted_vals gives us a 1
         # for contests called for the RHS party. So this sum gives us the number of called contests for RHS
         called_contests_rhs = np.nansum(1 - called_states_sorted_vals)
 
+        # Our values should not be lower than the number of called
         agg_pred = min(max(aggregate_dem_vals_pred, called_contests_lhs), called_contests_rhs) + base_to_add
         agg_lower = min(max(interval_lower, called_contests_lhs), called_contests_rhs) + base_to_add
-        agg_upper = min(max(interval_upper, called_contests_lhs), called_contests_rhs)  + base_to_add
-        national_summary_estimates = {
-            "margin": [
-                agg_pred,
-                agg_lower,
-                agg_upper
-            ]
-        }
+        agg_upper = min(max(interval_upper, called_contests_lhs), called_contests_rhs) + base_to_add
+        national_summary_estimates = {"margin": [agg_pred, agg_lower, agg_upper]}
 
         return national_summary_estimates
