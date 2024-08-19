@@ -1420,7 +1420,9 @@ class BootstrapElectionModel(BaseElectionModel):
         # for contests called for the RHS party. So this sum gives us the number of called contests for RHS
         called_contests_rhs = np.nansum(1 - called_states_sorted_vals)
 
-        # Our values should not be lower than the number of called
+        # Since the values should be greater than the called_contests_lhs we max with that and since they
+        # should be less than the called_contests_rhs we min with that. Also we add  in the base to account
+        # for uncontested races.
         agg_pred = min(max(aggregate_dem_vals_pred, called_contests_lhs), called_contests_rhs) + base_to_add
         agg_lower = min(max(interval_lower, called_contests_lhs), called_contests_rhs) + base_to_add
         agg_upper = min(max(interval_upper, called_contests_lhs), called_contests_rhs) + base_to_add
