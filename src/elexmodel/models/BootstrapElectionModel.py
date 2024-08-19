@@ -1351,8 +1351,8 @@ class BootstrapElectionModel(BaseElectionModel):
         # since we max/min the state called values with contest win probabilities,
         # we don't want the uncalled states to have a number to max/min
         # in order for those states to keep their original computed win probability
-        called_states_sorted_vals[called_states_sorted_vals == -1] = np.nan
-
+        called_states_sorted_vals[np.isclose(called_states_sorted_vals, -1)] = np.nan
+        
         # technically we do not need to do this division, since the margin
         # (ie. aggregate_error_B_1 and aggregate_error_B_2)
         # are enough to know who has won a contest (we don't need the normalized margin)
@@ -1407,11 +1407,27 @@ class BootstrapElectionModel(BaseElectionModel):
         interval_upper, interval_lower = (
             aggregate_dem_vals_pred - np.quantile(aggregate_dem_vals_B, q=[lower_q, upper_q], axis=-1).T
         ).T
+
+        # There is the small chance that because we sampled both components of the difference (ie error_B_1 and error_B_2)
+        # that the values are off by 1 or 2 seats. To stop this from having effects on our prediction that are unreasonable
+        # we max and min with the fewest possible seats that the LHS party might win (ie. the total number of ones that have
+        # been called in their favor already) and we min with the highest possible seats that the LHS party might win (ie. the
+        # total number of ones that have been called by the RHS party).
+        
+        # this is the total number of 1s in called_states. Which is the number of contests called for the LHS party
+        called_contests_lhs = np.nansum(called_states_sorted_vals)
+        # since uncalled states are NaN in called_states_sorted_vals 1 - called_states_sorted_vals gives us a 1
+        # for contests called for the RHS party. So this sum gives us the number of called contests for RHS
+        called_contests_rhs = np.nansum(1 - called_states_sorted_vals)
+
+        agg_pred = min(max(aggregate_dem_vals_pred, called_contests_lhs), called_contests_rhs) + base_to_add
+        agg_lower = min(max(interval_lower, called_contests_lhs), called_contests_rhs) + base_to_add
+        agg_upper = min(max(interval_upper, called_contests_lhs), called_contests_rhs)  + base_to_add
         national_summary_estimates = {
             "margin": [
-                aggregate_dem_vals_pred + base_to_add,
-                interval_lower + base_to_add,
-                interval_upper + base_to_add,
+                agg_pred,
+                agg_lower,
+                agg_upper
             ]
         }
 
