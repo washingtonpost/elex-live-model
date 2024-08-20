@@ -1410,14 +1410,19 @@ class BootstrapElectionModel(BaseElectionModel):
 
         # There is the small chance that because we sampled both components of the difference (ie error_B_1 and error_B_2)
         # that the values are off by 1 or 2 seats. To stop this from having effects on our prediction that are unreasonable
-        # we max and min with the fewest possible seats that the LHS party might win (ie. the total number of ones that have
-        # been called in their favor already) and we min with the highest possible seats that the LHS party might win (ie. the
-        # total number of ones that have been called by the RHS party).
+        # we max and min with the fewest aggregate value that the LHS party might win (ie. the total number of contests that
+        # have already been called in their favor times the value of each contest) and we min with the highest possible aggregate
+        # value that the LHS party might win (ie. their current agg value plus the agg value of the uncontested races) 
 
-        # this is the total number of 1s in called_states. Which is the number of contests called for the LHS party
+        # this is the aggregate value of the LHS party that have been already called 
+        # ie. the sum of of the number of called contests in the LHS favor times the contests values
         called_values_lhs = np.nansum(called_states_sorted_vals * nat_sum_data_dict_sorted_vals)
+        # the total agg value of the LHS *could* get is either the total value they do have already called plus
+        # the value of the uncalled races. That is equal to the total value of all contests minus the the value 
+        # of the races that have been called by the RHS party. Which is what we compute here.
         # since uncalled states are NaN in called_states_sorted_vals 1 - called_states_sorted_vals gives us a 1
-        # for contests called for the RHS party. So this sum gives us the number of called contests for RHS
+        # for contests called for the RHS party, which we then multiply by the value of the contests. We subtract this
+        # by the total value of the contests.
         called_values_rhs = np.sum(nat_sum_data_dict_sorted_vals) - np.nansum((1 - called_states_sorted_vals) * nat_sum_data_dict_sorted_vals)
 
         # Since the values should be greater than the called_values_lhs we max with that and since they
