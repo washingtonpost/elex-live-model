@@ -1338,6 +1338,7 @@ class BootstrapElectionModel(BaseElectionModel):
                 f"called_states is of length {len(called_states)} but there are {self.aggregate_error_B_1.shape[0]} contests"
             )
 
+        # NOTE: This assumes that pd.get_dummies does alphabetical ordering
         # sort in order to get in the same order as the contests,
         # which have been sorted when getting dummies for aggregate indicators
         # in get_aggregate_prediction_intervals
