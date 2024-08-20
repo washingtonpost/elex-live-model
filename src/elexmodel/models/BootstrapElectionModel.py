@@ -2,6 +2,7 @@ from __future__ import annotations  # pylint: disable=too-many-lines
 
 import logging
 
+import math
 import numpy as np
 import pandas as pd
 from elexsolver.OLSRegressionSolver import OLSRegressionSolver
@@ -85,12 +86,19 @@ class BootstrapElectionModel(BaseElectionModel):
         self.rng = np.random.default_rng(seed=self.seed)  # used for sampling
         self.ran_bootstrap = False
 
+        self.called_states = {'VA-47': 0, 'VA-50': 0, 'VA-51': 0, 'VA-53': 0, 'VA-55': 1, 'VA-61': 0, 'VA-62': 0, 'VA-89': 0, 'VA-64': 0, 'VA-65': 1, 'VA-66': 0, 'VA-70': 1, 'VA-71': 0, 'VA-73': 0, 'VA-75': 0, 'VA-82': 0, 'VA-60': 0, 'VA-76': 1, 'VA-83': 0, 'VA-84': 1, 'VA-41': 0, 'VA-33': 0, 'VA-86': 0, 'VA-87': 1, 'VA-88': 1, 'VA-90': 0, 'VA-93': 1, 'VA-94': 1, 'VA-96': 1, 'VA-34': 0, 'VA-97': 1, 'VA-99': 0, 'VA-72': 0, 'VA-31': 0, 'VA-11': 1, 'VA-30': 0, 'VA-52': 0, 'VA-91': 1, 'VA-92': 1, 'VA-100': 0, 'VA-6': 1, 'VA-7': 1, 'VA-8': 1, 'VA-9': 1, 'VA-10': 1, 'VA-14': 1, 'VA-15': 1, 'VA-18': 1, 'VA-21': 1, 'VA-32': 0, 'VA-36': 0, 'VA-37': 0, 'VA-40': 0, 'VA-57': 0, 'VA-58': 1, 'VA-59': 0, 'VA-23': 1, 'VA-20': 1, 'VA-22': 0, 'VA-25': 1, 'VA-26': 1, 'VA-27': 1, 'VA-28': 1, 'VA-29': 1, 'VA-67': 0}
+        self.called_states['VA-82'] = -1.0
+        self.called_states['VA-41'] = -1.0
+        self.called_states['VA-21'] = -1.0
+        self.lhs_called_threshold = 0.005
+        self.rhs_called_threshold = -0.005
+
         # Assume that we have a baseline normalized margin
         # (D^{Y'} - R^{Y'}) / (D^{Y'} + R^{Y'}) is one of the covariates
         if "baseline_normalized_margin" not in self.features:
             raise BootstrapElectionModelException(
                 "baseline_normalized_margin not included as feature. This is necessary for the model to work."
-            )
+            )        
 
     def cv_lambda(
         self, x: np.ndarray, y: np.ndarray, lambdas_: np.ndarray, weights: np.ndarray | None = None, k: int = 5
@@ -1054,6 +1062,23 @@ class BootstrapElectionModel(BaseElectionModel):
             len(aggregate) == 2 and "postal_code" in aggregate and "district" in aggregate
         )
 
+    def _call_contest(self, to_call: np.array) -> np.array:
+        called_states_sorted = sorted(self.called_states.items())
+        called_states_min_max_values = np.asarray([self.lhs_called_threshold if y == 1 else self.rhs_called_threshold if y == 0 else math.nan for x, y in called_states_sorted]).reshape(-1, 1)
+
+        called = np.where(
+            np.isnan(called_states_min_max_values), 
+            to_call, 
+            np.where(
+                called_states_min_max_values == self.lhs_called_threshold, 
+                np.maximum(to_call, self.lhs_called_threshold), 
+                np.minimum(to_call, self.rhs_called_threshold)
+            )
+        )
+
+        return called
+
+
     def get_aggregate_predictions(
         self,
         reporting_units: pd.DataFrame,
@@ -1117,7 +1142,7 @@ class BootstrapElectionModel(BaseElectionModel):
         # to get the normalized margin for the aggregate
         # turnout prediction could be zero, in which case predicted margin is also zero,
         # so replace NaNs with zero in that case
-        raw_margin_df["pred_margin"] = np.nan_to_num(raw_margin_df.pred_margin / aggregate_z_total.flatten())
+        raw_margin_df["pred_margin"] = self._call_contest(np.nan_to_num(raw_margin_df.pred_margin / aggregate_z_total.flatten()).reshape(-1, 1))
         raw_margin_df["results_margin"] = np.nan_to_num(raw_margin_df.results_margin / aggregate_z_total.flatten())
         # if we are in the top level prediction, then save the aggregated baseline margin,
         # which we will need for the national summary (e.g. ecv) model
@@ -1257,12 +1282,12 @@ class BootstrapElectionModel(BaseElectionModel):
         aggregate_error_B_4 = aggregate_z_total_pred
 
         # (sum_{i = 1}^N w_i * \tilde_{y_i}^b * \tilde_{z_i}^b) /  (\sum_{i = 1}^N w_i * \tilde_{z_i}^b)
-        divided_error_B_1 = np.nan_to_num(aggregate_error_B_1 / aggregate_error_B_3)
+        divided_error_B_1 = self._call_contest(np.nan_to_num(aggregate_error_B_1 / aggregate_error_B_3))
 
         # (\sum_{i = 1}^N w_i * (\hat_{y_i} + \residual_{y, i}^b) *
         # (\hat{z_i} + \residual_{z, i}^b)) /
         # (\sum_{i = 1}^N w_i * (\hat{z_i} + \residual_{z, i}^b))
-        divided_error_B_2 = np.nan_to_num(aggregate_error_B_2 / aggregate_error_B_4)
+        divided_error_B_2 = self._call_contest(np.nan_to_num(aggregate_error_B_2 / aggregate_error_B_4))
 
         # subtract to get bootstrap error for estimate in our predictions
         aggregate_error_B = divided_error_B_1 - divided_error_B_2
@@ -1280,19 +1305,15 @@ class BootstrapElectionModel(BaseElectionModel):
         )
         # calculate normalized margin in the aggregate prediction
         # turnout prediction could be zero, so convert NaN -> 0
-        aggregate_perc_margin_total = np.nan_to_num(aggregate_yz_total / aggregate_z_total)
+        aggregate_perc_margin_total = self._call_contest(np.nan_to_num(aggregate_yz_total / aggregate_z_total).reshape(-1, 1))
 
         # saves the aggregate errors in case we want to generate somem form of national predictions (like ecv)
         if self._is_top_level_aggregate(aggregate):
-            self.aggregate_error_B_1 = aggregate_error_B_1
-            self.aggregate_error_B_2 = aggregate_error_B_2
-            self.aggregate_error_B_3 = aggregate_error_B_3
-            self.aggregate_error_B_4 = aggregate_error_B_4
+            self.divided_error_B_1 = divided_error_B_1
+            self.divided_error_B_2 = divided_error_B_2
             self.aggregate_perc_margin_total = aggregate_perc_margin_total
 
-        interval_upper, interval_lower = (
-            aggregate_perc_margin_total - np.quantile(aggregate_error_B, q=[lower_q, upper_q], axis=-1).T
-        ).T
+        interval_upper, interval_lower = (aggregate_perc_margin_total - np.quantile(divided_error_B_1 - divided_error_B_2, q=[lower_q, upper_q], axis=-1).T).T
         interval_upper = interval_upper.reshape(-1, 1)
         interval_lower = interval_lower.reshape(-1, 1)
 
@@ -1319,23 +1340,23 @@ class BootstrapElectionModel(BaseElectionModel):
         if nat_sum_data_dict is None:
             # the order does not matter since all contests have the same weight,
             # so we can use anything as the key when sorting
-            nat_sum_data_dict = {i: 1 for i in range(self.aggregate_error_B_1.shape[0])}
+            nat_sum_data_dict = {i: 1 for i in range(self.divided_error_B_1.shape[0])}
 
         # if we didn't pass the right number of national summary weights
         # (ie. the number of contests) then raise an exception
-        if len(nat_sum_data_dict) != self.aggregate_error_B_1.shape[0]:
+        if len(nat_sum_data_dict) != self.divided_error_B_1.shape[0]:
             raise BootstrapElectionModelException(
-                f"nat_sum_data_dict is of length {len(nat_sum_data_dict)} but there are {self.aggregate_error_B_1.shape[0]} contests"
+                f"nat_sum_data_dict is of length {len(nat_sum_data_dict)} but there are {self.divided_error_B_1.shape[0]} contests"
             )
 
         # called states is a dictionary where 1 means that the LHS party has one, 0 means that the RHS party has won
         # and -1 means that the state is not called. If called_states is None, assume that all states are not called.
         if called_states is None:
-            called_states = {i: -1 for i in range(self.aggregate_error_B_1.shape[0])}
+            called_states = {i: -1 for i in range(self.divided_error_B_1.shape[0])}
 
-        if len(called_states) != self.aggregate_error_B_1.shape[0]:
+        if len(called_states) != self.divided_error_B_1.shape[0]:
             raise BootstrapElectionModelException(
-                f"called_states is of length {len(called_states)} but there are {self.aggregate_error_B_1.shape[0]} contests"
+                f"called_states is of length {len(called_states)} but there are {self.divided_error_B_1.shape[0]} contests"
             )
 
         # NOTE: This assumes that pd.get_dummies does alphabetical ordering
@@ -1359,17 +1380,12 @@ class BootstrapElectionModel(BaseElectionModel):
         # are enough to know who has won a contest (we don't need the normalized margin)
         # but we normalize so that the temperature we use to set aggressiveness of sigmoid is in the right scale
 
-        # divided_error_B_1 = np.nan_to_num(self.aggregate_error_B_1 / self.aggregate_baseline_margin.reshape(-1, 1))
-        divided_error_B_1 = np.nan_to_num(self.aggregate_error_B_1 / self.aggregate_error_B_3)
-        # divided_error_B_2 = np.nan_to_num(self.aggregate_error_B_2 / self.aggregate_baseline_margin.reshape(-1, 1))
-        divided_error_B_2 = np.nan_to_num(self.aggregate_error_B_2 / self.aggregate_error_B_4)
-
         if self.hard_threshold:
-            aggregate_dem_prob_B_1 = divided_error_B_1 > 0.5
-            aggregate_dem_prob_B_1 = divided_error_B_2 > 0.5
+            aggregate_dem_prob_B_1 = self.divided_error_B_1 > 0.5
+            aggregate_dem_prob_B_1 = self.divided_error_B_2 > 0.5
         else:
-            aggregate_dem_prob_B_1 = expit(self.T * divided_error_B_1)
-            aggregate_dem_prob_B_2 = expit(self.T * divided_error_B_2)
+            aggregate_dem_prob_B_1 = expit(self.T * self.divided_error_B_1)
+            aggregate_dem_prob_B_2 = expit(self.T * self.divided_error_B_2)
 
         # since called_states_sorted_vals has value 1 if the state is called for the LHS party,
         # maxing the probabilities gives a probability of 1 for the LHS party
@@ -1377,16 +1393,16 @@ class BootstrapElectionModel(BaseElectionModel):
         # so mining with probabilities gives a probability of 0 for the LHS party
         # and called_states_sorted_vals has value np.nan if the state is uncalled,
         # since we use fmax/fmin the actual number and not nan gets propagated, so we maintain the probability
-        aggregate_dem_prob_B_1_called = np.fmin(
-            np.fmax(aggregate_dem_prob_B_1, called_states_sorted_vals), called_states_sorted_vals
-        )
-        aggregate_dem_prob_B_2_called = np.fmin(
-            np.fmax(aggregate_dem_prob_B_2, called_states_sorted_vals), called_states_sorted_vals
-        )
+        # aggregate_dem_prob_B_1_called = np.fmin(
+        #     np.fmax(aggregate_dem_prob_B_1, called_states_sorted_vals), called_states_sorted_vals
+        # )
+        # aggregate_dem_prob_B_2_called = np.fmin(
+        #     np.fmax(aggregate_dem_prob_B_2, called_states_sorted_vals), called_states_sorted_vals
+        # )
 
         # multiply by weights of each contest
-        aggregate_dem_vals_B_1 = nat_sum_data_dict_sorted_vals * aggregate_dem_prob_B_1_called
-        aggregate_dem_vals_B_2 = nat_sum_data_dict_sorted_vals * aggregate_dem_prob_B_2_called
+        aggregate_dem_vals_B_1 = nat_sum_data_dict_sorted_vals * aggregate_dem_prob_B_1
+        aggregate_dem_vals_B_2 = nat_sum_data_dict_sorted_vals * aggregate_dem_prob_B_2
 
         # calculate the error in our national aggregate prediction
         aggregate_dem_vals_B = np.sum(aggregate_dem_vals_B_1, axis=0) - np.sum(aggregate_dem_vals_B_2, axis=0)
@@ -1435,5 +1451,4 @@ class BootstrapElectionModel(BaseElectionModel):
         agg_lower = min(max(interval_lower, called_values_lhs), called_values_rhs) + base_to_add
         agg_upper = min(max(interval_upper, called_values_lhs), called_values_rhs) + base_to_add
         national_summary_estimates = {"margin": [agg_pred, agg_lower, agg_upper]}
-
         return national_summary_estimates
