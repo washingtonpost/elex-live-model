@@ -1415,17 +1415,17 @@ class BootstrapElectionModel(BaseElectionModel):
         # total number of ones that have been called by the RHS party).
 
         # this is the total number of 1s in called_states. Which is the number of contests called for the LHS party
-        called_contests_lhs = np.nansum(called_states_sorted_vals)
+        called_values_lhs = np.nansum(called_states_sorted_vals * nat_sum_data_dict_sorted_vals)
         # since uncalled states are NaN in called_states_sorted_vals 1 - called_states_sorted_vals gives us a 1
         # for contests called for the RHS party. So this sum gives us the number of called contests for RHS
-        called_contests_rhs = np.nansum(1 - called_states_sorted_vals)
+        called_values_rhs = np.sum(nat_sum_data_dict_sorted_vals) - np.nansum((1 - called_states_sorted_vals) * nat_sum_data_dict_sorted_vals)
 
-        # Since the values should be greater than the called_contests_lhs we max with that and since they
-        # should be less than the called_contests_rhs we min with that. Also we add  in the base to account
+        # Since the values should be greater than the called_values_lhs we max with that and since they
+        # should be less than the called_values_rhs we min with that. Also we add  in the base to account
         # for uncontested races.
-        agg_pred = min(max(aggregate_dem_vals_pred, called_contests_lhs), called_contests_rhs) + base_to_add
-        agg_lower = min(max(interval_lower, called_contests_lhs), called_contests_rhs) + base_to_add
-        agg_upper = min(max(interval_upper, called_contests_lhs), called_contests_rhs) + base_to_add
+        agg_pred = min(max(aggregate_dem_vals_pred, called_values_lhs), called_values_rhs) + base_to_add
+        agg_lower = min(max(interval_lower, called_values_lhs), called_values_rhs) + base_to_add
+        agg_upper = min(max(interval_upper, called_values_lhs), called_values_rhs) + base_to_add
         national_summary_estimates = {"margin": [agg_pred, agg_lower, agg_upper]}
 
         return national_summary_estimates
