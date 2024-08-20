@@ -1338,6 +1338,7 @@ class BootstrapElectionModel(BaseElectionModel):
                 f"called_states is of length {len(called_states)} but there are {self.aggregate_error_B_1.shape[0]} contests"
             )
 
+        # NOTE: This assumes that pd.get_dummies does alphabetical ordering
         # sort in order to get in the same order as the contests,
         # which have been sorted when getting dummies for aggregate indicators
         # in get_aggregate_prediction_intervals
@@ -1351,7 +1352,7 @@ class BootstrapElectionModel(BaseElectionModel):
         # since we max/min the state called values with contest win probabilities,
         # we don't want the uncalled states to have a number to max/min
         # in order for those states to keep their original computed win probability
-        called_states_sorted_vals[called_states_sorted_vals == -1] = np.nan
+        called_states_sorted_vals[np.isclose(called_states_sorted_vals, -1)] = np.nan
 
         # technically we do not need to do this division, since the margin
         # (ie. aggregate_error_B_1 and aggregate_error_B_2)
@@ -1407,12 +1408,32 @@ class BootstrapElectionModel(BaseElectionModel):
         interval_upper, interval_lower = (
             aggregate_dem_vals_pred - np.quantile(aggregate_dem_vals_B, q=[lower_q, upper_q], axis=-1).T
         ).T
-        national_summary_estimates = {
-            "margin": [
-                aggregate_dem_vals_pred + base_to_add,
-                interval_lower + base_to_add,
-                interval_upper + base_to_add,
-            ]
-        }
+
+        # There is the small chance that because we sampled both components of the difference (ie error_B_1 and error_B_2)
+        # that the values are off by 1 or 2 seats. To stop this from having effects on our prediction that are unreasonable
+        # we max and min with the fewest aggregate value that the LHS party might win (ie. the total number of contests that
+        # have already been called in their favor times the value of each contest) and we min with the highest possible aggregate
+        # value that the LHS party might win (ie. their current agg value plus the agg value of the uncontested races)
+
+        # this is the aggregate value of the LHS party that have been already called
+        # ie. the sum of of the number of called contests in the LHS favor times the contests values
+        called_values_lhs = np.nansum(called_states_sorted_vals * nat_sum_data_dict_sorted_vals)
+        # the total agg value of the LHS *could* get is either the total value they do have already called plus
+        # the value of the uncalled races. That is equal to the total value of all contests minus the the value
+        # of the races that have been called by the RHS party. Which is what we compute here.
+        # since uncalled states are NaN in called_states_sorted_vals 1 - called_states_sorted_vals gives us a 1
+        # for contests called for the RHS party, which we then multiply by the value of the contests. We subtract this
+        # by the total value of the contests.
+        called_values_rhs = np.sum(nat_sum_data_dict_sorted_vals) - np.nansum(
+            (1 - called_states_sorted_vals) * nat_sum_data_dict_sorted_vals
+        )
+
+        # Since the values should be greater than the called_values_lhs we max with that and since they
+        # should be less than the called_values_rhs we min with that. Also we add  in the base to account
+        # for uncontested races.
+        agg_pred = min(max(aggregate_dem_vals_pred, called_values_lhs), called_values_rhs) + base_to_add
+        agg_lower = min(max(interval_lower, called_values_lhs), called_values_rhs) + base_to_add
+        agg_upper = min(max(interval_upper, called_values_lhs), called_values_rhs) + base_to_add
+        national_summary_estimates = {"margin": [agg_pred, agg_lower, agg_upper]}
 
         return national_summary_estimates
