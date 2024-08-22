@@ -1069,7 +1069,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         # called_contests is a dictionary where 1 means that the LHS party has won, 0 means that the RHS party has won
         # and -1 means that the contest is not called. If called_contests is None, assume that all contests are not called.
-        if called_contests is None:
+        if called_contests is None or len(called_contests) == 0:
             called_contests = {i: -1 for i in range(to_call.shape[0])}
 
         if len(called_contests) != to_call.shape[0]:
