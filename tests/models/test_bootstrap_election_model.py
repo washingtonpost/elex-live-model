@@ -924,9 +924,12 @@ def test_get_national_summary_estimates(bootstrap_election_model, rng):
     bootstrap_election_model.aggregate_error_B_2 = rng.normal(scale=s, size=(n, B))
     bootstrap_election_model.aggregate_error_B_3 = rng.normal(scale=s, size=(n, B))
     bootstrap_election_model.aggregate_error_B_4 = rng.normal(scale=s, size=(n, B))
+    bootstrap_election_model.divided_error_B_1 = np.nan_to_num(bootstrap_election_model.aggregate_error_B_1 / bootstrap_election_model.aggregate_error_B_3)
+    bootstrap_election_model.divided_error_B_2 = np.nan_to_num(bootstrap_election_model.aggregate_error_B_2 / bootstrap_election_model.aggregate_error_B_4)
+
     bootstrap_election_model.aggregate_perc_margin_total = rng.normal(scale=s, size=(n, 1))
 
-    nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(None, None, 0, 0.95)
+    nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(None, 0, 0.95)
     assert "margin" in nat_sum_estimates
     assert len(nat_sum_estimates["margin"]) == 3
     assert nat_sum_estimates["margin"][0] >= nat_sum_estimates["margin"][1]
@@ -934,50 +937,19 @@ def test_get_national_summary_estimates(bootstrap_election_model, rng):
 
     # testing adding to base
     base_to_add = rng.random()
-    nat_sum_estimates_w_base = bootstrap_election_model.get_national_summary_estimates(None, None, base_to_add, 0.95)
+    nat_sum_estimates_w_base = bootstrap_election_model.get_national_summary_estimates(None, base_to_add, 0.95)
     assert nat_sum_estimates_w_base["margin"][0] == pytest.approx(nat_sum_estimates["margin"][0] + base_to_add)
     assert nat_sum_estimates_w_base["margin"][1] == pytest.approx(nat_sum_estimates["margin"][1] + base_to_add)
     assert nat_sum_estimates_w_base["margin"][2] == pytest.approx(nat_sum_estimates["margin"][2] + base_to_add)
 
-    # test calling races
-    states_called = {i: 1 for i in range(n)}
     nat_sum_data_dict = {i: 3 for i in range(n)}
     nat_sum_data_dict[1] = 7
-    nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(
-        nat_sum_data_dict, states_called, 0, 0.95
-    )
-    assert nat_sum_estimates["margin"][0] == pytest.approx(34)
-    assert nat_sum_estimates["margin"][1] == pytest.approx(34)
-    assert nat_sum_estimates["margin"][2] == pytest.approx(34)
 
-    states_called = {i: 0 for i in range(n)}
-    nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(
-        nat_sum_data_dict, states_called, 0, 0.95
-    )
-    assert nat_sum_estimates["margin"][0] == pytest.approx(0)
-    assert nat_sum_estimates["margin"][1] == pytest.approx(0)
-    assert nat_sum_estimates["margin"][2] == pytest.approx(0)
-
-    states_called = {i: 0 for i in range(n)}
-    states_called[1] = 1
-    nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(
-        nat_sum_data_dict, states_called, 0, 0.95
-    )
-    assert nat_sum_estimates["margin"][0] == pytest.approx(7)
-    assert nat_sum_estimates["margin"][1] == pytest.approx(7)
-    assert nat_sum_estimates["margin"][2] == pytest.approx(7)
-
-    # test exceptions
-    states_called = {i: 0 for i in range(n - 1)}
-    with pytest.raises(BootstrapElectionModelException):
-        nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(
-            nat_sum_data_dict, states_called, 0, 0.95
-        )
-
+    # test exception
     nat_sum_data_dict = {i: 3 for i in range(n - 1)}
     with pytest.raises(BootstrapElectionModelException):
         nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(
-            nat_sum_data_dict, states_called, 0, 0.95
+            nat_sum_data_dict, 0, 0.95
         )
 
 

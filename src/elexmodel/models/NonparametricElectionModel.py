@@ -128,6 +128,7 @@ class NonparametricElectionModel(ConformalElectionModel):
         alpha: float,
         unit_prediction_intervals: PredictionIntervals,
         estimand: str,
+        **kwargs,
     ) -> PredictionIntervals:
         """
         Get aggregate prediction intervals. In the non-parametric case prediction intervals just sum.

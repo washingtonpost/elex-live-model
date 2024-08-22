@@ -114,6 +114,7 @@ class GaussianElectionModel(ConformalElectionModel):
         alpha: float,
         unit_prediction_intervals: PredictionIntervals,
         estimand: str,
+        **kwargs
     ) -> PredictionIntervals:
         """
         Get aggregate prediction intervals. Adjust aggregate prediction intervals based on Gaussian models
