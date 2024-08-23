@@ -1220,6 +1220,22 @@ class BootstrapElectionModel(BaseElectionModel):
 
         return PredictionIntervals(interval_lower.round(decimals=0), interval_upper.round(decimals=0))
 
+    def _argquantile(self, data, q):
+        data = data.flatten()
+        quantile_value = np.quantile(data, q)
+
+        # Find the index of the quantile value in the sorted data
+        sorted_indices = np.argsort(data)
+        sorted_data = data[sorted_indices]
+
+        # Find the index in the sorted array that corresponds to the quantile value
+        quantile_index_in_sorted = np.searchsorted(sorted_data, quantile_value, side='left')
+
+        # Convert this index back to the index in the original array
+        argquantile_index = sorted_indices[quantile_index_in_sorted]
+
+        return argquantile_index
+
     def get_aggregate_prediction_intervals(
         self,
         reporting_units: pd.DataFrame,
@@ -1325,20 +1341,41 @@ class BootstrapElectionModel(BaseElectionModel):
         # turnout prediction could be zero, so convert NaN -> 0
         aggregate_perc_margin_total = np.nan_to_num(aggregate_yz_total / aggregate_z_total).reshape(-1, 1)
 
+        lower_q, upper_q = self._get_quantiles(alpha)
+
+
         # saves the aggregate errors in case we want to generate somem form of national predictions (like ecv)
         if self._is_top_level_aggregate(aggregate):
-            called_contests = kwargs.get("called_contests")
-            divided_error_B_1 = self._call_contests(divided_error_B_1, called_contests)
-            divided_error_B_2 = self._call_contests(divided_error_B_2, called_contests)
-            aggregate_perc_margin_total = self._call_contests(aggregate_perc_margin_total, called_contests)
+            called_contests = kwargs.get("called_contests")            
+            lower_quantile, upper_quantile = np.quantile(divided_error_B_1 - divided_error_B_2, q=[lower_q, upper_q], axis=-1)
+            interval_upper = aggregate_perc_margin_total - lower_quantile
+            interval_lower = aggregate_perc_margin_total - upper_quantile
+
+            divided_error_B_1_lower = divided_error_B_1
+            divided_error_B_1_upper = divided_error_B_1
+            if called_contests['VA'] == 1:
+                if interval_lower < 0:
+                    adjustment = upper_quantile - (aggregate_perc_margin_total - self.lhs_called_threshold)
+                    divided_error_B_1_lower = divided_error_B_1 - adjustment
+                if interval_upper < 0:
+                    adjustment = lower_quantile - (aggregate_perc_margin_total - self.lhs_called_threshold)
+                    divided_error_B_1_upper = divided_error_B_1 - adjustment
+            elif called_contests['VA'] == 0:
+                adjustment = (aggregate_perc_margin_total + self.lhs_called_threshold) - upper_adjust
+                divided_error_B_1 = divided_error_B_1 + adjustment
+
+            # divided_error_B_1 = self._call_contests(divided_error_B_1, called_contests)
+            # divided_error_B_2 = self._call_contests(divided_error_B_2, called_contests)
+            # aggregate_perc_margin_total = self._call_contests(aggregate_perc_margin_total, called_contests)
 
             self.divided_error_B_1 = divided_error_B_1
             self.divided_error_B_2 = divided_error_B_2
             self.aggregate_perc_margin_total = aggregate_perc_margin_total
 
-        lower_q, upper_q = self._get_quantiles(alpha)
+        interval_upper = (aggregate_perc_margin_total - np.quantile(divided_error_B_1_upper - divided_error_B_2, q=lower_q))
+        interval_lower = (aggregate_perc_margin_total - np.quantile(divided_error_B_1_lower - divided_error_B_2, q=upper_q))
 
-        interval_upper, interval_lower = (aggregate_perc_margin_total - np.quantile(divided_error_B_1 - divided_error_B_2, q=[lower_q, upper_q], axis=-1).T).T
+        # interval_upper, interval_lower = (aggregate_perc_margin_total - np.quantile(divided_error_B_1 - divided_error_B_2, q=[lower_q, upper_q], axis=-1).T).T
         interval_upper = interval_upper.reshape(-1, 1)
         interval_lower = interval_lower.reshape(-1, 1)
 
@@ -1382,6 +1419,7 @@ class BootstrapElectionModel(BaseElectionModel):
         nat_sum_data_dict_sorted_vals = np.asarray([x[1] for x in nat_sum_data_dict_sorted]).reshape(-1, 1)
 
         if self.hard_threshold:
+            # TODO: should this not be > 0 ???
             aggregate_dem_prob_B_1 = self.divided_error_B_1 > 0.5
             aggregate_dem_prob_B_1 = self.divided_error_B_2 > 0.5
         else:
