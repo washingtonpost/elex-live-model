@@ -1028,6 +1028,7 @@ class BootstrapElectionModel(BaseElectionModel):
         # and turn into turnout estimate
         self.weighted_z_test_pred = z_test_pred * weights_test
         self.ran_bootstrap = True
+        self.n_contests = aggregate_indicator.shape[1]
 
     def get_unit_predictions(
         self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, estimand: str, **kwargs
@@ -1060,43 +1061,33 @@ class BootstrapElectionModel(BaseElectionModel):
             len(aggregate) == 2 and "postal_code" in aggregate and "district" in aggregate
         )
 
-    def _call_contests(self, to_call: np.array, called_contests: dict) -> np.array:
+    def _call_contest(self, to_call: np.array, called_contests: dict) -> np.array:
         """
-        Function to call contests.
-        This takes bootstrap predictions and forces them to greater than or less than zero depending on how the race has been called
-        The function is agnostic to whether this is being applied to predictions or intervals
+        This functions applies race calls to the point prediction
         """
 
         # called_contests is a dictionary where 1 means that the LHS party has won, 0 means that the RHS party has won
         # and -1 means that the contest is not called. If called_contests is None, assume that all contests are not called.
         if called_contests is None or len(called_contests) == 0:
-            called_contests = {i: -1 for i in range(to_call.shape[0])}
+            called_contests = {i: -1 for i in range(self.n_contests)}
 
-        if len(called_contests) != to_call.shape[0]:
+        if len(called_contests) != self.n_contests:
             raise BootstrapElectionModelException(
-                f"called_states is of length {len(called_contests)} but there are {to_call.shape[0]} contests"
+                f"called_contests is of length {len(called_contests)} but there are {self.n_contests} contests"
             )
 
-        # If contest i is called for the LHS party (ie. called_contest[i] == 1), then the margin should be above zero so the prediction
-        # and intervals should always be greater then self.lhs_called_threshold
-        # If contest i is called for the RHS party (ie. called_contest[i] == 0), then the margin should be less than zero so the prediction
-        # and intervals should always be less than self.rhs_called_threshold
-        # if contest i is not called then we use math.nan
-        called_contests_sorted = sorted(called_contests.items())
-        called_contests_min_max_values = np.asarray([self.lhs_called_threshold if y == 1 else self.rhs_called_threshold if y == 0 else math.nan for x, y in called_contests_sorted]).reshape(-1, 1)
+        # array sorted by contest, where the element is the call indicator (1, 0 or -1)
+        contest_call_array =  np.array([contest_tuple[1] for contest_tuple in sorted(called_contests.items())])
 
-        called = np.where(
-            np.isnan(called_contests_min_max_values), 
+        return np.where(
+            np.isclose(contest_call_array, -1), 
             to_call, # if contest i is uncalled then we continue to use the value that was present before
             np.where(
-                called_contests_min_max_values == self.lhs_called_threshold, # if contest i is called for LHS party 
+                np.isclose(contest_call_array, 1), # if contest i is called for LHS party 
                 np.maximum(to_call, self.lhs_called_threshold), # then value is max of what is was and lhs_called_threshold
                 np.minimum(to_call, self.rhs_called_threshold) # in this case the contest is called for RHS party so the value should be min of what it was and rhs_called_threshold (min because negative)
+                )
             )
-        )
-
-        return called
-
 
     def get_aggregate_predictions(
         self,
@@ -1168,7 +1159,9 @@ class BootstrapElectionModel(BaseElectionModel):
         # which we will need for the national summary (e.g. ecv) model
         if self._is_top_level_aggregate(aggregate):
             called_contests = kwargs.get("called_contests")
-            raw_margin_df["pred_margin"] = self._call_contests(raw_margin_df.pred_margin.values.reshape(-1, 1), called_contests)
+            self.aggregate_pred_margin = self._call_contest(raw_margin_df.pred_margin, called_contests).reshape(-1, 1)
+            raw_margin_df["pred_margin"] = self.aggregate_pred_margin
+
             aggregate_sum = all_units.groupby(aggregate_temp_column_name).sum()
             self.aggregate_baseline_margin = (
                 (aggregate_sum.baseline_dem - aggregate_sum.baseline_gop) / (aggregate_sum.baseline_turnout + 1)
@@ -1220,21 +1213,6 @@ class BootstrapElectionModel(BaseElectionModel):
 
         return PredictionIntervals(interval_lower.round(decimals=0), interval_upper.round(decimals=0))
 
-    def _argquantile(self, data, q):
-        data = data.flatten()
-        quantile_value = np.quantile(data, q)
-
-        # Find the index of the quantile value in the sorted data
-        sorted_indices = np.argsort(data)
-        sorted_data = data[sorted_indices]
-
-        # Find the index in the sorted array that corresponds to the quantile value
-        quantile_index_in_sorted = np.searchsorted(sorted_data, quantile_value, side='left')
-
-        # Convert this index back to the index in the original array
-        argquantile_index = sorted_indices[quantile_index_in_sorted]
-
-        return argquantile_index
 
     def get_aggregate_prediction_intervals(
         self,
@@ -1343,39 +1321,34 @@ class BootstrapElectionModel(BaseElectionModel):
 
         lower_q, upper_q = self._get_quantiles(alpha)
 
-
         # saves the aggregate errors in case we want to generate somem form of national predictions (like ecv)
         if self._is_top_level_aggregate(aggregate):
-            called_contests = kwargs.get("called_contests")            
-            lower_quantile, upper_quantile = np.quantile(divided_error_B_1 - divided_error_B_2, q=[lower_q, upper_q], axis=-1)
-            interval_upper = aggregate_perc_margin_total - lower_quantile
-            interval_lower = aggregate_perc_margin_total - upper_quantile
+            aggregate_perc_margin_total = self.aggregate_pred_margin
 
-            divided_error_B_1_lower = divided_error_B_1
-            divided_error_B_1_upper = divided_error_B_1
-            if called_contests['VA'] == 1:
-                if interval_lower < 0:
-                    adjustment = upper_quantile - (aggregate_perc_margin_total - self.lhs_called_threshold)
-                    divided_error_B_1_lower = divided_error_B_1 - adjustment
-                if interval_upper < 0:
-                    adjustment = lower_quantile - (aggregate_perc_margin_total - self.lhs_called_threshold)
-                    divided_error_B_1_upper = divided_error_B_1 - adjustment
-            elif called_contests['VA'] == 0:
-                adjustment = (aggregate_perc_margin_total + self.lhs_called_threshold) - upper_adjust
-                divided_error_B_1 = divided_error_B_1 + adjustment
+            called_contests = kwargs.get("called_contests")
+            error_diff = divided_error_B_1 - divided_error_B_2
+            interval_upper, interval_lower = (aggregate_perc_margin_total - np.quantile(error_diff, q=[lower_q, upper_q], axis=-1).T).T
 
-            # divided_error_B_1 = self._call_contests(divided_error_B_1, called_contests)
-            # divided_error_B_2 = self._call_contests(divided_error_B_2, called_contests)
-            # aggregate_perc_margin_total = self._call_contests(aggregate_perc_margin_total, called_contests)
+            for i, (contest, call) in enumerate(called_contests.items()):
+                interval_lower_i = interval_lower[i]
+                interval_upper_i = interval_upper[i]
+                if call == 1:
+                    if interval_lower_i < 0:
+                        error_diff[i, error_diff[i] > 0] = (aggregate_perc_margin_total[i] - self.lhs_called_threshold).flatten()
+                        divided_error_B_1[i, divided_error_B_1[i] < 0] = self.lhs_called_threshold
+                        divided_error_B_2[i, divided_error_B_2[i] < 0] = self.lhs_called_threshold
+                        divided_error_B_2[i, (error_diff[i] < 0) & (divided_error_B_2[i] < 0)] += error_diff[i, (error_diff[i] < 0) & (divided_error_B_2[i] < 0)]
+                elif call == 0:
+                    if interval_upper_i > 0:
+                        error_diff[i, error_diff[i] < 0] = (self.rhs_called_threshold - aggregate_perc_margin_total[i]).flatten()
+                        divided_error_B_1[i, divided_error_B_1[i] > 0] = self.rhs_called_threshold
+                        divided_error_B_2[i, divided_error_B_2[i] > 0] = self.rhs_called_threshold
+                        divided_error_B_2[i, (error_diff[i] > 0) & (divided_error_B_2[i] > 0)] += error_diff[i, (error_diff[i] > 0) & (divided_error_B_2[i] > 0)]
 
             self.divided_error_B_1 = divided_error_B_1
             self.divided_error_B_2 = divided_error_B_2
-            self.aggregate_perc_margin_total = aggregate_perc_margin_total
 
-        interval_upper = (aggregate_perc_margin_total - np.quantile(divided_error_B_1_upper - divided_error_B_2, q=lower_q))
-        interval_lower = (aggregate_perc_margin_total - np.quantile(divided_error_B_1_lower - divided_error_B_2, q=upper_q))
-
-        # interval_upper, interval_lower = (aggregate_perc_margin_total - np.quantile(divided_error_B_1 - divided_error_B_2, q=[lower_q, upper_q], axis=-1).T).T
+        interval_upper, interval_lower = (aggregate_perc_margin_total - np.quantile(error_diff, q=[lower_q, upper_q], axis=-1).T).T
         interval_upper = interval_upper.reshape(-1, 1)
         interval_lower = interval_lower.reshape(-1, 1)
 
@@ -1419,9 +1392,8 @@ class BootstrapElectionModel(BaseElectionModel):
         nat_sum_data_dict_sorted_vals = np.asarray([x[1] for x in nat_sum_data_dict_sorted]).reshape(-1, 1)
 
         if self.hard_threshold:
-            # TODO: should this not be > 0 ???
-            aggregate_dem_prob_B_1 = self.divided_error_B_1 > 0.5
-            aggregate_dem_prob_B_1 = self.divided_error_B_2 > 0.5
+            aggregate_dem_prob_B_1 = self.divided_error_B_1 > 0
+            aggregate_dem_prob_B_1 = self.divided_error_B_2 > 0
         else:
             aggregate_dem_prob_B_1 = expit(self.T * self.divided_error_B_1)
             aggregate_dem_prob_B_2 = expit(self.T * self.divided_error_B_2)
@@ -1435,9 +1407,9 @@ class BootstrapElectionModel(BaseElectionModel):
 
         # we also need a national aggregate point prediction
         if self.hard_threshold:
-            aggregate_dem_probs_total = self.aggregate_perc_margin_total > 0.5
+            aggregate_dem_probs_total = self.aggregate_pred_margin > 0.5
         else:
-            aggregate_dem_probs_total = expit(self.T * self.aggregate_perc_margin_total)
+            aggregate_dem_probs_total = expit(self.T * self.aggregate_pred_margin)
 
         aggregate_dem_vals_pred = np.sum(nat_sum_data_dict_sorted_vals * aggregate_dem_probs_total)
 
