@@ -1329,26 +1329,35 @@ class BootstrapElectionModel(BaseElectionModel):
             error_diff = divided_error_B_1 - divided_error_B_2
             interval_upper, interval_lower = (aggregate_perc_margin_total - np.quantile(error_diff, q=[lower_q, upper_q], axis=-1).T).T
 
-            for i, (contest, call) in enumerate(called_contests.items()):
+
+            for i, (contest, call) in enumerate(sorted(called_contests.items(), key=lambda x: x[0])):
                 interval_lower_i = interval_lower[i]
                 interval_upper_i = interval_upper[i]
                 if call == 1:
                     if interval_lower_i < 0:
+                        # if a contest has been called for the LHS party but the interval_lower is below zero (ie. our model does not think that this is called)
+                        # error_diff > 0 means that lower bound is smaller than the prediction, so for those we set the error_diff to be the gap between the prediction
+                        # and the imposed lower bound. This forces the difference between the error_diff and the prediction to be exactly the imposed lower bound
                         error_diff[i, error_diff[i] > 0] = (aggregate_perc_margin_total[i] - self.lhs_called_threshold).flatten()
-                        divided_error_B_1[i, divided_error_B_1[i] < 0] = self.lhs_called_threshold
-                        divided_error_B_2[i, divided_error_B_2[i] < 0] = self.lhs_called_threshold
-                        divided_error_B_2[i, (error_diff[i] < 0) & (divided_error_B_2[i] < 0)] += error_diff[i, (error_diff[i] < 0) & (divided_error_B_2[i] < 0)]
+                    # for error_B_1 and error_B_2 we can set all of them to the imposed lower bound, because we no longer care about doing inference on the intervals
+                    # ie. the winner is fixed now so we no longer care about doing inference on the margin
+                    # NOTE: we cannot do this for error_diff because we still want the upper bound in case to be what it would be without the race call
+                    divided_error_B_1[i, :] = self.lhs_called_threshold
+                    divided_error_B_2[i, :] = self.lhs_called_threshold
                 elif call == 0:
                     if interval_upper_i > 0:
+                        # if a contest has been called for the RHS party but the interval_upper is larger than zero (ie. our model does not think this is called)
+                        # error_diff < 0 means that the upper bound is larger than the prediction, so for those we set error_diff to be the gap between the prediction
+                        # and the imposed upper bound. This forces the difference between the error diff and the prediction to be the imposed upper bound
                         error_diff[i, error_diff[i] < 0] = (self.rhs_called_threshold - aggregate_perc_margin_total[i]).flatten()
-                        divided_error_B_1[i, divided_error_B_1[i] > 0] = self.rhs_called_threshold
-                        divided_error_B_2[i, divided_error_B_2[i] > 0] = self.rhs_called_threshold
-                        divided_error_B_2[i, (error_diff[i] > 0) & (divided_error_B_2[i] > 0)] += error_diff[i, (error_diff[i] > 0) & (divided_error_B_2[i] > 0)]
+                    divided_error_B_1[i, :] = self.rhs_called_threshold
+                    divided_error_B_2[i, :] = self.rhs_called_threshold
 
             self.divided_error_B_1 = divided_error_B_1
             self.divided_error_B_2 = divided_error_B_2
 
         interval_upper, interval_lower = (aggregate_perc_margin_total - np.quantile(error_diff, q=[lower_q, upper_q], axis=-1).T).T
+
         interval_upper = interval_upper.reshape(-1, 1)
         interval_lower = interval_lower.reshape(-1, 1)
 
@@ -1393,7 +1402,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         if self.hard_threshold:
             aggregate_dem_prob_B_1 = self.divided_error_B_1 > 0
-            aggregate_dem_prob_B_1 = self.divided_error_B_2 > 0
+            aggregate_dem_prob_B_2 = self.divided_error_B_2 > 0
         else:
             aggregate_dem_prob_B_1 = expit(self.T * self.divided_error_B_1)
             aggregate_dem_prob_B_2 = expit(self.T * self.divided_error_B_2)
@@ -1419,8 +1428,16 @@ class BootstrapElectionModel(BaseElectionModel):
             aggregate_dem_vals_pred - np.quantile(aggregate_dem_vals_B, q=[lower_q, upper_q], axis=-1).T
         ).T
 
-        agg_pred = aggregate_dem_vals_pred + base_to_add
-        agg_lower = interval_lower + base_to_add
-        agg_upper = interval_upper + base_to_add
+        # B_1 and B_2 outcomes should respect called races
+        # because we create independent samples for B_1 and B_2 their difference can exaggerate the possible outcomes
+        # in the predicted lower and upper bounds.
+        # to undo this, we take the lower bound for B_1 and B_2 and the upper bound for B_1 and B_2 to max/min those 
+        # with the predicted lower and upper bounds.
+        lower_bound = min(aggregate_dem_vals_B_1.sum(axis=0).min(), aggregate_dem_vals_B_2.sum(axis=0).min())
+        upper_bound = max(aggregate_dem_vals_B_1.sum(axis=0).max(), aggregate_dem_vals_B_2.sum(axis=0).max())
+
+        agg_pred = round(aggregate_dem_vals_pred + base_to_add, 2)
+        agg_lower = round(max(interval_lower, lower_bound) + base_to_add, 2)
+        agg_upper = round(min(interval_upper, upper_bound) + base_to_add, 2)
         national_summary_estimates = {"margin": [agg_pred, agg_lower, agg_upper]}
         return national_summary_estimates
