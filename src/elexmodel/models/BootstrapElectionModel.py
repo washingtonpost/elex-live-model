@@ -1321,12 +1321,13 @@ class BootstrapElectionModel(BaseElectionModel):
 
         lower_q, upper_q = self._get_quantiles(alpha)
 
+        error_diff = divided_error_B_1 - divided_error_B_2
+
         # saves the aggregate errors in case we want to generate somem form of national predictions (like ecv)
         if self._is_top_level_aggregate(aggregate):
             aggregate_perc_margin_total = self.aggregate_pred_margin
 
             called_contests = kwargs.get("called_contests")
-            error_diff = divided_error_B_1 - divided_error_B_2
             interval_upper, interval_lower = (aggregate_perc_margin_total - np.quantile(error_diff, q=[lower_q, upper_q], axis=-1).T).T
 
 
