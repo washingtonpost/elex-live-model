@@ -360,7 +360,7 @@ class ModelClient:
                     results_handler.unexpected_units,
                     aggregate_list,
                     estimand,
-                    called_contests=called_contests
+                    called_contests=called_contests,
                 )
                 alpha_to_agg_prediction_intervals = {}
                 for alpha in prediction_intervals:
@@ -372,7 +372,7 @@ class ModelClient:
                         alpha,
                         alpha_to_unit_prediction_intervals[alpha],
                         estimand,
-                        called_contests=called_contests
+                        called_contests=called_contests,
                     )
                     if isinstance(self.model, ConformalElectionModel):
                         self.all_conformalization_data_agg_dict[alpha][

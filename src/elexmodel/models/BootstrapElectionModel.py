@@ -2,7 +2,6 @@ from __future__ import annotations  # pylint: disable=too-many-lines
 
 import logging
 
-import math
 import numpy as np
 import pandas as pd
 from elexsolver.OLSRegressionSolver import OLSRegressionSolver
@@ -96,7 +95,7 @@ class BootstrapElectionModel(BaseElectionModel):
         if "baseline_normalized_margin" not in self.features:
             raise BootstrapElectionModelException(
                 "baseline_normalized_margin not included as feature. This is necessary for the model to work."
-            )        
+            )
 
     def cv_lambda(
         self, x: np.ndarray, y: np.ndarray, lambdas_: np.ndarray, weights: np.ndarray | None = None, k: int = 5
@@ -1078,7 +1077,7 @@ class BootstrapElectionModel(BaseElectionModel):
         called_contest_acceptable_values = {0, 1, -1}
         if not all(value in called_contest_acceptable_values for value in called_contests.values()):
             raise BootstrapElectionModelException(
-                f"called_contest values need to be either 0, 1, or -1. But current value is {called_contest}"
+                f"called_contest values need to be either 0, 1, or -1. But current value is {called_contests}"
             )
 
         return called_contests
@@ -1091,17 +1090,21 @@ class BootstrapElectionModel(BaseElectionModel):
         called_contests = self._format_called_contests_dictionary(called_contests)
 
         # array sorted by contest, where the element is the call indicator (1, 0 or -1)
-        contest_call_array =  np.array([contest_tuple[1] for contest_tuple in sorted(called_contests.items())])
+        contest_call_array = np.array([contest_tuple[1] for contest_tuple in sorted(called_contests.items())])
 
         return np.where(
-            np.isclose(contest_call_array, -1), 
-            to_call, # if contest i is uncalled then we continue to use the value that was present before
+            np.isclose(contest_call_array, -1),
+            to_call,  # if contest i is uncalled then we continue to use the value that was present before
             np.where(
-                np.isclose(contest_call_array, 1), # if contest i is called for LHS party 
-                np.maximum(to_call, self.lhs_called_threshold), # then value is max of what is was and lhs_called_threshold
-                np.minimum(to_call, self.rhs_called_threshold) # in this case the contest is called for RHS party so the value should be min of what it was and rhs_called_threshold (min because negative)
-                )
-            )
+                np.isclose(contest_call_array, 1),  # if contest i is called for LHS party
+                np.maximum(
+                    to_call, self.lhs_called_threshold
+                ),  # then value is max of what is was and lhs_called_threshold
+                np.minimum(
+                    to_call, self.rhs_called_threshold
+                ),  # in this case the contest is called for RHS party so the value should be min of what it was and rhs_called_threshold (min because negative)
+            ),
+        )
 
     def get_aggregate_predictions(
         self,
@@ -1110,7 +1113,7 @@ class BootstrapElectionModel(BaseElectionModel):
         unexpected_units: pd.DataFrame,
         aggregate: list,
         estimand: str,
-        **kwargs: dict
+        **kwargs: dict,
     ) -> pd.DataFrame:
         """
         Generates and returns the normalized margin for arbitrary aggregates
@@ -1167,7 +1170,9 @@ class BootstrapElectionModel(BaseElectionModel):
         # to get the normalized margin for the aggregate
         # turnout prediction could be zero, in which case predicted margin is also zero,
         # so replace NaNs with zero in that case
-        raw_margin_df["pred_margin"] = np.nan_to_num(raw_margin_df.pred_margin / aggregate_z_total.flatten()).reshape(-1, 1)
+        raw_margin_df["pred_margin"] = np.nan_to_num(raw_margin_df.pred_margin / aggregate_z_total.flatten()).reshape(
+            -1, 1
+        )
         raw_margin_df["results_margin"] = np.nan_to_num(raw_margin_df.results_margin / aggregate_z_total.flatten())
         # if we are in the top level prediction, then save the aggregated baseline margin,
         # which we will need for the national summary (e.g. ecv) model
@@ -1227,7 +1232,6 @@ class BootstrapElectionModel(BaseElectionModel):
 
         return PredictionIntervals(interval_lower.round(decimals=0), interval_upper.round(decimals=0))
 
-
     def get_aggregate_prediction_intervals(
         self,
         reporting_units: pd.DataFrame,
@@ -1237,7 +1241,7 @@ class BootstrapElectionModel(BaseElectionModel):
         alpha: float,
         unit_prediction_intervals: PredictionIntervals,
         estimand: str,
-        **kwargs: dict
+        **kwargs: dict,
     ) -> PredictionIntervals:
         """
         Generate and return aggregate prediction intervals for arbitrary aggregates
@@ -1342,8 +1346,9 @@ class BootstrapElectionModel(BaseElectionModel):
             aggregate_perc_margin_total = self.aggregate_pred_margin
 
             called_contests = self._format_called_contests_dictionary(kwargs.get("called_contests", {}))
-            interval_upper, interval_lower = (aggregate_perc_margin_total - np.quantile(error_diff, q=[lower_q, upper_q], axis=-1).T).T
-
+            interval_upper, interval_lower = (
+                aggregate_perc_margin_total - np.quantile(error_diff, q=[lower_q, upper_q], axis=-1).T
+            ).T
 
             for i, (contest, call) in enumerate(sorted(called_contests.items(), key=lambda x: x[0])):
                 interval_lower_i = interval_lower[i]
@@ -1353,7 +1358,9 @@ class BootstrapElectionModel(BaseElectionModel):
                         # if a contest has been called for the LHS party but the interval_lower is below zero (ie. our model does not think that this is called)
                         # error_diff > 0 means that lower bound is smaller than the prediction, so for those we set the error_diff to be the gap between the prediction
                         # and the imposed lower bound. This forces the difference between the error_diff and the prediction to be exactly the imposed lower bound
-                        error_diff[i, error_diff[i] > 0] = (aggregate_perc_margin_total[i] - self.lhs_called_threshold).flatten()
+                        error_diff[i, error_diff[i] > 0] = (
+                            aggregate_perc_margin_total[i] - self.lhs_called_threshold
+                        ).flatten()
                     # for error_B_1 and error_B_2 we can set all of them to the imposed lower bound, because we no longer care about doing inference on the intervals
                     # ie. the winner is fixed now so we no longer care about doing inference on the margin
                     # NOTE: we cannot do this for error_diff because we still want the upper bound in case to be what it would be without the race call
@@ -1364,23 +1371,25 @@ class BootstrapElectionModel(BaseElectionModel):
                         # if a contest has been called for the RHS party but the interval_upper is larger than zero (ie. our model does not think this is called)
                         # error_diff < 0 means that the upper bound is larger than the prediction, so for those we set error_diff to be the gap between the prediction
                         # and the imposed upper bound. This forces the difference between the error diff and the prediction to be the imposed upper bound
-                        error_diff[i, error_diff[i] < 0] = (self.rhs_called_threshold - aggregate_perc_margin_total[i]).flatten()
+                        error_diff[i, error_diff[i] < 0] = (
+                            self.rhs_called_threshold - aggregate_perc_margin_total[i]
+                        ).flatten()
                     divided_error_B_1[i, :] = self.rhs_called_threshold
                     divided_error_B_2[i, :] = self.rhs_called_threshold
 
             self.divided_error_B_1 = divided_error_B_1
             self.divided_error_B_2 = divided_error_B_2
 
-        interval_upper, interval_lower = (aggregate_perc_margin_total - np.quantile(error_diff, q=[lower_q, upper_q], axis=-1).T).T
+        interval_upper, interval_lower = (
+            aggregate_perc_margin_total - np.quantile(error_diff, q=[lower_q, upper_q], axis=-1).T
+        ).T
 
         interval_upper = interval_upper.reshape(-1, 1)
         interval_lower = interval_lower.reshape(-1, 1)
 
         return PredictionIntervals(interval_lower, interval_upper)
 
-    def get_national_summary_estimates(
-        self, nat_sum_data_dict: dict, base_to_add: int | float, alpha: float
-    ) -> list:
+    def get_national_summary_estimates(self, nat_sum_data_dict: dict, base_to_add: int | float, alpha: float) -> list:
         """
         Generates and returns a national summary estimate (ie. electoral votes or total number of senate seats).
         This function does both the point prediction and the lower and upper estimates.
@@ -1446,7 +1455,7 @@ class BootstrapElectionModel(BaseElectionModel):
         # B_1 and B_2 outcomes should respect called races
         # because we create independent samples for B_1 and B_2 their difference can exaggerate the possible outcomes
         # in the predicted lower and upper bounds.
-        # to undo this, we take the lower bound for B_1 and B_2 and the upper bound for B_1 and B_2 to max/min those 
+        # to undo this, we take the lower bound for B_1 and B_2 and the upper bound for B_1 and B_2 to max/min those
         # with the predicted lower and upper bounds.
         lower_bound = min(aggregate_dem_vals_B_1.sum(axis=0).min(), aggregate_dem_vals_B_2.sum(axis=0).min())
         upper_bound = max(aggregate_dem_vals_B_1.sum(axis=0).max(), aggregate_dem_vals_B_2.sum(axis=0).max())

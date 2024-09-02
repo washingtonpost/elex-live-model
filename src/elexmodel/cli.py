@@ -53,11 +53,7 @@ class PythonLiteralOption(click.Option):
     help="A dictionary of model parameters",
 )
 @click.option(
-    "--called_contests",
-    "called_contests",
-    default="{}",
-    cls=PythonLiteralOption,
-    help="A dictionary with race calls"
+    "--called_contests", "called_contests", default="{}", cls=PythonLiteralOption, help="A dictionary with race calls"
 )
 @click.option(
     "--percent_reporting",
