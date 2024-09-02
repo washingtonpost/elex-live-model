@@ -1061,11 +1061,10 @@ class BootstrapElectionModel(BaseElectionModel):
             len(aggregate) == 2 and "postal_code" in aggregate and "district" in aggregate
         )
 
-    def _call_contest(self, to_call: np.array, called_contests: dict) -> np.array:
+    def _format_called_contests_dictionary(self, called_contests: dict | None) -> dict:
         """
-        This functions applies race calls to the point prediction
+        Make sure that the called contest dictionary has the correct format
         """
-
         # called_contests is a dictionary where 1 means that the LHS party has won, 0 means that the RHS party has won
         # and -1 means that the contest is not called. If called_contests is None, assume that all contests are not called.
         if called_contests is None or len(called_contests) == 0:
@@ -1075,6 +1074,21 @@ class BootstrapElectionModel(BaseElectionModel):
             raise BootstrapElectionModelException(
                 f"called_contests is of length {len(called_contests)} but there are {self.n_contests} contests"
             )
+
+        called_contest_acceptable_values = {0, 1, -1}
+        if not all(value in called_contest_acceptable_values for value in called_contests.values()):
+            raise BootstrapElectionModelException(
+                f"called_contest values need to be either 0, 1, or -1. But current value is {called_contest}"
+            )
+
+        return called_contests
+
+    def _call_contest(self, to_call: np.array, called_contests: dict) -> np.array:
+        """
+        This functions applies race calls to the point prediction
+        """
+
+        called_contests = self._format_called_contests_dictionary(called_contests)
 
         # array sorted by contest, where the element is the call indicator (1, 0 or -1)
         contest_call_array =  np.array([contest_tuple[1] for contest_tuple in sorted(called_contests.items())])
@@ -1327,7 +1341,7 @@ class BootstrapElectionModel(BaseElectionModel):
         if self._is_top_level_aggregate(aggregate):
             aggregate_perc_margin_total = self.aggregate_pred_margin
 
-            called_contests = kwargs.get("called_contests")
+            called_contests = self._format_called_contests_dictionary(kwargs.get("called_contests", {}))
             interval_upper, interval_lower = (aggregate_perc_margin_total - np.quantile(error_diff, q=[lower_q, upper_q], axis=-1).T).T
 
 

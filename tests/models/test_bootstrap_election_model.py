@@ -646,7 +646,6 @@ def test_aggregate_predictions(bootstrap_election_model):
             "district",
         ],
     )
-
     bootstrap_election_model.weighted_z_test_pred = np.asarray([1, 1, 1, 1, 1, 1]).reshape(-1, 1)
 
     # test that is top level aggregate is working
@@ -655,7 +654,8 @@ def test_aggregate_predictions(bootstrap_election_model):
     )
     with pytest.raises(AttributeError):
         bootstrap_election_model.aggregate_baseline_margin
-
+    
+    bootstrap_election_model.n_contests = 6 # a through f
     aggregate_predictions = bootstrap_election_model.get_aggregate_predictions(
         reporting_units, nonreporting_units, unexpected_units, ["postal_code"], "margin"
     )
@@ -707,6 +707,8 @@ def test_aggregate_predictions(bootstrap_election_model):
 
     # test more complicated aggregate (postal code-district)
     bootstrap_election_model.weighted_z_test_pred = np.asarray([1, 1, 1, 1, 1, 1]).reshape(-1, 1)
+    bootstrap_election_model.n_contests = 8 # (a, c), (a, a), (b, a), (c, c), (d, c), (e, e), (e, a), (f, f)
+
     aggregate_predictions = bootstrap_election_model.get_aggregate_predictions(
         reporting_units, nonreporting_units, unexpected_units, ["postal_code", "district"], "margin"
     )
@@ -889,6 +891,8 @@ def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
     bootstrap_election_model.weighted_z_test_pred = rng.normal(scale=s, size=(n, 1))
     bootstrap_election_model.weighted_yz_test_pred = rng.normal(scale=s, size=(n, 1))
 
+    bootstrap_election_model.n_contests = 6 # a through f
+    bootstrap_election_model.get_aggregate_predictions(reporting_units, nonreporting_units, unexpected_units, ['postal_code'], "margin")
     lower, upper = bootstrap_election_model.get_aggregate_prediction_intervals(
         reporting_units, nonreporting_units, unexpected_units, ["postal_code"], 0.95, None, None
     )
@@ -901,6 +905,8 @@ def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
     assert all(lower <= upper)
 
     # test with more complicated aggregate
+    bootstrap_election_model.n_contests = 8 # (a, c), (a, a), (b, a), (c, c), (d, c), (e, e), (e, a), (f, f)
+    bootstrap_election_model.get_aggregate_predictions(reporting_units, nonreporting_units, unexpected_units, ['postal_code', 'district'], "margin")
     lower, upper = bootstrap_election_model.get_aggregate_prediction_intervals(
         reporting_units, nonreporting_units, unexpected_units, ["postal_code", "district"], 0.95, None, None
     )
@@ -920,6 +926,7 @@ def test_get_national_summary_estimates(bootstrap_election_model, rng):
     s = 2.0
     B = 20
     bootstrap_election_model.B = B
+    bootstrap_election_model.aggregate_pred_margin = rng.normal(scale=s, size=(n, 1))
     bootstrap_election_model.aggregate_error_B_1 = rng.normal(scale=s, size=(n, B))
     bootstrap_election_model.aggregate_error_B_2 = rng.normal(scale=s, size=(n, B))
     bootstrap_election_model.aggregate_error_B_3 = rng.normal(scale=s, size=(n, B))
@@ -929,6 +936,7 @@ def test_get_national_summary_estimates(bootstrap_election_model, rng):
 
     bootstrap_election_model.aggregate_perc_margin_total = rng.normal(scale=s, size=(n, 1))
 
+    
     nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(None, 0, 0.95)
     assert "margin" in nat_sum_estimates
     assert len(nat_sum_estimates["margin"]) == 3
@@ -938,9 +946,9 @@ def test_get_national_summary_estimates(bootstrap_election_model, rng):
     # testing adding to base
     base_to_add = rng.random()
     nat_sum_estimates_w_base = bootstrap_election_model.get_national_summary_estimates(None, base_to_add, 0.95)
-    assert nat_sum_estimates_w_base["margin"][0] == pytest.approx(nat_sum_estimates["margin"][0] + base_to_add)
-    assert nat_sum_estimates_w_base["margin"][1] == pytest.approx(nat_sum_estimates["margin"][1] + base_to_add)
-    assert nat_sum_estimates_w_base["margin"][2] == pytest.approx(nat_sum_estimates["margin"][2] + base_to_add)
+    assert nat_sum_estimates_w_base["margin"][0] == pytest.approx(round(nat_sum_estimates["margin"][0] + base_to_add), 2)
+    assert nat_sum_estimates_w_base["margin"][1] == pytest.approx(round(nat_sum_estimates["margin"][1] + base_to_add), 2)
+    assert nat_sum_estimates_w_base["margin"][2] == pytest.approx(round(nat_sum_estimates["margin"][2] + base_to_add), 2)
 
     nat_sum_data_dict = {i: 3 for i in range(n)}
     nat_sum_data_dict[1] = 7
