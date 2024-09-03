@@ -169,9 +169,6 @@ class ModelClient:
         raw_aggregate_list = base_aggregate + [aggregate]
         return sorted(list(set(raw_aggregate_list)), key=lambda x: AGGREGATE_ORDER.index(x))
 
-    def get_national_summary_votes_estimates(self, nat_sum_data_dict=None, called_states={}, base_to_add=0, alpha=0.99):
-        return self.model.get_national_summary_estimates(nat_sum_data_dict, called_states, base_to_add, alpha)
-
     def get_estimates(
         self,
         current_data,  # list of lists
@@ -385,8 +382,10 @@ class ModelClient:
         results_handler.process_final_results()
 
         if national_summary:
-            # TODO: parameters for self.get_national_summary_votes_estimates()
-            nat_sum_estimates = self.get_national_summary_votes_estimates(nat_sum_data_dict=None, called_states=None)
+            # TODO: arguments for self.model.get_national_summary_estimates
+            nat_sum_estimates = self.model.get_national_summary_estimates(
+                nat_sum_data_dict=None, called_states=None, base_to_add=0, alpha=0.99
+            )
             results_handler.add_national_summary_estimates(nat_sum_estimates)
 
         if APP_ENV != "local" and save_results:
