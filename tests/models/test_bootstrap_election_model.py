@@ -712,6 +712,7 @@ def test_aggregate_predictions(bootstrap_election_model):
             "district",
         ],
     )
+
     bootstrap_election_model.weighted_z_test_pred = np.asarray([1, 1, 1, 1, 1, 1]).reshape(-1, 1)
 
     # test that is top level aggregate is working
@@ -758,6 +759,23 @@ def test_aggregate_predictions(bootstrap_election_model):
     assert aggregate_predictions[aggregate_predictions.postal_code == "d"].reporting[3] == pytest.approx(0)
     assert aggregate_predictions[aggregate_predictions.postal_code == "e"].reporting[4] == pytest.approx(0)
     assert aggregate_predictions[aggregate_predictions.postal_code == "f"].reporting[5] == pytest.approx(0)
+
+    # test with a race call
+    called_contests = {x: 1 for x in range(bootstrap_election_model.n_contests)}
+    aggregate_predictions = bootstrap_election_model.get_aggregate_predictions(
+        reporting_units, nonreporting_units, unexpected_units, ["postal_code"], "margin", called_contests=called_contests
+    )
+    assert (aggregate_predictions.pred_margin >= bootstrap_election_model.lhs_called_threshold).all()
+    assert aggregate_predictions.pred_margin.iloc[0] == bootstrap_election_model.lhs_called_threshold # since otherwise would be negative
+    assert aggregate_predictions.pred_margin.iloc[1] == pytest.approx(0.9 / 2) # should not have changed
+
+    called_contests = {x: 0 for x in range(bootstrap_election_model.n_contests)}
+    aggregate_predictions = bootstrap_election_model.get_aggregate_predictions(
+        reporting_units, nonreporting_units, unexpected_units, ["postal_code"], "margin", called_contests=called_contests
+    )
+    assert (aggregate_predictions.pred_margin <= bootstrap_election_model.rhs_called_threshold).all()
+    assert aggregate_predictions.pred_margin.iloc[0] == pytest.approx(-2.6 / 4) # should not have changed
+    assert aggregate_predictions.pred_margin.iloc[1] == bootstrap_election_model.rhs_called_threshold # since otherwise positive
 
     # test more complicated z predictions
     bootstrap_election_model.weighted_z_test_pred = np.asarray([2, 3, 1, 1, 1, 1]).reshape(-1, 1)
@@ -833,9 +851,22 @@ def test_aggregate_predictions(bootstrap_election_model):
     # test with a race call
     called_contests = {x: 1 for x in range(bootstrap_election_model.n_contests)}
     aggregate_predictions = bootstrap_election_model.get_aggregate_predictions(
-        reporting_units, nonreporting_units, unexpected_units, ["postal_code", "district"], "margin", called_contests
+        reporting_units, nonreporting_units, unexpected_units, ["postal_code", "district"], "margin", called_contests=called_contests
     )
-    assert (aggregate_predictions.pred_margin > bootstrap_election_model.lhs_called_threshold).all()
+    assert (aggregate_predictions.pred_margin >= bootstrap_election_model.lhs_called_threshold).all()
+    assert aggregate_predictions.pred_margin.iloc[0] == bootstrap_election_model.lhs_called_threshold # since otherwise would be zero
+    assert aggregate_predictions.pred_margin.iloc[1] == bootstrap_election_model.lhs_called_threshold # since otherwise would be negative
+    assert aggregate_predictions.pred_margin.iloc[2] == pytest.approx(0.9 / 2) # should not have changed
+
+
+    called_contests = {x: 0 for x in range(bootstrap_election_model.n_contests)}
+    aggregate_predictions = bootstrap_election_model.get_aggregate_predictions(
+        reporting_units, nonreporting_units, unexpected_units, ["postal_code", "district"], "margin", called_contests=called_contests
+    )
+    assert (aggregate_predictions.pred_margin <= bootstrap_election_model.rhs_called_threshold).all()
+    assert aggregate_predictions.pred_margin.iloc[0] == bootstrap_election_model.rhs_called_threshold # since otherwise would be zero
+    assert aggregate_predictions.pred_margin.iloc[1] == pytest.approx(-2.6 / 3) # should not have changed
+    assert aggregate_predictions.pred_margin.iloc[2] == bootstrap_election_model.rhs_called_threshold # since otherwise would be greater than zero
 
 def test_get_quantile(bootstrap_election_model):
     bootstrap_election_model.B = 1000
