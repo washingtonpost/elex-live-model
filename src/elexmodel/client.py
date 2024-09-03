@@ -383,9 +383,7 @@ class ModelClient:
 
         if national_summary:
             # TODO: arguments for self.model.get_national_summary_estimates
-            nat_sum_estimates = self.model.get_national_summary_estimates(
-                nat_sum_data_dict=None, called_states=None, base_to_add=0, alpha=0.99
-            )
+            nat_sum_estimates = self.model.get_national_summary_estimates(None, None, 0, 0.99)
             results_handler.add_national_summary_estimates(nat_sum_estimates)
 
         if APP_ENV != "local" and save_results:
