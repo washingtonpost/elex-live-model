@@ -25,6 +25,7 @@ class ModelResultsHandler:
         self.aggregates = [agg for agg in aggregates if agg != "unit"]
         self.estimates = {agg: [] for agg in self.aggregates}
         self.unit_data = {}
+        self.final_results = {}
 
         self.reporting_units = reporting_units
         self.nonreporting_units = nonreporting_units
@@ -93,7 +94,6 @@ class ModelResultsHandler:
         """
         Create final data frames of results
         """
-        self.final_results = {}
         for agg in self.aggregates:
             merge_on = ["postal_code", "reporting", agg]
             # joins together dfs of the same level of aggregation (different estimands)
@@ -105,6 +105,20 @@ class ModelResultsHandler:
             self.final_results["unit_data"] = reduce(
                 lambda x, y: pd.merge(x, y, how="inner", on=merge_on), self.unit_data.values()
             )
+
+    def add_national_summary_estimates(self, national_summary_dict):
+        df = pd.DataFrame(
+            [
+                {
+                    "estimand": e,
+                    "agg_pred": national_summary_dict[e][0],
+                    "agg_lower": national_summary_dict[e][1],
+                    "agg_upper": national_summary_dict[e][2],
+                }
+                for e in national_summary_dict
+            ]
+        )
+        self.final_results["nat_sum_data"] = df
 
     def write_data(self, election_id, office, geographic_unit_type):
         """

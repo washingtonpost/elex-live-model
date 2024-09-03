@@ -207,6 +207,7 @@ class ModelClient:
         # saving conformalization data only makes sense if a ConformalElectionModel is used
         save_conformalization = "conformalization" in save_output
         handle_unreporting = kwargs.get("handle_unreporting", "drop")
+        national_summary = kwargs.get("national_summary", False)
 
         district_election = False
         if office in {"H", "Y", "Z"}:
@@ -382,6 +383,12 @@ class ModelClient:
                 )
 
         results_handler.process_final_results()
+
+        if national_summary:
+            # TODO: parameters for self.get_national_summary_votes_estimates()
+            nat_sum_estimates = self.get_national_summary_votes_estimates(nat_sum_data_dict=None, called_states=None)
+            results_handler.add_national_summary_estimates(nat_sum_estimates)
+
         if APP_ENV != "local" and save_results:
             results_handler.write_data(election_id, office, geographic_unit_type)
 
