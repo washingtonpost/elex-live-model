@@ -578,6 +578,67 @@ def test_is_top_level_aggregate(bootstrap_election_model):
     assert not bootstrap_election_model._is_top_level_aggregate(["county_fips"])
     assert not bootstrap_election_model._is_top_level_aggregate([])
 
+def test_format_called_contests_dictionary(bootstrap_election_model, rng):
+    n_contests = 10
+    bootstrap_election_model.n_contests = n_contests
+
+    # test that if dictionary is None or empty, the functions returns with entirely -1 values
+    called_contests = bootstrap_election_model._format_called_contests_dictionary(None)
+    assert len(called_contests) == n_contests
+    assert all(x == -1 for x in called_contests.values())
+
+    called_contests = bootstrap_election_model._format_called_contests_dictionary({})
+    assert len(called_contests) == n_contests
+    assert all(x == -1 for x in called_contests.values())
+
+    # test that if too few contests are passed it breaks
+    called_contests_break = {x: -1 for x in range(n_contests - 1)}
+    with pytest.raises(BootstrapElectionModelException):
+        bootstrap_election_model._format_called_contests_dictionary(called_contests_break)
+
+    # test that if too many contests are passed it breaks
+    called_contests_break = {x: -1 for x in range(n_contests + 1)}
+    with pytest.raises(BootstrapElectionModelException):
+        bootstrap_election_model._format_called_contests_dictionary(called_contests_break)
+
+    # test that if something isn't 0, 1 or -1 passed it fails
+    called_contests_break = {x: -1 for x in range(4)}
+    called_contests_break[4] = 3
+    with pytest.raises(BootstrapElectionModelException):
+        bootstrap_election_model._format_called_contests_dictionary(called_contests_break)
+
+    # this should just work
+    called_contests = {x: rng.choice([0, 1, -1], size=None, replace=True) for x in range(n_contests)}
+    assert called_contests == bootstrap_election_model._format_called_contests_dictionary(called_contests)
+
+    # perturbed should also work because using isclose
+    called_contests = {x: rng.choice([0, 1, -1], size=None, replace=True) + 1e-15 for x in range(n_contests)}
+    assert called_contests == bootstrap_election_model._format_called_contests_dictionary(called_contests)
+
+
+def test_call_contest(bootstrap_election_model, rng):
+    s = 2
+    n_contests = 10
+    bootstrap_election_model.n_contests = n_contests
+
+    called_contests = {x: -1 for x in range(n_contests)}
+    called_contests[0] = 1 + 1e-35 # test isclose
+    called_contests[1] = 1
+    called_contests[2] += 1e-35
+    called_contests[n_contests - 2] = 0 - 1e35
+    called_contests[n_contests - 1] = 0
+
+    to_call = np.asarray([0.3, -0.3, 0.2, -0.4, 0.15, -0.25, 0.86, -0.74, -0.3, 0.3])
+
+    called = bootstrap_election_model._call_contest(to_call, called_contests)
+    assert called.shape == (n_contests, )
+    assert called[0] == to_call[0] # since called for LHS and positive should remain the same
+    assert called[1] == bootstrap_election_model.lhs_called_threshold # since called for LHS but negative should be replaced
+    assert called[2] == to_call[2] # since uncalled should remain the same
+    assert called[3] == to_call[3] # since uncalled should remain the same
+
+    assert called[-2] == to_call[-2] # since called for RHS and negative this should not change
+    assert called[-1] == bootstrap_election_model.rhs_called_threshold # since called for RHS but positive should be repalced
 
 def test_aggregate_predictions(bootstrap_election_model):
     reporting_units = pd.DataFrame(
