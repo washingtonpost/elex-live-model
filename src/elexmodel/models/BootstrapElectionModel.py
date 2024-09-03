@@ -1076,7 +1076,11 @@ class BootstrapElectionModel(BaseElectionModel):
             )
 
         called_contest_acceptable_values = {0, 1, -1}
-        if not all(any(math.isclose(value, acceptable_value) for acceptable_value in called_contest_acceptable_values) in called_contest_acceptable_values for value in called_contests.values()):
+        if not all(
+            any(math.isclose(value, acceptable_value) for acceptable_value in called_contest_acceptable_values)
+            in called_contest_acceptable_values
+            for value in called_contests.values()
+        ):
             raise BootstrapElectionModelException(
                 f"called_contest values need to be either 0, 1, or -1. But current value is {called_contests}"
             )

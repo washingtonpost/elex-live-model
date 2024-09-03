@@ -578,6 +578,7 @@ def test_is_top_level_aggregate(bootstrap_election_model):
     assert not bootstrap_election_model._is_top_level_aggregate(["county_fips"])
     assert not bootstrap_election_model._is_top_level_aggregate([])
 
+
 def test_format_called_contests_dictionary(bootstrap_election_model, rng):
     n_contests = 10
     bootstrap_election_model.n_contests = n_contests
@@ -617,12 +618,11 @@ def test_format_called_contests_dictionary(bootstrap_election_model, rng):
 
 
 def test_call_contest(bootstrap_election_model, rng):
-    s = 2
     n_contests = 10
     bootstrap_election_model.n_contests = n_contests
 
     called_contests = {x: -1 for x in range(n_contests)}
-    called_contests[0] = 1 + 1e-35 # test isclose
+    called_contests[0] = 1 + 1e-35  # test isclose
     called_contests[1] = 1
     called_contests[2] += 1e-35
     called_contests[n_contests - 2] = 0 - 1e35
@@ -631,14 +631,19 @@ def test_call_contest(bootstrap_election_model, rng):
     to_call = np.asarray([0.3, -0.3, 0.2, -0.4, 0.15, -0.25, 0.86, -0.74, -0.3, 0.3])
 
     called = bootstrap_election_model._call_contest(to_call, called_contests)
-    assert called.shape == (n_contests, )
-    assert called[0] == to_call[0] # since called for LHS and positive should remain the same
-    assert called[1] == bootstrap_election_model.lhs_called_threshold # since called for LHS but negative should be replaced
-    assert called[2] == to_call[2] # since uncalled should remain the same
-    assert called[3] == to_call[3] # since uncalled should remain the same
+    assert called.shape == (n_contests,)
+    assert called[0] == to_call[0]  # since called for LHS and positive should remain the same
+    assert (
+        called[1] == bootstrap_election_model.lhs_called_threshold
+    )  # since called for LHS but negative should be replaced
+    assert called[2] == to_call[2]  # since uncalled should remain the same
+    assert called[3] == to_call[3]  # since uncalled should remain the same
 
-    assert called[-2] == to_call[-2] # since called for RHS and negative this should not change
-    assert called[-1] == bootstrap_election_model.rhs_called_threshold # since called for RHS but positive should be repalced
+    assert called[-2] == to_call[-2]  # since called for RHS and negative this should not change
+    assert (
+        called[-1] == bootstrap_election_model.rhs_called_threshold
+    )  # since called for RHS but positive should be repalced
+
 
 def test_aggregate_predictions(bootstrap_election_model):
     reporting_units = pd.DataFrame(
@@ -825,6 +830,12 @@ def test_aggregate_predictions(bootstrap_election_model):
         (aggregate_predictions.postal_code == "f") & (aggregate_predictions.district == "f")
     ].reporting[7] == pytest.approx(0)
 
+    # test with a race call
+    called_contests = {x: 1 for x in range(bootstrap_election_model.n_contests)}
+    aggregate_predictions = bootstrap_election_model.get_aggregate_predictions(
+        reporting_units, nonreporting_units, unexpected_units, ["postal_code", "district"], "margin", called_contests
+    )
+    assert (aggregate_predictions.pred_margin > bootstrap_election_model.lhs_called_threshold).all()
 
 def test_get_quantile(bootstrap_election_model):
     bootstrap_election_model.B = 1000
