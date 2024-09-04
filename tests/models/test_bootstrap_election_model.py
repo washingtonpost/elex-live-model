@@ -1050,7 +1050,7 @@ def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
         ["postal_code"],
         "margin",
         called_contests=called_contests,
-    ) # race calling for aggregate prediction interval assumes that the point prediction has been set accordingly
+    )  # race calling for aggregate prediction interval assumes that the point prediction has been set accordingly
     lower, upper = bootstrap_election_model.get_aggregate_prediction_intervals(
         reporting_units,
         nonreporting_units,
@@ -1074,7 +1074,7 @@ def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
         ["postal_code"],
         "margin",
         called_contests=called_contests,
-    ) # race calling for aggregate prediction interval assumes that the point prediction has been set accordingly
+    )  # race calling for aggregate prediction interval assumes that the point prediction has been set accordingly
     lower, upper = bootstrap_election_model.get_aggregate_prediction_intervals(
         reporting_units,
         nonreporting_units,
@@ -1190,27 +1190,17 @@ def test_get_national_summary_estimates(bootstrap_election_model, rng):
     bootstrap_election_model.errors_B_2 = rng.normal(scale=s, size=(n, B))
     bootstrap_election_model.errors_B_3 = rng.normal(scale=s, size=(n, B))
     bootstrap_election_model.errors_B_4 = rng.normal(scale=s, size=(n, B))
-    
+
     bootstrap_election_model.weighted_z_test_pred = rng.normal(scale=s, size=(n, 1))
     bootstrap_election_model.weighted_yz_test_pred = rng.normal(scale=s, size=(n, 1))
 
     bootstrap_election_model.n_contests = 6
 
     bootstrap_election_model.get_aggregate_predictions(
-        reporting_units,
-        nonreporting_units,
-        unexpected_units,
-        ["postal_code"],
-        "margin"
-    ) # race calling for aggregate prediction interval assumes that the point prediction has been set accordingly
+        reporting_units, nonreporting_units, unexpected_units, ["postal_code"], "margin"
+    )  # race calling for aggregate prediction interval assumes that the point prediction has been set accordingly
     lower, upper = bootstrap_election_model.get_aggregate_prediction_intervals(
-        reporting_units,
-        nonreporting_units,
-        unexpected_units,
-        ["postal_code"],
-        0.95,
-        None,
-        None
+        reporting_units, nonreporting_units, unexpected_units, ["postal_code"], 0.95, None, None
     )
 
     nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(None, 0, 0.95)
@@ -1219,19 +1209,18 @@ def test_get_national_summary_estimates(bootstrap_election_model, rng):
     assert nat_sum_estimates["margin"][0] >= nat_sum_estimates["margin"][1]
     assert nat_sum_estimates["margin"][0] <= nat_sum_estimates["margin"][2]
 
-
     # adding race call
     called_contests = {x: 1 for x in range(bootstrap_election_model.n_contests)}
     called_contests[0] = -1
     called_contests[1] = -1
-    pred = bootstrap_election_model.get_aggregate_predictions(
+    bootstrap_election_model.get_aggregate_predictions(
         reporting_units,
         nonreporting_units,
         unexpected_units,
         ["postal_code"],
         "margin",
         called_contests=called_contests,
-    ) # race calling for aggregate prediction interval assumes that the point prediction has been set accordingly
+    )  # race calling for aggregate prediction interval assumes that the point prediction has been set accordingly
     lower, upper = bootstrap_election_model.get_aggregate_prediction_intervals(
         reporting_units,
         nonreporting_units,
@@ -1243,21 +1232,21 @@ def test_get_national_summary_estimates(bootstrap_election_model, rng):
         called_contests=called_contests,
     )
     nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(None, 0, 0.95)
-    assert nat_sum_estimates['margin'][0] == 5 # the 4 called ones plus the second one
-    assert nat_sum_estimates['margin'][1] == 4 # the 4 called ones
-    assert nat_sum_estimates['margin'][2] == 6 # all of them
+    assert nat_sum_estimates["margin"][0] == 5  # the 4 called ones plus the second one
+    assert nat_sum_estimates["margin"][1] == 4  # the 4 called ones
+    assert nat_sum_estimates["margin"][2] == 6  # all of them
 
     called_contests = {x: 0 for x in range(bootstrap_election_model.n_contests)}
     called_contests[0] = -1
     called_contests[1] = -1
-    pred = bootstrap_election_model.get_aggregate_predictions(
+    bootstrap_election_model.get_aggregate_predictions(
         reporting_units,
         nonreporting_units,
         unexpected_units,
         ["postal_code"],
         "margin",
         called_contests=called_contests,
-    ) # race calling for aggregate prediction interval assumes that the point prediction has been set accordingly
+    )  # race calling for aggregate prediction interval assumes that the point prediction has been set accordingly
     lower, upper = bootstrap_election_model.get_aggregate_prediction_intervals(
         reporting_units,
         nonreporting_units,
@@ -1269,10 +1258,9 @@ def test_get_national_summary_estimates(bootstrap_election_model, rng):
         called_contests=called_contests,
     )
     nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(None, 0, 0.95)
-    assert nat_sum_estimates['margin'][0] == 1 # the 2nd one, only not called for RHS
-    assert nat_sum_estimates['margin'][1] == 0 # might lose the 2nd one also
-    assert nat_sum_estimates['margin'][2] == 2 # 2nd and first
-
+    assert nat_sum_estimates["margin"][0] == 1  # the 2nd one, only not called for RHS
+    assert nat_sum_estimates["margin"][1] == 0  # might lose the 2nd one also
+    assert nat_sum_estimates["margin"][2] == 2  # 2nd and first
 
     # testing adding to base
     base_to_add = rng.random()
