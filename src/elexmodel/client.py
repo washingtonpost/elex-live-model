@@ -41,6 +41,7 @@ class ModelClient:
         self.all_conformalization_data_unit_dict = defaultdict(dict)
         self.all_conformalization_data_agg_dict = defaultdict(dict)
         self.model = None
+        self.results_handler = None
 
     def _check_input_parameters(
         self,
@@ -169,6 +170,34 @@ class ModelClient:
         raw_aggregate_list = base_aggregate + [aggregate]
         return sorted(list(set(raw_aggregate_list)), key=lambda x: AGGREGATE_ORDER.index(x))
 
+    def get_national_summary_votes_estimates(
+        self, nat_sum_data_dict=None, called_states=None, base_to_add=0, alpha=0.99
+    ):
+        if self.model is None:
+            raise ModelClientException(
+                "Must call the get_estimands() method before get_national_summary_votes_estimates()."
+            )
+
+        if "nat_sum_data" in self.results_handler.final_results:
+            nat_sum_estimates = (
+                self.results_handler.final_results["nat_sum_data"].set_index("estimand").to_dict(orient="index")
+            )
+            nat_sum_estimates = {
+                e: [
+                    nat_sum_estimates[e]["agg_pred"],
+                    nat_sum_estimates[e]["agg_lower"],
+                    nat_sum_estimates[e]["agg_upper"],
+                ]
+                for e in nat_sum_estimates
+            }
+        else:
+            nat_sum_estimates = self.model.get_national_summary_estimates(
+                nat_sum_data_dict, called_states, base_to_add, alpha
+            )
+            self.results_handler.add_national_summary_estimates(nat_sum_estimates)
+
+        return nat_sum_estimates
+
     def get_estimates(
         self,
         current_data,  # list of lists
@@ -204,7 +233,13 @@ class ModelClient:
         # saving conformalization data only makes sense if a ConformalElectionModel is used
         save_conformalization = "conformalization" in save_output
         handle_unreporting = kwargs.get("handle_unreporting", "drop")
+
         national_summary = kwargs.get("national_summary", False)
+        if national_summary:
+            nat_sum_data_dict = kwargs.get("nat_sum_data_dict", None)
+            called_states = kwargs.get("called_states", None)
+            base_to_add = kwargs.get("base_to_add", 0)
+            alpha = kwargs.get("alpha", 0.99)
 
         district_election = False
         if office in {"H", "Y", "Z"}:
@@ -327,7 +362,7 @@ class ModelClient:
         if len(duplicate_units) > 0:
             raise ModelClientException(f"At least one unit appears twice: {duplicate_units}")
 
-        results_handler = ModelResultsHandler(
+        self.results_handler = ModelResultsHandler(
             aggregates, prediction_intervals, reporting_units, nonreporting_units, unexpected_units
         )
 
@@ -335,35 +370,35 @@ class ModelClient:
             unit_predictions, unit_turnout_predictions = self.model.get_unit_predictions(
                 reporting_units, nonreporting_units, estimand, unexpected_units=unexpected_units
             )
-            results_handler.add_unit_predictions(estimand, unit_predictions, unit_turnout_predictions)
+            self.results_handler.add_unit_predictions(estimand, unit_predictions, unit_turnout_predictions)
             # gets prediciton intervals for each alpha
             alpha_to_unit_prediction_intervals = {}
             for alpha in prediction_intervals:
                 alpha_to_unit_prediction_intervals[alpha] = self.model.get_unit_prediction_intervals(
-                    results_handler.reporting_units, results_handler.nonreporting_units, alpha, estimand
+                    self.results_handler.reporting_units, self.results_handler.nonreporting_units, alpha, estimand
                 )
                 if isinstance(self.model, ConformalElectionModel):
                     self.all_conformalization_data_unit_dict[alpha][
                         estimand
                     ] = self.model.get_all_conformalization_data_unit()
 
-            results_handler.add_unit_intervals(estimand, alpha_to_unit_prediction_intervals)
+            self.results_handler.add_unit_intervals(estimand, alpha_to_unit_prediction_intervals)
 
-            for aggregate in results_handler.aggregates:
+            for aggregate in self.results_handler.aggregates:
                 aggregate_list = self.get_aggregate_list(office, aggregate)
                 estimates_df = self.model.get_aggregate_predictions(
-                    results_handler.reporting_units,
-                    results_handler.nonreporting_units,
-                    results_handler.unexpected_units,
+                    self.results_handler.reporting_units,
+                    self.results_handler.nonreporting_units,
+                    self.results_handler.unexpected_units,
                     aggregate_list,
                     estimand,
                 )
                 alpha_to_agg_prediction_intervals = {}
                 for alpha in prediction_intervals:
                     alpha_to_agg_prediction_intervals[alpha] = self.model.get_aggregate_prediction_intervals(
-                        results_handler.reporting_units,
-                        results_handler.nonreporting_units,
-                        results_handler.unexpected_units,
+                        self.results_handler.reporting_units,
+                        self.results_handler.nonreporting_units,
+                        self.results_handler.unexpected_units,
                         aggregate_list,
                         alpha,
                         alpha_to_unit_prediction_intervals[alpha],
@@ -375,21 +410,19 @@ class ModelClient:
                         ] = self.model.get_all_conformalization_data_agg()
 
                 # get all of the prediction intervals here
-                results_handler.add_agg_predictions(
+                self.results_handler.add_agg_predictions(
                     estimand, aggregate, estimates_df, alpha_to_agg_prediction_intervals
                 )
 
-        results_handler.process_final_results()
+        self.results_handler.process_final_results()
 
         if national_summary:
-            # TODO: arguments for self.model.get_national_summary_estimates
-            nat_sum_estimates = self.model.get_national_summary_estimates(None, None, 0, 0.99)
-            results_handler.add_national_summary_estimates(nat_sum_estimates)
+            self.get_national_summary_votes_estimates(nat_sum_data_dict, called_states, base_to_add, alpha)
 
         if APP_ENV != "local" and save_results:
-            results_handler.write_data(election_id, office, geographic_unit_type)
+            self.results_handler.write_data(election_id, office, geographic_unit_type)
 
-        return results_handler.final_results
+        return self.results_handler.final_results
 
 
 class HistoricalModelClient(ModelClient):
