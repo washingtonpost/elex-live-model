@@ -1266,13 +1266,13 @@ def test_get_national_summary_estimates(bootstrap_election_model, rng):
     base_to_add = rng.random()
     nat_sum_estimates_w_base = bootstrap_election_model.get_national_summary_estimates(None, base_to_add, 0.95)
     assert nat_sum_estimates_w_base["margin"][0] == pytest.approx(
-        round(nat_sum_estimates["margin"][0] + base_to_add), 2
+        round(nat_sum_estimates["margin"][0] + base_to_add, 2)
     )
     assert nat_sum_estimates_w_base["margin"][1] == pytest.approx(
-        round(nat_sum_estimates["margin"][1] + base_to_add), 2
+        round(nat_sum_estimates["margin"][1] + base_to_add, 2)
     )
     assert nat_sum_estimates_w_base["margin"][2] == pytest.approx(
-        round(nat_sum_estimates["margin"][2] + base_to_add), 2
+        round(nat_sum_estimates["margin"][2] + base_to_add, 2)
     )
 
     nat_sum_data_dict = {i: 3 for i in range(n)}
