@@ -1086,7 +1086,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         return called_contests
 
-    def _call_contest(self, to_call: np.array, called_contests: dict) -> np.array:
+    def _adjust_called_contests(self, to_call: np.array, called_contests: dict) -> np.array:
         """
         This functions applies race calls to the point prediction
         """
@@ -1182,7 +1182,9 @@ class BootstrapElectionModel(BaseElectionModel):
         # which we will need for the national summary (e.g. ecv) model
         if self._is_top_level_aggregate(aggregate):
             called_contests = kwargs.get("called_contests")
-            self.aggregate_pred_margin = self._call_contest(raw_margin_df.pred_margin, called_contests).reshape(-1, 1)
+            self.aggregate_pred_margin = self._adjust_called_contests(
+                raw_margin_df.pred_margin, called_contests
+            ).reshape(-1, 1)
             raw_margin_df["pred_margin"] = self.aggregate_pred_margin
 
             aggregate_sum = all_units.groupby(aggregate_temp_column_name).sum()
