@@ -42,7 +42,10 @@ class ModelClient:
         self.all_conformalization_data_agg_dict = defaultdict(dict)
         self.model = None
         self.results_handler = None
-        self._model_updated = False
+        self.election_id = None
+        self.office = None
+        self.geographic_unit_type = None
+        self.save_results = None
 
     def _check_input_parameters(
         self,
@@ -172,32 +175,26 @@ class ModelClient:
         return sorted(list(set(raw_aggregate_list)), key=lambda x: AGGREGATE_ORDER.index(x))
 
     def get_national_summary_votes_estimates(
-        self, nat_sum_data_dict=None, called_states=None, base_to_add=0, alpha=0.99
+        self,
+        nat_sum_data_dict=None,
+        called_states=None,
+        base_to_add=0,
+        alpha=0.99,
     ):
         if self.model is None:
             raise ModelClientException(
                 "Must call the get_estimands() method before get_national_summary_votes_estimates()."
             )
 
-        if self._model_updated or "nat_sum_data" not in self.results_handler.final_results:
-            nat_sum_estimates = self.model.get_national_summary_estimates(
-                nat_sum_data_dict, called_states, base_to_add, alpha
-            )
-            self.results_handler.add_national_summary_estimates(nat_sum_estimates)
-            self._model_updated = False
+        nat_sum_estimates = self.model.get_national_summary_estimates(
+            nat_sum_data_dict, called_states, base_to_add, alpha
+        )
+        self.results_handler.add_national_summary_estimates(nat_sum_estimates)
 
-        else:
-            nat_sum_estimates = (
-                self.results_handler.final_results["nat_sum_data"].set_index("estimand").to_dict(orient="index")
+        if APP_ENV != "local" and self.save_results:
+            self.results_handler.write_data(
+                self.election_id, self.office, self.geographic_unit_type, keys=["nat_sum_data"]
             )
-            nat_sum_estimates = {
-                e: [
-                    nat_sum_estimates[e]["agg_pred"],
-                    nat_sum_estimates[e]["agg_lower"],
-                    nat_sum_estimates[e]["agg_upper"],
-                ]
-                for e in nat_sum_estimates
-            }
 
         return nat_sum_estimates
 
@@ -230,19 +227,12 @@ class ModelClient:
         fixed_effects = kwargs.get("fixed_effects", {})
         pi_method = kwargs.get("pi_method", "nonparametric")
         save_output = kwargs.get("save_output", ["results"])
-        save_results = "results" in save_output
+        self.save_results = "results" in save_output
         save_data = "data" in save_output
         save_config = "config" in save_output
         # saving conformalization data only makes sense if a ConformalElectionModel is used
         save_conformalization = "conformalization" in save_output
         handle_unreporting = kwargs.get("handle_unreporting", "drop")
-
-        national_summary = kwargs.get("national_summary", False)
-        if national_summary:
-            nat_sum_data_dict = kwargs.get("nat_sum_data_dict", None)
-            called_states = kwargs.get("called_states", None)
-            base_to_add = kwargs.get("base_to_add", 0)
-            alpha = kwargs.get("alpha", 0.99)
 
         district_election = False
         if office in {"H", "Y", "Z"}:
@@ -276,15 +266,18 @@ class ModelClient:
             model_parameters,
             handle_unreporting,
         )
+        self.election_id = election_id
+        self.office = office
+        self.geographic_unit_type = geographic_unit_type
 
-        states_with_election = config_handler.get_states(office)
-        estimand_baselines = config_handler.get_estimand_baselines(office, estimands)
+        states_with_election = config_handler.get_states(self.office)
+        estimand_baselines = config_handler.get_estimand_baselines(self.office, estimands)
 
-        LOG.info("Getting preprocessed data: %s", election_id)
+        LOG.info("Getting preprocessed data: %s", self.election_id)
         preprocessed_data_handler = PreprocessedDataHandler(
-            election_id,
-            office,
-            geographic_unit_type,
+            self.election_id,
+            self.office,
+            self.geographic_unit_type,
             estimands,
             estimand_baselines,
             data=preprocessed_data,
@@ -302,7 +295,7 @@ class ModelClient:
             preprocessed_data,
             current_data,
             estimands,
-            geographic_unit_type,
+            self.geographic_unit_type,
             handle_unreporting=handle_unreporting,
         )
 
@@ -335,7 +328,6 @@ class ModelClient:
             self.model = GaussianElectionModel(model_settings=model_settings)
         elif pi_method == "bootstrap":
             self.model = BootstrapElectionModel(model_settings=model_settings)
-        self._model_updated = True
 
         minimum_reporting_units_max = 0
         for alpha in prediction_intervals:
@@ -343,8 +335,8 @@ class ModelClient:
             if minimum_reporting_units > minimum_reporting_units_max:
                 minimum_reporting_units_max = minimum_reporting_units
 
-        if APP_ENV != "local" and save_results:
-            data.write_data(election_id, office)
+        if APP_ENV != "local" and self.save_results:
+            data.write_data(self.election_id, self.office)
 
         n_reporting_expected_units = reporting_units.shape[0]
         n_unexpected_units = unexpected_units.shape[0]
@@ -389,7 +381,7 @@ class ModelClient:
             self.results_handler.add_unit_intervals(estimand, alpha_to_unit_prediction_intervals)
 
             for aggregate in self.results_handler.aggregates:
-                aggregate_list = self.get_aggregate_list(office, aggregate)
+                aggregate_list = self.get_aggregate_list(self.office, aggregate)
                 estimates_df = self.model.get_aggregate_predictions(
                     self.results_handler.reporting_units,
                     self.results_handler.nonreporting_units,
@@ -420,11 +412,8 @@ class ModelClient:
 
         self.results_handler.process_final_results()
 
-        if national_summary:
-            self.get_national_summary_votes_estimates(nat_sum_data_dict, called_states, base_to_add, alpha)
-
-        if APP_ENV != "local" and save_results:
-            self.results_handler.write_data(election_id, office, geographic_unit_type)
+        if APP_ENV != "local" and self.save_results:
+            self.results_handler.write_data(self.election_id, self.office, self.geographic_unit_type)
 
         return self.results_handler.final_results
 

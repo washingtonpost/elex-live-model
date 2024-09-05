@@ -120,7 +120,7 @@ class ModelResultsHandler:
         )
         self.final_results["nat_sum_data"] = df
 
-    def write_data(self, election_id, office, geographic_unit_type):
+    def write_data(self, election_id, office, geographic_unit_type, keys=None):
         """
         Saves dataframe of estimates for all estimands to S3
         Different file by aggregate level
@@ -129,6 +129,8 @@ class ModelResultsHandler:
             self.process_final_results()
         s3_client = s3.S3CsvUtil(TARGET_BUCKET)
         for key, value in self.final_results.items():
+            if keys is not None and key not in keys:
+                continue
             path = f"{S3_FILE_PATH}/{election_id}/predictions/{office}/{geographic_unit_type}/{key}/current.csv"
             # convert df to csv
             csv_data = convert_df_to_csv(value)
