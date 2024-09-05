@@ -617,7 +617,7 @@ def test_format_called_contests_dictionary(bootstrap_election_model, rng):
     assert called_contests == bootstrap_election_model._format_called_contests_dictionary(called_contests)
 
 
-def test_call_contest(bootstrap_election_model, rng):
+def test_adjust_called_contests(bootstrap_election_model, rng):
     n_contests = 10
     bootstrap_election_model.n_contests = n_contests
 
@@ -630,7 +630,7 @@ def test_call_contest(bootstrap_election_model, rng):
 
     to_call = np.asarray([0.3, -0.3, 0.2, -0.4, 0.15, -0.25, 0.86, -0.74, -0.3, 0.3])
 
-    called = bootstrap_election_model._call_contest(to_call, called_contests)
+    called = bootstrap_election_model._adjust_called_contests(to_call, called_contests)
     assert called.shape == (n_contests,)
     assert called[0] == to_call[0]  # since called for LHS and positive should remain the same
     assert (
