@@ -107,18 +107,11 @@ class ModelResultsHandler:
             )
 
     def add_national_summary_estimates(self, national_summary_dict):
-        df = pd.DataFrame(
-            [
-                {
-                    "estimand": e,
-                    "agg_pred": national_summary_dict[e][0],
-                    "agg_lower": national_summary_dict[e][1],
-                    "agg_upper": national_summary_dict[e][2],
-                }
-                for e in national_summary_dict
-            ]
+        df = pd.DataFrame.from_dict(
+            national_summary_dict, orient="index", columns=["agg_pred", "agg_lower", "agg_upper"]
         )
-        self.final_results["nat_sum_data"] = df
+        df.index.name = "estimand"
+        self.final_results["nat_sum_data"] = df.reset_index()
 
     def write_data(self, election_id, office, geographic_unit_type, keys=None):
         """
