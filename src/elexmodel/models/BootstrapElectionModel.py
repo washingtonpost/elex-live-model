@@ -1,7 +1,6 @@
 from __future__ import annotations  # pylint: disable=too-many-lines
 
 import logging
-import math
 
 import numpy as np
 import pandas as pd
@@ -1077,7 +1076,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         called_contest_acceptable_values = {0, 1, -1}
         if not all(
-            any(math.isclose(value, acceptable_value) for acceptable_value in called_contest_acceptable_values)
+            any(np.isclose(value, acceptable_value) for acceptable_value in called_contest_acceptable_values)
             in called_contest_acceptable_values
             for value in called_contests.values()
         ):
