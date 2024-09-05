@@ -835,7 +835,10 @@ def test_estimandizer_input(model_client, va_governor_county_data, va_config):
 
 
 def test_get_national_summary_votes_estimates(model_client, va_governor_county_data, va_config):
-    expected_df = pd.DataFrame([{"estimand": "margin", "agg_pred": 1.0, "agg_lower": 1.0, "agg_upper": 1.0}])
+    expected = {"margin": [1.0, 1.0, 1.0]}
+    expected_df = pd.DataFrame.from_dict(expected, orient="index", columns=["agg_pred", "agg_lower", "agg_upper"])
+    expected_df.index.name = "estimand"
+    expected_df = expected_df.reset_index()
 
     election_id = "2017-11-07_VA_G"
     office_id = "G"
@@ -855,7 +858,7 @@ def test_get_national_summary_votes_estimates(model_client, va_governor_county_d
     preprocessed_data = va_governor_county_data.copy()
     preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
 
-    final_results = model_client.get_estimates(
+    model_client.get_estimates(
         data,
         election_id,
         office_id,
@@ -869,5 +872,7 @@ def test_get_national_summary_votes_estimates(model_client, va_governor_county_d
         **kwargs,
     )
 
-    assert "nat_sum_data" in final_results.keys()
-    pd.testing.assert_frame_equal(expected_df, final_results["nat_sum_data"])
+    current = model_client.get_national_summary_votes_estimates(None, None, 0, 0.99)
+
+    assert expected == current
+    pd.testing.assert_frame_equal(expected_df, model_client.results_handler.final_results["nat_sum_data"])
