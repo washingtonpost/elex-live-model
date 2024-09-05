@@ -42,6 +42,7 @@ class ModelClient:
         self.all_conformalization_data_agg_dict = defaultdict(dict)
         self.model = None
         self.results_handler = None
+        self._model_updated = False
 
     def _check_input_parameters(
         self,
@@ -178,7 +179,14 @@ class ModelClient:
                 "Must call the get_estimands() method before get_national_summary_votes_estimates()."
             )
 
-        if "nat_sum_data" in self.results_handler.final_results:
+        if self._model_updated or "nat_sum_data" not in self.results_handler.final_results:
+            nat_sum_estimates = self.model.get_national_summary_estimates(
+                nat_sum_data_dict, called_states, base_to_add, alpha
+            )
+            self.results_handler.add_national_summary_estimates(nat_sum_estimates)
+            self._model_updated = False
+
+        else:
             nat_sum_estimates = (
                 self.results_handler.final_results["nat_sum_data"].set_index("estimand").to_dict(orient="index")
             )
@@ -190,11 +198,6 @@ class ModelClient:
                 ]
                 for e in nat_sum_estimates
             }
-        else:
-            nat_sum_estimates = self.model.get_national_summary_estimates(
-                nat_sum_data_dict, called_states, base_to_add, alpha
-            )
-            self.results_handler.add_national_summary_estimates(nat_sum_estimates)
 
         return nat_sum_estimates
 
@@ -332,6 +335,7 @@ class ModelClient:
             self.model = GaussianElectionModel(model_settings=model_settings)
         elif pi_method == "bootstrap":
             self.model = BootstrapElectionModel(model_settings=model_settings)
+        self._model_updated = True
 
         minimum_reporting_units_max = 0
         for alpha in prediction_intervals:
