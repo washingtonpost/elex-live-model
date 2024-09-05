@@ -968,7 +968,6 @@ class BootstrapElectionModel(BaseElectionModel):
         z_test_pred = (ols_z.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat)).clip(
             min=z_partial_reporting_lower, max=z_partial_reporting_upper
         )
-        yz_test_pred = y_test_pred * z_test_pred
 
         # we now need to generate our bootstrapped "true" quantities (in order to subtract the
         # bootstrapped estimates from these quantities to get an estimate for our error)
@@ -1017,10 +1016,11 @@ class BootstrapElectionModel(BaseElectionModel):
             min=z_partial_reporting_lower, max=z_partial_reporting_upper
         ) * weights_test
 
+        # the point prediction is the bootstrap sample mean
         # this is for the unit point prediction. turn into unnormalized margin
-        self.weighted_yz_test_pred = yz_test_pred * weights_test
+        self.weighted_yz_test_pred = yz_test_pred_B.mean(axis=1).reshape(-1, 1) * weights_test
         # and turn into turnout estimate
-        self.weighted_z_test_pred = z_test_pred * weights_test
+        self.weighted_z_test_pred = z_test_pred_B.mean(axis=1).reshape(-1, 1) * weights_test
         self.ran_bootstrap = True
 
     def get_unit_predictions(
