@@ -270,18 +270,9 @@ class ModelClient:
             handle_unreporting=handle_unreporting,
         )
 
-        turnout_factor_lower = model_parameters.get("turnout_factor_lower", 0.2)
-        turnout_factor_upper = model_parameters.get("turnout_factor_upper", 2.5)
-
-        reporting_units = data.get_reporting_units(
-            percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper
-        )
-        nonreporting_units = data.get_nonreporting_units(
-            percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper
-        )
-        unexpected_units = data.get_unexpected_units(
-            percent_reporting_threshold, aggregates, turnout_factor_lower, turnout_factor_upper
-        )
+        reporting_units = data.get_reporting_units(percent_reporting_threshold)
+        nonreporting_units = data.get_nonreporting_units(percent_reporting_threshold)
+        unexpected_units = data.get_unexpected_units(percent_reporting_threshold, aggregates)
 
         LOG.info(
             "Model parameters: \n prediction intervals: %s, percent reporting threshold: %s, \

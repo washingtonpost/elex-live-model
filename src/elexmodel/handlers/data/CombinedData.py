@@ -48,7 +48,7 @@ class CombinedDataHandler:
 
         self.data = data
 
-    def get_reporting_units(self, percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper):
+    def get_reporting_units(self, percent_reporting_threshold):
         """
         Get reporting data. These are units where the expected vote is greater than the percent reporting threshold.
         """
@@ -58,9 +58,7 @@ class CombinedDataHandler:
         )
 
         # remove unexpected units
-        unexpected_units = self._get_unexpected_units(
-            percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper
-        )
+        unexpected_units = self._get_unexpected_units(percent_reporting_threshold)
         reporting_units = reporting_units[
             ~reporting_units.geographic_unit_fips.isin(unexpected_units.geographic_unit_fips)
         ].reset_index(drop=True)
@@ -76,7 +74,7 @@ class CombinedDataHandler:
 
         return reporting_units
 
-    def get_nonreporting_units(self, percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper):
+    def get_nonreporting_units(self, percent_reporting_threshold):
         """
         Get nonreporting data. These are units where expected vote is less than the percent reporting threshold
         """
@@ -86,9 +84,7 @@ class CombinedDataHandler:
         )
 
         # remove unexpected units
-        unexpected_units = self._get_unexpected_units(
-            percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper
-        )
+        unexpected_units = self._get_unexpected_units(percent_reporting_threshold)
         nonreporting_units = nonreporting_units[
             ~nonreporting_units.geographic_unit_fips.isin(unexpected_units.geographic_unit_fips)
         ].reset_index(drop=True)
@@ -128,7 +124,7 @@ class CombinedDataHandler:
         return components[0]
 
     # TODO: rename unexpected units to be non-modeled units
-    def _get_unexpected_units(self, percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper):
+    def _get_unexpected_units(self, percent_reporting_threshold):
         expected_geographic_units = self._get_expected_geographic_unit_fips().tolist()
         no_baseline_units = self._get_units_without_baseline()
         # Note: this uses current_data because self.data drops unexpected units
@@ -137,16 +133,24 @@ class CombinedDataHandler:
             | self.current_data.geographic_unit_fips.isin(no_baseline_units)
         ].reset_index(drop=True)
 
-        units_with_strange_turnout_factor = self.data[
-            (self.data.percent_expected_vote >= percent_reporting_threshold)
-            & ((self.data.turnout_factor <= turnout_factor_lower) | (self.data.turnout_factor >= turnout_factor_upper))
-        ][self.current_data.columns]
+        units_with_strange_turnout_factor = self.data[self.data.percent_expected_vote >= percent_reporting_threshold]
+        turnout_factor_mean = units_with_strange_turnout_factor["turnout_factor"].mean()
+        turnout_factor_std = units_with_strange_turnout_factor["turnout_factor"].std()
+        (lower_limit, upper_limit) = (
+            turnout_factor_mean - (turnout_factor_std * 3),
+            turnout_factor_mean + (turnout_factor_std * 3),
+        )
+        units_with_strange_turnout_factor = units_with_strange_turnout_factor[
+            (units_with_strange_turnout_factor["turnout_factor"] < lower_limit)
+            | (units_with_strange_turnout_factor["turnout_factor"] > upper_limit)
+        ]
+        units_with_strange_turnout_factor = units_with_strange_turnout_factor[self.current_data.columns]
 
         all_unexpected_units = pd.concat([unexpected_units, units_with_strange_turnout_factor]).reset_index(drop=True)
         all_unexpected_units.drop_duplicates(subset="geographic_unit_fips", inplace=True)
         return all_unexpected_units
 
-    def get_unexpected_units(self, percent_reporting_threshold, aggregates, turnout_factor_lower, turnout_factor_upper):
+    def get_unexpected_units(self, percent_reporting_threshold, aggregates):
         """
         Gets units for which we will not be making predictions:
             - unexpected units (ie. units for which we have no covariates prepared)
@@ -154,9 +158,7 @@ class CombinedDataHandler:
             - units with strange turnout factors (ie. units that are likely precinct mismatches)
         """
 
-        unexpected_units = self._get_unexpected_units(
-            percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper
-        )
+        unexpected_units = self._get_unexpected_units(percent_reporting_threshold)
 
         # since we were not expecting them, we have don't have their county or district
         # from preprocessed data. so we have to add that back in.
