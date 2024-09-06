@@ -966,7 +966,6 @@ class BootstrapElectionModel(BaseElectionModel):
         z_test_pred = z_test_pred_B.mean(axis=1).reshape(-1, 1)
         yz_test_pred = y_test_pred * z_test_pred
 
-
         # we now need to generate our bootstrapped "true" quantities (in order to subtract the
         # bootstrapped estimates from these quantities to get an estimate for our error)
         # In a normal bootstrap setting we would replace y and z with \hat{y} and \hat{z}
