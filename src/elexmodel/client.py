@@ -169,8 +169,8 @@ class ModelClient:
         raw_aggregate_list = base_aggregate + [aggregate]
         return sorted(list(set(raw_aggregate_list)), key=lambda x: AGGREGATE_ORDER.index(x))
 
-    def get_national_summary_votes_estimates(self, nat_sum_data_dict=None, called_states={}, base_to_add=0, alpha=0.99):
-        return self.model.get_national_summary_estimates(nat_sum_data_dict, called_states, base_to_add, alpha)
+    def get_national_summary_votes_estimates(self, nat_sum_data_dict=None, base_to_add=0, alpha=0.99):
+        return self.model.get_national_summary_estimates(nat_sum_data_dict, base_to_add, alpha)
 
     def get_estimates(
         self,
@@ -200,6 +200,7 @@ class ModelClient:
         aggregates = kwargs.get("aggregates", DEFAULT_AGGREGATES[office])
         fixed_effects = kwargs.get("fixed_effects", {})
         pi_method = kwargs.get("pi_method", "nonparametric")
+        called_contests = kwargs.get("called_contests", None)
         save_output = kwargs.get("save_output", ["results"])
         save_results = "results" in save_output
         save_data = "data" in save_output
@@ -350,6 +351,7 @@ class ModelClient:
                     results_handler.unexpected_units,
                     aggregate_list,
                     estimand,
+                    called_contests=called_contests,
                 )
                 alpha_to_agg_prediction_intervals = {}
                 for alpha in prediction_intervals:
@@ -361,6 +363,7 @@ class ModelClient:
                         alpha,
                         alpha_to_unit_prediction_intervals[alpha],
                         estimand,
+                        called_contests=called_contests,
                     )
                     if isinstance(self.model, ConformalElectionModel):
                         self.all_conformalization_data_agg_dict[alpha][
