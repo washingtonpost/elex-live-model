@@ -960,14 +960,10 @@ class BootstrapElectionModel(BaseElectionModel):
         # \tilde{y_i}^{b} * \tilde{z_i}^{b}
         yz_test_pred_B = y_test_pred_B * z_test_pred_B
 
-        # In order to generate our point prediction, we also need to apply our non-bootstrapped model to the testset
+        # In order to generate our point prediction, we take the bootstrap mean.
         # this is \hat{y_i} and \hat{z_i}
-        y_test_pred = (ols_y.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat)).clip(
-            min=y_partial_reporting_lower, max=y_partial_reporting_upper
-        )
-        z_test_pred = (ols_z.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat)).clip(
-            min=z_partial_reporting_lower, max=z_partial_reporting_upper
-        )
+        y_test_pred = y_test_pred_B.mean(axis=1).reshape(-1, 1)
+        z_test_pred = z_test_pred_B.mean(axis=1).reshape(-1, 1)
         yz_test_pred = y_test_pred * z_test_pred
 
         # we now need to generate our bootstrapped "true" quantities (in order to subtract the
