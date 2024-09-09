@@ -168,7 +168,7 @@ def cli(
 
         if kwargs.get("national_summary", False):
             # TODO: get_national_summary_votes_estimates() arguments via CLI
-            model_client.get_national_summary_votes_estimates(None, None, 0, 0.99)
+            model_client.get_national_summary_votes_estimates(None, 0, 0.99)
 
         for aggregate_level, estimates in result.items():
             print(aggregate_level, "\n", estimates, "\n")

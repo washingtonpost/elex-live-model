@@ -174,7 +174,6 @@ class ModelClient:
         raw_aggregate_list = base_aggregate + [aggregate]
         return sorted(list(set(raw_aggregate_list)), key=lambda x: AGGREGATE_ORDER.index(x))
 
-
     def get_national_summary_votes_estimates(self, nat_sum_data_dict=None, base_to_add=0, alpha=0.99):
         if self.model is None:
             raise ModelClientException(
@@ -190,7 +189,6 @@ class ModelClient:
             )
 
         return nat_sum_estimates
-
 
     def get_estimates(
         self,
