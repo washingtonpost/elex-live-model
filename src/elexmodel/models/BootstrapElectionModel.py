@@ -1359,7 +1359,7 @@ class BootstrapElectionModel(BaseElectionModel):
             for i, (contest, call) in enumerate(sorted(called_contests.items(), key=lambda x: x[0])):
                 interval_lower_i = interval_lower[i]
                 interval_upper_i = interval_upper[i]
-                if call == 1:
+                if np.isclose(call, 1):
                     if interval_lower_i < 0:
                         # if a contest has been called for the LHS party but the interval_lower is below zero (ie. our model does not think that this is called)
                         # error_diff > 0 means that lower bound is smaller than the prediction, so for those we set the error_diff to be the gap between the prediction
@@ -1372,7 +1372,7 @@ class BootstrapElectionModel(BaseElectionModel):
                     # NOTE: we cannot do this for error_diff because we still want the upper bound in case to be what it would be without the race call
                     divided_error_B_1[i, :] = self.lhs_called_threshold
                     divided_error_B_2[i, :] = self.lhs_called_threshold
-                elif call == 0:
+                elif np.isclose(call, 0):
                     if interval_upper_i > 0:
                         # if a contest has been called for the RHS party but the interval_upper is larger than zero (ie. our model does not think this is called)
                         # error_diff < 0 means that the upper bound is larger than the prediction, so for those we set error_diff to be the gap between the prediction
