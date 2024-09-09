@@ -196,15 +196,19 @@ def test_get_reporting_data_dropping_with_turnout_factor(va_governor_county_data
 
     combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
 
-    # TODO
-    turnout_factor_lower = 0.95
-    turnout_factor_upper = 1.2
     reporting_units_above_turnout_factor_threshold = combined_data_handler.data[
-        combined_data_handler.data.turnout_factor > turnout_factor_upper
+        combined_data_handler.data.turnout_factor
+        > (combined_data_handler.data.turnout_factor.mean() + (3 * combined_data_handler.data.turnout_factor.std()))
     ].shape[0]
     reporting_units_below_turnout_factor_threshold = combined_data_handler.data[
         (combined_data_handler.data.percent_expected_vote == 100)
-        & (combined_data_handler.data.turnout_factor < turnout_factor_lower)
+    ]
+    (m, s) = (
+        reporting_units_below_turnout_factor_threshold.turnout_factor.mean(),
+        reporting_units_below_turnout_factor_threshold.turnout_factor.std(),
+    )
+    reporting_units_below_turnout_factor_threshold = reporting_units_below_turnout_factor_threshold[
+        reporting_units_below_turnout_factor_threshold.turnout_factor < (m - (3 * s))
     ].shape[0]
 
     observed_data = combined_data_handler.get_reporting_units(100)

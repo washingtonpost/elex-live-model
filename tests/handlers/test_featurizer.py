@@ -362,7 +362,7 @@ def test_generate_fixed_effects(va_governor_county_data):
 
     assert combined_data_handler.data.shape == (133, 35)
     n_expected_columns = 6  # (6 - 1) fixed effects + 1 intercept
-    assert reporting_data_features.shape == (133, n_expected_columns)
+    assert reporting_data_features.shape == (131, n_expected_columns)
     assert nonreporting_data_features.shape == (0, n_expected_columns)
 
     assert "county_classification_nova" in reporting_data_features.columns
@@ -383,7 +383,7 @@ def test_generate_fixed_effects(va_governor_county_data):
     featurizer = Featurizer([], {"county_classification": ["all"], "county_fips": ["all"]})
 
     reporting_data = combined_data_handler.get_reporting_units(99)
-    nonreporting_data = combined_data_handler.get_nonreporting_units(99, 0.5, 1.5)
+    nonreporting_data = combined_data_handler.get_nonreporting_units(99)
 
     n_train = reporting_data.shape[0]
     all_units = pd.concat([reporting_data, nonreporting_data], axis=0)
@@ -395,8 +395,8 @@ def test_generate_fixed_effects(va_governor_county_data):
 
     assert combined_data_handler.data.shape == (133, 35)
 
-    n_expected_columns = 138  # (6 - 1) + (133 - 1) fixed effects + 1 intercept
-    assert reporting_data_features.shape == (133, n_expected_columns)
+    n_expected_columns = 136  # (6 - 1) + (131 - 1) fixed effects + 1 intercept
+    assert reporting_data_features.shape == (131, n_expected_columns)
     assert nonreporting_data_features.shape == (0, n_expected_columns)
 
     assert "county_classification_nova" in reporting_data_features.columns
@@ -407,7 +407,7 @@ def test_generate_fixed_effects(va_governor_county_data):
 
     assert "county_classification" in featurizer.fixed_effect_cols
     assert "county_fips" in featurizer.fixed_effect_cols
-    assert len(featurizer.expanded_fixed_effects) == 137  # 6 + 133 - 2
+    assert len(featurizer.expanded_fixed_effects) == 135  # 6 + 131 - 2
 
 
 def test_generate_fixed_effects_not_all_reporting(va_governor_county_data):
