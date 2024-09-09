@@ -872,7 +872,7 @@ def test_get_national_summary_votes_estimates(model_client, va_governor_county_d
         **kwargs,
     )
 
-    current = model_client.get_national_summary_votes_estimates(None, None, 0, 0.99)
+    current = model_client.get_national_summary_votes_estimates(None, 0, 0.99)
 
     assert expected == current
     pd.testing.assert_frame_equal(expected_df, model_client.results_handler.final_results["nat_sum_data"])
