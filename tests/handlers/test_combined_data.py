@@ -327,11 +327,11 @@ def test_turnout_factor_as_unexpected(va_governor_county_data):
     va_governor_county_data["last_election_results_turnout"] = va_governor_county_data.baseline_turnout + 1
     combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
 
-    turnout_factor_lower = 0.95
-    turnout_factor_upper = 1.2
     unexpected_data = combined_data_handler.get_unexpected_units(100, ["county_fips"])
-    over = combined_data_handler.data[combined_data_handler.data.turnout_factor >= turnout_factor_upper].shape[0]
-    under = combined_data_handler.data[combined_data_handler.data.turnout_factor < turnout_factor_lower].shape[0]
-    unexpected_data.shape[0] == over + under
 
-    assert unexpected_data.shape == (1, 9)
+    (m, s) = (combined_data_handler.data.turnout_factor.mean(), combined_data_handler.data.turnout_factor.std())
+    (lower, upper) = (m - (3 * s), m + (3 * s))
+    over = combined_data_handler.data[combined_data_handler.data.turnout_factor > upper].shape[0]
+    under = combined_data_handler.data[combined_data_handler.data.turnout_factor < lower].shape[0]
+
+    assert unexpected_data.shape == (over + under, 9)
