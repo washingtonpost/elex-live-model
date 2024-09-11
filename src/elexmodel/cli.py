@@ -79,6 +79,12 @@ class PythonLiteralOption(click.Option):
     help="options: results, data, config",
 )
 @click.option("--handle_unreporting", "handle_unreporting", default="drop", type=click.Choice(["drop", "zero"]))
+@click.option(
+    "--national_summary",
+    "national_summary",
+    is_flag=True,
+    help="When not running a historical election, output results aggregated to the national level.",
+)
 def cli(
     election_id, estimands, office_id, prediction_intervals, percent_reporting_threshold, geographic_unit_type, **kwargs
 ):
@@ -159,5 +165,10 @@ def cli(
             geographic_unit_type,
             **kwargs
         )
+
+        if kwargs.get("national_summary", False):
+            # TODO: get_national_summary_votes_estimates() arguments via CLI
+            model_client.get_national_summary_votes_estimates(None, 0, 0.99)
+
         for aggregate_level, estimates in result.items():
             print(aggregate_level, "\n", estimates, "\n")

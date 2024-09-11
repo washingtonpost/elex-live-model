@@ -25,6 +25,7 @@ class ModelResultsHandler:
         self.aggregates = [agg for agg in aggregates if agg != "unit"]
         self.estimates = {agg: [] for agg in self.aggregates}
         self.unit_data = {}
+        self.final_results = {}
 
         self.reporting_units = reporting_units
         self.nonreporting_units = nonreporting_units
@@ -93,7 +94,6 @@ class ModelResultsHandler:
         """
         Create final data frames of results
         """
-        self.final_results = {}
         for agg in self.aggregates:
             merge_on = ["postal_code", "reporting", agg]
             # joins together dfs of the same level of aggregation (different estimands)
@@ -106,7 +106,14 @@ class ModelResultsHandler:
                 lambda x, y: pd.merge(x, y, how="inner", on=merge_on), self.unit_data.values()
             )
 
-    def write_data(self, election_id, office, geographic_unit_type):
+    def add_national_summary_estimates(self, national_summary_dict):
+        df = pd.DataFrame.from_dict(
+            national_summary_dict, orient="index", columns=["agg_pred", "agg_lower", "agg_upper"]
+        )
+        df.index.name = "estimand"
+        self.final_results["nat_sum_data"] = df.reset_index()
+
+    def write_data(self, election_id, office, geographic_unit_type, keys=None):
         """
         Saves dataframe of estimates for all estimands to S3
         Different file by aggregate level
@@ -115,6 +122,8 @@ class ModelResultsHandler:
             self.process_final_results()
         s3_client = s3.S3CsvUtil(TARGET_BUCKET)
         for key, value in self.final_results.items():
+            if keys is not None and key not in keys:
+                continue
             path = f"{S3_FILE_PATH}/{election_id}/predictions/{office}/{geographic_unit_type}/{key}/current.csv"
             # convert df to csv
             csv_data = convert_df_to_csv(value)
