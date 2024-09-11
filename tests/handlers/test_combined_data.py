@@ -200,9 +200,14 @@ def test_get_reporting_data_dropping_with_turnout_factor(va_governor_county_data
         combined_data_handler.data.turnout_factor
         > (combined_data_handler.data.turnout_factor.mean() + (3 * combined_data_handler.data.turnout_factor.std()))
     ].shape[0]
+
     reporting_units_below_turnout_factor_threshold = combined_data_handler.data[
         (combined_data_handler.data.percent_expected_vote == 100)
     ]
+    # note that the mean and std of turnout_factor are recomputed here because
+    # reporting_units_below_turnout_factor_threshold first selects only those
+    # units whose percent EV is 100, whereas reporting_units_above_turnout_factor_threshold
+    # uses all units regardless of their percent EV
     (m, s) = (
         reporting_units_below_turnout_factor_threshold.turnout_factor.mean(),
         reporting_units_below_turnout_factor_threshold.turnout_factor.std(),
