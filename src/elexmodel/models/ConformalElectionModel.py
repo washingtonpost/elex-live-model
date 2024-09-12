@@ -206,5 +206,5 @@ class ConformalElectionModel(BaseElectionModel.BaseElectionModel, ABC):
         """
         raise NotImplementedError
 
-    def get_national_summary_estimates(self, nat_sum_data_dict, called_states, base_to_add):
+    def get_national_summary_estimates(self, nat_sum_data_dict, called_states, base_to_add, alpha):
         raise NotImplementedError()

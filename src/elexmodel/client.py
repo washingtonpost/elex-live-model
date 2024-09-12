@@ -41,6 +41,11 @@ class ModelClient:
         self.all_conformalization_data_unit_dict = defaultdict(dict)
         self.all_conformalization_data_agg_dict = defaultdict(dict)
         self.model = None
+        self.results_handler = None
+        self.election_id = None
+        self.office = None
+        self.geographic_unit_type = None
+        self.save_results = None
 
     def _check_input_parameters(
         self,
@@ -170,7 +175,20 @@ class ModelClient:
         return sorted(list(set(raw_aggregate_list)), key=lambda x: AGGREGATE_ORDER.index(x))
 
     def get_national_summary_votes_estimates(self, nat_sum_data_dict=None, base_to_add=0, alpha=0.99):
-        return self.model.get_national_summary_estimates(nat_sum_data_dict, base_to_add, alpha)
+        if self.model is None:
+            raise ModelClientException(
+                "Must call the get_estimands() method before get_national_summary_votes_estimates()."
+            )
+
+        nat_sum_estimates = self.model.get_national_summary_estimates(nat_sum_data_dict, base_to_add, alpha)
+        self.results_handler.add_national_summary_estimates(nat_sum_estimates)
+
+        if APP_ENV != "local" and self.save_results:
+            self.results_handler.write_data(
+                self.election_id, self.office, self.geographic_unit_type, keys=["nat_sum_data"]
+            )
+
+        return nat_sum_estimates
 
     def get_estimates(
         self,
@@ -202,7 +220,7 @@ class ModelClient:
         pi_method = kwargs.get("pi_method", "nonparametric")
         called_contests = kwargs.get("called_contests", None)
         save_output = kwargs.get("save_output", ["results"])
-        save_results = "results" in save_output
+        self.save_results = "results" in save_output
         save_data = "data" in save_output
         save_config = "config" in save_output
         # saving conformalization data only makes sense if a ConformalElectionModel is used
@@ -241,15 +259,18 @@ class ModelClient:
             model_parameters,
             handle_unreporting,
         )
+        self.election_id = election_id
+        self.office = office
+        self.geographic_unit_type = geographic_unit_type
 
-        states_with_election = config_handler.get_states(office)
-        estimand_baselines = config_handler.get_estimand_baselines(office, estimands)
+        states_with_election = config_handler.get_states(self.office)
+        estimand_baselines = config_handler.get_estimand_baselines(self.office, estimands)
 
-        LOG.info("Getting preprocessed data: %s", election_id)
+        LOG.info("Getting preprocessed data: %s", self.election_id)
         preprocessed_data_handler = PreprocessedDataHandler(
-            election_id,
-            office,
-            geographic_unit_type,
+            self.election_id,
+            self.office,
+            self.geographic_unit_type,
             estimands,
             estimand_baselines,
             data=preprocessed_data,
@@ -267,7 +288,7 @@ class ModelClient:
             preprocessed_data,
             current_data,
             estimands,
-            geographic_unit_type,
+            self.geographic_unit_type,
             handle_unreporting=handle_unreporting,
         )
 
@@ -298,8 +319,8 @@ class ModelClient:
             if minimum_reporting_units > minimum_reporting_units_max:
                 minimum_reporting_units_max = minimum_reporting_units
 
-        if APP_ENV != "local" and save_results:
-            data.write_data(election_id, office)
+        if APP_ENV != "local" and self.save_results:
+            data.write_data(self.election_id, self.office)
 
         n_reporting_expected_units = reporting_units.shape[0]
         n_unexpected_units = unexpected_units.shape[0]
@@ -321,7 +342,7 @@ class ModelClient:
         if len(duplicate_units) > 0:
             raise ModelClientException(f"At least one unit appears twice: {duplicate_units}")
 
-        results_handler = ModelResultsHandler(
+        self.results_handler = ModelResultsHandler(
             aggregates, prediction_intervals, reporting_units, nonreporting_units, unexpected_units
         )
 
@@ -329,26 +350,26 @@ class ModelClient:
             unit_predictions, unit_turnout_predictions = self.model.get_unit_predictions(
                 reporting_units, nonreporting_units, estimand, unexpected_units=unexpected_units
             )
-            results_handler.add_unit_predictions(estimand, unit_predictions, unit_turnout_predictions)
+            self.results_handler.add_unit_predictions(estimand, unit_predictions, unit_turnout_predictions)
             # gets prediciton intervals for each alpha
             alpha_to_unit_prediction_intervals = {}
             for alpha in prediction_intervals:
                 alpha_to_unit_prediction_intervals[alpha] = self.model.get_unit_prediction_intervals(
-                    results_handler.reporting_units, results_handler.nonreporting_units, alpha, estimand
+                    self.results_handler.reporting_units, self.results_handler.nonreporting_units, alpha, estimand
                 )
                 if isinstance(self.model, ConformalElectionModel):
                     self.all_conformalization_data_unit_dict[alpha][
                         estimand
                     ] = self.model.get_all_conformalization_data_unit()
 
-            results_handler.add_unit_intervals(estimand, alpha_to_unit_prediction_intervals)
+            self.results_handler.add_unit_intervals(estimand, alpha_to_unit_prediction_intervals)
 
-            for aggregate in results_handler.aggregates:
-                aggregate_list = self.get_aggregate_list(office, aggregate)
+            for aggregate in self.results_handler.aggregates:
+                aggregate_list = self.get_aggregate_list(self.office, aggregate)
                 estimates_df = self.model.get_aggregate_predictions(
-                    results_handler.reporting_units,
-                    results_handler.nonreporting_units,
-                    results_handler.unexpected_units,
+                    self.results_handler.reporting_units,
+                    self.results_handler.nonreporting_units,
+                    self.results_handler.unexpected_units,
                     aggregate_list,
                     estimand,
                     called_contests=called_contests,
@@ -356,9 +377,9 @@ class ModelClient:
                 alpha_to_agg_prediction_intervals = {}
                 for alpha in prediction_intervals:
                     alpha_to_agg_prediction_intervals[alpha] = self.model.get_aggregate_prediction_intervals(
-                        results_handler.reporting_units,
-                        results_handler.nonreporting_units,
-                        results_handler.unexpected_units,
+                        self.results_handler.reporting_units,
+                        self.results_handler.nonreporting_units,
+                        self.results_handler.unexpected_units,
                         aggregate_list,
                         alpha,
                         alpha_to_unit_prediction_intervals[alpha],
@@ -371,15 +392,16 @@ class ModelClient:
                         ] = self.model.get_all_conformalization_data_agg()
 
                 # get all of the prediction intervals here
-                results_handler.add_agg_predictions(
+                self.results_handler.add_agg_predictions(
                     estimand, aggregate, estimates_df, alpha_to_agg_prediction_intervals
                 )
 
-        results_handler.process_final_results()
-        if APP_ENV != "local" and save_results:
-            results_handler.write_data(election_id, office, geographic_unit_type)
+        self.results_handler.process_final_results()
 
-        return results_handler.final_results
+        if APP_ENV != "local" and self.save_results:
+            self.results_handler.write_data(self.election_id, self.office, self.geographic_unit_type)
+
+        return self.results_handler.final_results
 
 
 class HistoricalModelClient(ModelClient):
