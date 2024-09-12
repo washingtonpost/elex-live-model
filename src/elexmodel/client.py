@@ -219,6 +219,7 @@ class ModelClient:
         fixed_effects = kwargs.get("fixed_effects", {})
         pi_method = kwargs.get("pi_method", "nonparametric")
         called_contests = kwargs.get("called_contests", None)
+        allow_model_call = kwargs.get("allow_model_call", None)
         save_output = kwargs.get("save_output", ["results"])
         self.save_results = "results" in save_output
         save_data = "data" in save_output
@@ -394,6 +395,7 @@ class ModelClient:
                         alpha_to_unit_prediction_intervals[alpha],
                         estimand,
                         called_contests=called_contests,
+                        allow_model_call=allow_model_call
                     )
                     if isinstance(self.model, ConformalElectionModel):
                         self.all_conformalization_data_agg_dict[alpha][

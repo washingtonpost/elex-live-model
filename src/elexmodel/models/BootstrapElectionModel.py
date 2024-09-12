@@ -1056,14 +1056,14 @@ class BootstrapElectionModel(BaseElectionModel):
             len(aggregate) == 2 and "postal_code" in aggregate and "district" in aggregate
         )
 
-    def _format_called_contests_dictionary(self, called_contests: dict | None) -> dict:
+    def _format_called_contests_dictionary(self, called_contests: dict | None, fill_value: int | bool) -> dict:
         """
         Make sure that the called contest dictionary has the correct format
         """
         # called_contests is a dictionary where 1 means that the LHS party has won, 0 means that the RHS party has won
         # and -1 means that the contest is not called. If called_contests is None, assume that all contests are not called.
         if called_contests is None or len(called_contests) == 0:
-            called_contests = {i: -1 for i in range(self.n_contests)}
+            called_contests = {i: fill_value for i in range(self.n_contests)}
 
         if len(called_contests) != self.n_contests:
             raise BootstrapElectionModelException(
@@ -1087,7 +1087,7 @@ class BootstrapElectionModel(BaseElectionModel):
         This functions applies race calls to the point prediction
         """
 
-        called_contests = self._format_called_contests_dictionary(called_contests)
+        called_contests = self._format_called_contests_dictionary(called_contests, fill_value=-1)
 
         # array sorted by contest, where the element is the call indicator (1, 0 or -1)
         contest_call_array = np.array([contest_tuple[1] for contest_tuple in sorted(called_contests.items())])
@@ -1347,14 +1347,34 @@ class BootstrapElectionModel(BaseElectionModel):
         if self._is_top_level_aggregate(aggregate):
             aggregate_perc_margin_total = self.aggregate_pred_margin
 
-            called_contests = self._format_called_contests_dictionary(kwargs.get("called_contests", {}))
+            called_contests = self._format_called_contests_dictionary(kwargs.get("called_contests", {}), fill_value=-1)
+            allow_model_call = self._format_called_contests_dictionary(kwargs.get("allow_model_call", {}), fill_value=True)
+
             interval_upper, interval_lower = (
                 aggregate_perc_margin_total - np.quantile(error_diff, q=[lower_q, upper_q], axis=-1).T
             ).T
 
-            for i, (contest, call) in enumerate(sorted(called_contests.items(), key=lambda x: x[0])):
+            for i, ((contest, call), (__, allow_model_call_i)) in enumerate(zip(sorted(called_contests.items(), key=lambda x: x[0]), sorted(allow_model_call.items(), key=lambda x: x[0]))):
                 interval_lower_i = interval_lower[i]
                 interval_upper_i = interval_upper[i]
+
+                if not allow_model_call_i:
+                    # if we don't allow the model call, then force the lower interval to be below zero and the upper interval to be above zero
+                    if interval_lower_i > 0:
+                        # if interval_lower_i > 0 then our model thinks the race is called for the LHS party. 
+                        error_diff[i, error_diff[i] < 0] = (
+                            aggregate_perc_margin_total[i] - self.rhs_called_threshold
+                        ).flatten()
+                        divided_error_B_1[i, :] = self.rhs_called_threshold
+                        divided_error_B_2[i, :] = self.rhs_called_threshold
+                    if interval_upper_i < 0:
+                        # if interval_upper_i < 0 then our model thinks the race has been called for the RHS party
+                        error_diff[i, error_diff[i] > 0] = (
+                            self.lhs_called_threshold - aggregate_perc_margin_total[i]
+                        ).flatten()
+                        divided_error_B_1[i, :] = self.lhs_called_threshold
+                        divided_error_B_2[i, :] = self.lhs_called_threshold
+
                 if np.isclose(call, 1):
                     if interval_lower_i < 0:
                         # if a contest has been called for the LHS party but the interval_lower is below zero (ie. our model does not think that this is called)
@@ -1378,6 +1398,7 @@ class BootstrapElectionModel(BaseElectionModel):
                         ).flatten()
                     divided_error_B_1[i, :] = self.rhs_called_threshold
                     divided_error_B_2[i, :] = self.rhs_called_threshold
+
 
             self.divided_error_B_1 = divided_error_B_1
             self.divided_error_B_2 = divided_error_B_2
