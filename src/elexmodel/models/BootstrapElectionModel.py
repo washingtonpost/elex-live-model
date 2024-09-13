@@ -1362,14 +1362,20 @@ class BootstrapElectionModel(BaseElectionModel):
                     # if we don't allow the model call, then force the lower interval to be below zero and the upper interval to be above zero
                     if interval_lower_i > 0:
                         # if interval_lower_i > 0 then our model thinks the race is called for the LHS party. 
-                        error_diff[i, error_diff[i] < 0] = (
+                        # error_diff > 0 means that the lower bound is smaller than the prediction, so for those we set error_diff to be the gap between
+                        # the prediction and the imposed lower bound. This forces the difference between error_diff and the prediction to be exactly the imposed
+                        # lower bound
+                        error_diff[i, error_diff[i] > 0] = (
                             aggregate_perc_margin_total[i] - self.rhs_called_threshold
                         ).flatten()
+                        # for error_B_1 and error_B_2 we can set all of them to the imposed lower bound, because we no longer care about doing inference on the interval
                         divided_error_B_1[i, :] = self.rhs_called_threshold
                         divided_error_B_2[i, :] = self.rhs_called_threshold
                     if interval_upper_i < 0:
-                        # if interval_upper_i < 0 then our model thinks the race has been called for the RHS party
-                        error_diff[i, error_diff[i] > 0] = (
+                        # if interval_upper_i < 0 then our model thinks the race has been called for the RHS party.
+                        # error_diff < 0 means that the upper bound is larger than the prediction, so for those we set error_diff to be the gap between the prediction
+                        # and the imposed upper bound. This foces
+                        error_diff[i, error_diff[i] < 0] = (
                             self.lhs_called_threshold - aggregate_perc_margin_total[i]
                         ).flatten()
                         divided_error_B_1[i, :] = self.lhs_called_threshold
