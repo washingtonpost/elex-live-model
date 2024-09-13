@@ -645,7 +645,7 @@ def test_adjust_called_contests(bootstrap_election_model, rng):
     )  # since called for RHS but positive should be repalced
 
 
-def test_aggregate_predictions(bootstrap_election_model):
+def get_data_used_for_testing_aggregate_predictions():
     reporting_units = pd.DataFrame(
         [
             ["a", -3, 0.2, 1, 1, 1, 1, 3, 5, 8, "c"],
@@ -713,6 +713,12 @@ def test_aggregate_predictions(bootstrap_election_model):
         ],
     )
 
+    return (reporting_units, nonreporting_units, unexpected_units)
+
+
+def test_aggregate_predictions_no_race_calls(bootstrap_election_model):
+    (reporting_units, nonreporting_units, unexpected_units) = get_data_used_for_testing_aggregate_predictions()
+    bootstrap_election_model.n_contests = 6  # a through f
     bootstrap_election_model.weighted_z_test_pred = np.asarray([1, 1, 1, 1, 1, 1]).reshape(-1, 1)
 
     # test that is top level aggregate is working
@@ -722,7 +728,6 @@ def test_aggregate_predictions(bootstrap_election_model):
     with pytest.raises(AttributeError):
         bootstrap_election_model.aggregate_baseline_margin
 
-    bootstrap_election_model.n_contests = 6  # a through f
     aggregate_predictions = bootstrap_election_model.get_aggregate_predictions(
         reporting_units, nonreporting_units, unexpected_units, ["postal_code"], "margin"
     )
@@ -759,6 +764,12 @@ def test_aggregate_predictions(bootstrap_election_model):
     assert aggregate_predictions[aggregate_predictions.postal_code == "d"].reporting[3] == pytest.approx(0)
     assert aggregate_predictions[aggregate_predictions.postal_code == "e"].reporting[4] == pytest.approx(0)
     assert aggregate_predictions[aggregate_predictions.postal_code == "f"].reporting[5] == pytest.approx(0)
+
+
+def test_aggregate_predictions_with_race_call(bootstrap_election_model):
+    (reporting_units, nonreporting_units, unexpected_units) = get_data_used_for_testing_aggregate_predictions()
+    bootstrap_election_model.n_contests = 6  # a through f
+    bootstrap_election_model.weighted_z_test_pred = np.asarray([1, 1, 1, 1, 1, 1]).reshape(-1, 1)
 
     # test with a race call
     called_contests = {x: 1 for x in range(bootstrap_election_model.n_contests)}
