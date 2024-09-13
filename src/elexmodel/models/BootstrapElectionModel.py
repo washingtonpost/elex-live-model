@@ -1159,7 +1159,7 @@ class BootstrapElectionModel(BaseElectionModel):
         # total turnout predictions
         aggregate_z_total = (
             aggregate_z_unexpected + aggregate_z_train + aggregate_indicator_test.T @ self.weighted_z_test_pred
-        )
+        ).flatten()
 
         # use get_aggregate_predictions from BaseElectionModel to sum unnormalized margin of all the units
         raw_margin_df = super().get_aggregate_predictions(
@@ -1170,10 +1170,9 @@ class BootstrapElectionModel(BaseElectionModel):
         # to get the normalized margin for the aggregate
         # turnout prediction could be zero, in which case predicted margin is also zero,
         # so replace NaNs with zero in that case
-        raw_margin_df["pred_margin"] = np.nan_to_num(raw_margin_df.pred_margin / aggregate_z_total.flatten()).reshape(
-            -1, 1
-        )
-        raw_margin_df["results_margin"] = np.nan_to_num(raw_margin_df.results_margin / aggregate_z_total.flatten())
+        raw_margin_df["pred_margin"] = np.nan_to_num(raw_margin_df.pred_margin / aggregate_z_total).reshape(-1, 1)
+        raw_margin_df["results_margin"] = np.nan_to_num(raw_margin_df.results_margin / aggregate_z_total)
+        raw_margin_df["pred_turnout"] = aggregate_z_total
         # if we are in the top level prediction, then save the aggregated baseline margin,
         # which we will need for the national summary (e.g. ecv) model
         if self._is_top_level_aggregate(aggregate):
@@ -1187,6 +1186,7 @@ class BootstrapElectionModel(BaseElectionModel):
             self.aggregate_baseline_margin = (
                 (aggregate_sum.baseline_dem - aggregate_sum.baseline_gop) / (aggregate_sum.baseline_turnout + 1)
             ).values
+
         return raw_margin_df
 
     def _get_quantiles(self, alpha):
@@ -1331,7 +1331,7 @@ class BootstrapElectionModel(BaseElectionModel):
         aggregate_z_total = (
             aggregate_z_unexpected + aggregate_z_train + aggregate_indicator_test.T @ self.weighted_z_test_pred
         )
-        # then the unnormalied margin component
+        # then the unnormalized margin component
         aggregate_yz_total = (
             aggregate_yz_unexpected + aggregate_yz_train + aggregate_indicator_test.T @ self.weighted_yz_test_pred
         )
