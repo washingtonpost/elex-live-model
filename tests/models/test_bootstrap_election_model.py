@@ -731,39 +731,38 @@ def test_aggregate_predictions_no_race_calls(bootstrap_election_model):
     aggregate_predictions = bootstrap_election_model.get_aggregate_predictions(
         reporting_units, nonreporting_units, unexpected_units, ["postal_code"], "margin"
     )
+    aggregate_predictions = aggregate_predictions.set_index("postal_code")
 
     assert bootstrap_election_model.aggregate_baseline_margin is not None
 
-    assert aggregate_predictions[aggregate_predictions.postal_code == "a"].pred_margin[0] == pytest.approx(
-        -2.6 / 4
-    )  # (-3 (pred) + 0.2 + 0 (reporting margin) + 0.2 (unexpected margin))/ 4
-    assert aggregate_predictions[aggregate_predictions.postal_code == "b"].pred_margin[1] == pytest.approx(
-        0.9 / 2
-    )  # (-0.1 + 1) / 2
-    assert aggregate_predictions[aggregate_predictions.postal_code == "c"].pred_margin[2] == pytest.approx(
-        0.3
-    )  # (0.3 + 0.3) / 2
-    assert aggregate_predictions[aggregate_predictions.postal_code == "d"].pred_margin[3] == pytest.approx(
-        8 / 3
-    )  # 0.8 / 3
-    assert aggregate_predictions[aggregate_predictions.postal_code == "e"].pred_margin[4] == pytest.approx(
-        4
-    )  # (4 + 4) / 2
-    assert aggregate_predictions[aggregate_predictions.postal_code == "f"].pred_margin[5] == pytest.approx(0.7 / 2)
+    # (-3 (pred) + 0.2 + 0 (reporting margin) + 0.2 (unexpected margin))/ 4
+    assert aggregate_predictions.loc["a", "pred_margin"] == pytest.approx(-2.6 / 4)
+    assert aggregate_predictions.loc["b", "pred_margin"] == pytest.approx(0.9 / 2)  # (-0.1 + 1) / 2
+    assert aggregate_predictions.loc["c", "pred_margin"] == pytest.approx(0.3)  # (0.3 + 0.3) / 2
+    assert aggregate_predictions.loc["d", "pred_margin"] == pytest.approx(8 / 3)  # 0.8 / 3
+    assert aggregate_predictions.loc["e", "pred_margin"] == pytest.approx(4)  # (4 + 4) / 2
+    assert aggregate_predictions.loc["f", "pred_margin"] == pytest.approx(0.7 / 2)
 
-    assert aggregate_predictions[aggregate_predictions.postal_code == "a"].results_margin[0] == pytest.approx(0.6 / 4)
-    assert aggregate_predictions[aggregate_predictions.postal_code == "b"].results_margin[1] == pytest.approx(-0.1 / 2)
-    assert aggregate_predictions[aggregate_predictions.postal_code == "c"].results_margin[2] == pytest.approx(0.3)
-    assert aggregate_predictions[aggregate_predictions.postal_code == "d"].results_margin[3] == pytest.approx(0.7 / 3)
-    assert aggregate_predictions[aggregate_predictions.postal_code == "e"].results_margin[4] == pytest.approx(0.1)
-    assert aggregate_predictions[aggregate_predictions.postal_code == "f"].results_margin[5] == pytest.approx(0.7 / 2)
+    assert aggregate_predictions.loc["a", "results_margin"] == pytest.approx(0.6 / 4)
+    assert aggregate_predictions.loc["b", "results_margin"] == pytest.approx(-0.1 / 2)
+    assert aggregate_predictions.loc["c", "results_margin"] == pytest.approx(0.3)
+    assert aggregate_predictions.loc["d", "results_margin"] == pytest.approx(0.7 / 3)
+    assert aggregate_predictions.loc["e", "results_margin"] == pytest.approx(0.1)
+    assert aggregate_predictions.loc["f", "results_margin"] == pytest.approx(0.7 / 2)
 
-    assert aggregate_predictions[aggregate_predictions.postal_code == "a"].reporting[0] == pytest.approx(2)
-    assert aggregate_predictions[aggregate_predictions.postal_code == "b"].reporting[1] == pytest.approx(1)
-    assert aggregate_predictions[aggregate_predictions.postal_code == "c"].reporting[2] == pytest.approx(2)
-    assert aggregate_predictions[aggregate_predictions.postal_code == "d"].reporting[3] == pytest.approx(0)
-    assert aggregate_predictions[aggregate_predictions.postal_code == "e"].reporting[4] == pytest.approx(0)
-    assert aggregate_predictions[aggregate_predictions.postal_code == "f"].reporting[5] == pytest.approx(0)
+    assert aggregate_predictions.loc["a", "reporting"] == pytest.approx(2)
+    assert aggregate_predictions.loc["b", "reporting"] == pytest.approx(1)
+    assert aggregate_predictions.loc["c", "reporting"] == pytest.approx(2)
+    assert aggregate_predictions.loc["d", "reporting"] == pytest.approx(0)
+    assert aggregate_predictions.loc["e", "reporting"] == pytest.approx(0)
+    assert aggregate_predictions.loc["f", "reporting"] == pytest.approx(0)
+
+    assert aggregate_predictions.loc["a", "pred_turnout"] == pytest.approx(4)
+    assert aggregate_predictions.loc["b", "pred_turnout"] == pytest.approx(2)
+    assert aggregate_predictions.loc["c", "pred_turnout"] == pytest.approx(2)
+    assert aggregate_predictions.loc["d", "pred_turnout"] == pytest.approx(3)
+    assert aggregate_predictions.loc["e", "pred_turnout"] == pytest.approx(2)
+    assert aggregate_predictions.loc["f", "pred_turnout"] == pytest.approx(2)
 
 
 def test_aggregate_predictions_with_race_call(bootstrap_election_model):
