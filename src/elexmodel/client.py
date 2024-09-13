@@ -398,7 +398,7 @@ class ModelClient:
                         alpha_to_unit_prediction_intervals[alpha],
                         estimand,
                         called_contests=called_contests,
-                        allow_model_call=allow_model_call
+                        allow_model_call=allow_model_call,
                     )
                     if isinstance(self.model, ConformalElectionModel):
                         self.all_conformalization_data_agg_dict[alpha][

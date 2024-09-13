@@ -1348,20 +1348,27 @@ class BootstrapElectionModel(BaseElectionModel):
             aggregate_perc_margin_total = self.aggregate_pred_margin
 
             called_contests = self._format_called_contests_dictionary(kwargs.get("called_contests", {}), fill_value=-1)
-            allow_model_call = self._format_called_contests_dictionary(kwargs.get("allow_model_call", {}), fill_value=True)
+            allow_model_call = self._format_called_contests_dictionary(
+                kwargs.get("allow_model_call", {}), fill_value=True
+            )
 
             interval_upper, interval_lower = (
                 aggregate_perc_margin_total - np.quantile(error_diff, q=[lower_q, upper_q], axis=-1).T
             ).T
 
-            for i, ((contest, call), (__, allow_model_call_i)) in enumerate(zip(sorted(called_contests.items(), key=lambda x: x[0]), sorted(allow_model_call.items(), key=lambda x: x[0]))):
+            for i, ((contest, call), (__, allow_model_call_i)) in enumerate(
+                zip(
+                    sorted(called_contests.items(), key=lambda x: x[0]),
+                    sorted(allow_model_call.items(), key=lambda x: x[0]),
+                )
+            ):
                 interval_lower_i = interval_lower[i]
                 interval_upper_i = interval_upper[i]
-                
+
                 if not allow_model_call_i:
                     # if we don't allow the model call, then force the lower interval to be below zero and the upper interval to be above zero
                     if interval_lower_i > 0:
-                        # if interval_lower_i > 0 then our model thinks the race is called for the LHS party. 
+                        # if interval_lower_i > 0 then our model thinks the race is called for the LHS party.
                         # error_diff > 0 means that the lower bound is smaller than the prediction, so for those we set error_diff to be the gap between
                         # the prediction and the imposed lower bound. This forces the difference between error_diff and the prediction to be exactly the imposed
                         # lower bound
@@ -1409,7 +1416,6 @@ class BootstrapElectionModel(BaseElectionModel):
                         ).flatten()
                     divided_error_B_1[i, :] = self.rhs_called_threshold
                     divided_error_B_2[i, :] = self.rhs_called_threshold
-
 
             self.divided_error_B_1 = divided_error_B_1
             self.divided_error_B_2 = divided_error_B_2

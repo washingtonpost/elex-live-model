@@ -94,7 +94,7 @@ def test_model_results_handler():
     expected_cols_agg = ["pred", "lower_0.7", "lower_0.9", "upper_0.7", "upper_0.9"]
     for v in handler.estimates.values():
         for i, df in enumerate(v):
-            expected_cols = [f"{x}_e{i+1}" for x in expected_cols_agg]
+            expected_cols = [f"{x}_e{i+1}" for x in expected_cols_agg]  # noqa: E226
             assert set(expected_cols).issubset(set(df.columns))
 
     # test preparation of final results data

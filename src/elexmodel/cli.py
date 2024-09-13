@@ -56,7 +56,11 @@ class PythonLiteralOption(click.Option):
     "--called_contests", "called_contests", default="{}", cls=PythonLiteralOption, help="A dictionary with race calls"
 )
 @click.option(
-    "--allow_model_call", "allow_model_call", default="{}", cls=PythonLiteralOption, help="A dictionary to allow model race calls"
+    "--allow_model_call",
+    "allow_model_call",
+    default="{}",
+    cls=PythonLiteralOption,
+    help="A dictionary to allow model race calls",
 )
 @click.option(
     "--percent_reporting",
