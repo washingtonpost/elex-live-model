@@ -58,12 +58,6 @@ intervals2_e1 = {0.7: PredictionIntervals([3900], [4600]), 0.9: PredictionInterv
 intervals1_e2 = {0.7: PredictionIntervals([400, 1600], [400, 1800]), 0.9: PredictionIntervals([400, 1500], [400, 2000])}
 intervals2_e2 = {0.7: PredictionIntervals([2000], [2200]), 0.9: PredictionIntervals([1800], [2400])}
 
-reporting_with_turnout = reporting.copy().drop(columns=["results_e2"])
-reporting_with_turnout["results_weights"] = [100000, 200000]
-nonreporting_turnout = [0]
-notexpected_with_turnout = notexpected.copy().drop(columns=["results_e2"])
-notexpected_with_turnout["results_weights"] = [0]
-
 
 def test_model_results_handler():
     # test unit predictions/intervals methods for two estimands
@@ -126,22 +120,41 @@ def test_no_unit_data():
 
 
 def test_add_turnout_results():
+    reporting_with_turnout = (
+        reporting.copy().drop(columns=["results_e2"]).rename(columns={"results_e1": "results_margin"})
+    )
+    reporting_with_turnout["results_weights"] = [100000, 200000]
+    reporting_with_turnout["pred_margin"] = [0.1, 0.05]
+
+    nonreporting_pred_turnout = [150]
+    predictions = [0.2]
+    intervals = {0.9: PredictionIntervals([0.1], [0.3])}
+
+    notexpected_with_turnout = (
+        notexpected.copy().drop(columns=["results_e2"]).rename(columns={"results_e1": "results_margin"})
+    )
+    notexpected_with_turnout["results_weights"] = [0]
+
+    agg_margin_with_turnout = agg1_e1.copy().drop(columns=["pred_e1"])
+    agg_margin_with_turnout["pred_margin"] = [0.1, 0.05]
+    agg_margin_with_turnout["pred_turnout"] = [2500, 4500]
+
+    intervals_margin = {0.9: PredictionIntervals([0.05, 0.15], [0, 0.10])}
+
     handler = ModelResultsHandler(
-        ["district", "unit", "postal_code"],
-        [0.7, 0.9],
+        ["district", "unit"],
+        [0.9],
         reporting_with_turnout.copy(),
         nonreporting.copy(),
         notexpected_with_turnout.copy(),
     )
-    handler.add_unit_predictions("e1", predictions_e1)
-    handler.add_unit_intervals("e1", intervals_e1)
-    handler.add_unit_turnout_predictions(nonreporting_turnout)
+    handler.add_unit_predictions("margin", predictions)
+    handler.add_unit_turnout_predictions(nonreporting_pred_turnout)
+    handler.add_unit_intervals("margin", intervals)
     expected_cols = [
-        "pred_e1",
-        "lower_0.7_e1",
-        "lower_0.9_e1",
-        "upper_0.7_e1",
-        "upper_0.9_e1",
+        "pred_margin",
+        "lower_0.9_margin",
+        "upper_0.9_margin",
         "results_weights",
         "pred_turnout",
     ]
@@ -150,22 +163,10 @@ def test_add_turnout_results():
     assert set(expected_cols).difference({"results_weights"}).issubset(set(handler.nonreporting_units))
     assert set(expected_cols).issubset(set(handler.unexpected_units))
 
-    # # test agg predictions for 2 aggs and 2 estimands
-    # handler.add_agg_predictions("e1", "district", agg1_e1, intervals1_e1)
-    # handler.add_agg_predictions("e1", "postal_code", agg2_e1, intervals2_e1)
+    # test agg predictions for 1 agg and 1 estimand
+    handler.add_agg_predictions("margin", "district", agg_margin_with_turnout, intervals_margin)
+    # test preparation of final results data
+    handler.process_final_results()
 
-    # assert len(handler.estimates["postal_code"]) == 2
-    # assert len(handler.estimates["district"]) == 2
-    # expected_cols_agg = ["pred", "lower_0.7", "lower_0.9", "upper_0.7", "upper_0.9"]
-    # for v in handler.estimates.values():
-    #     for i, df in enumerate(v):
-    #         expected_cols = [f"{x}_e{i+1}" for x in expected_cols_agg]
-    #         assert set(expected_cols).issubset(set(df.columns))
-
-    # # test preparation of final results data
-    # handler.process_final_results()
-
-    # assert set(handler.final_results.keys()) == set(["unit_data", "state_data", "district_data"])
-    # assert len(handler.final_results["unit_data"]) == 4
-    # assert len(handler.final_results["state_data"]) == 1
-    # assert len(handler.final_results["district_data"]) == 2
+    assert "pred_turnout" in handler.final_results["unit_data"].columns
+    assert "pred_turnout" in handler.final_results["district_data"].columns
