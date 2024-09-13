@@ -813,6 +813,10 @@ def test_aggregate_predictions_with_race_call(bootstrap_election_model):
     )  # now divided by 5 since the a in non reporting has weight 2
     assert aggregate_predictions[aggregate_predictions.postal_code == "b"].pred_margin[1] == pytest.approx(0.9 / 4)
 
+
+def test_more_complicated_aggregate_predictions_with_race_call(bootstrap_election_model):
+    (reporting_units, nonreporting_units, unexpected_units) = get_data_used_for_testing_aggregate_predictions()
+
     # test more complicated aggregate (postal code-district)
     bootstrap_election_model.weighted_z_test_pred = np.asarray([1, 1, 1, 1, 1, 1]).reshape(-1, 1)
     bootstrap_election_model.n_contests = 8  # (a, c), (a, a), (b, a), (c, c), (d, c), (e, e), (e, a), (f, f)
