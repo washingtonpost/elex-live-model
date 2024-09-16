@@ -61,10 +61,12 @@ intervals2_e2 = {0.7: PredictionIntervals([2000], [2200]), 0.9: PredictionInterv
 
 def test_model_results_handler():
     # test unit predictions/intervals methods for two estimands
-    handler = ModelResultsHandler(["district", "unit", "postal_code"], [0.7, 0.9], reporting, nonreporting, notexpected)
-    handler.add_unit_predictions("e1", predictions_e1, None)
+    handler = ModelResultsHandler(
+        ["district", "unit", "postal_code"], [0.7, 0.9], reporting.copy(), nonreporting.copy(), notexpected.copy()
+    )
+    handler.add_unit_predictions("e1", predictions_e1)
     handler.add_unit_intervals("e1", intervals_e1)
-    handler.add_unit_predictions("e2", predictions_e2, None)
+    handler.add_unit_predictions("e2", predictions_e2)
     handler.add_unit_intervals("e2", intervals_e2)
     expected_cols = [
         "pred_e1",
@@ -105,11 +107,66 @@ def test_model_results_handler():
 
 
 def test_no_unit_data():
-    handler = ModelResultsHandler(["postal_code"], [0.7, 0.9], reporting, nonreporting, notexpected)
-    handler.add_unit_predictions("e1", predictions_e1, None)
+    handler = ModelResultsHandler(
+        ["postal_code"], [0.7, 0.9], reporting.copy(), nonreporting.copy(), notexpected.copy()
+    )
+    handler.add_unit_predictions("e1", predictions_e1)
     handler.add_unit_intervals("e1", intervals_e1)
 
     handler.add_agg_predictions("e1", "postal_code", agg1_e1, intervals1_e1)
     handler.process_final_results()
 
     assert "unit_data" not in handler.final_results
+
+
+def test_add_turnout_results():
+    reporting_with_turnout = (
+        reporting.copy().drop(columns=["results_e2"]).rename(columns={"results_e1": "results_margin"})
+    )
+    reporting_with_turnout["results_weights"] = [100000, 200000]
+    reporting_with_turnout["pred_margin"] = [0.1, 0.05]
+
+    nonreporting_pred_turnout = [150]
+    predictions = [0.2]
+    intervals = {0.9: PredictionIntervals([0.1], [0.3])}
+
+    notexpected_with_turnout = (
+        notexpected.copy().drop(columns=["results_e2"]).rename(columns={"results_e1": "results_margin"})
+    )
+    notexpected_with_turnout["results_weights"] = [0]
+
+    agg_margin_with_turnout = agg1_e1.copy().drop(columns=["pred_e1"])
+    agg_margin_with_turnout["pred_margin"] = [0.1, 0.05]
+    agg_margin_with_turnout["pred_turnout"] = [2500, 4500]
+
+    intervals_margin = {0.9: PredictionIntervals([0.05, 0.15], [0, 0.10])}
+
+    handler = ModelResultsHandler(
+        ["district", "unit"],
+        [0.9],
+        reporting_with_turnout.copy(),
+        nonreporting.copy(),
+        notexpected_with_turnout.copy(),
+    )
+    handler.add_unit_predictions("margin", predictions)
+    handler.add_unit_turnout_predictions(nonreporting_pred_turnout)
+    handler.add_unit_intervals("margin", intervals)
+    expected_cols = [
+        "pred_margin",
+        "lower_0.9_margin",
+        "upper_0.9_margin",
+        "results_weights",
+        "pred_turnout",
+    ]
+
+    assert set(expected_cols).issubset(set(handler.reporting_units))
+    assert set(expected_cols).difference({"results_weights"}).issubset(set(handler.nonreporting_units))
+    assert set(expected_cols).issubset(set(handler.unexpected_units))
+
+    # test agg predictions for 1 agg and 1 estimand
+    handler.add_agg_predictions("margin", "district", agg_margin_with_turnout, intervals_margin)
+    # test preparation of final results data
+    handler.process_final_results()
+
+    assert "pred_turnout" in handler.final_results["unit_data"].columns
+    assert "pred_turnout" in handler.final_results["district_data"].columns

@@ -361,7 +361,10 @@ class ModelClient:
             unit_predictions, unit_turnout_predictions = self.model.get_unit_predictions(
                 reporting_units, nonreporting_units, estimand, unexpected_units=unexpected_units
             )
-            self.results_handler.add_unit_predictions(estimand, unit_predictions, unit_turnout_predictions)
+            self.results_handler.add_unit_predictions(estimand, unit_predictions)
+            if unit_turnout_predictions is not None:
+                self.results_handler.add_unit_turnout_predictions(unit_turnout_predictions)
+
             # gets prediciton intervals for each alpha
             alpha_to_unit_prediction_intervals = {}
             for alpha in prediction_intervals:
