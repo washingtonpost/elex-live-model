@@ -326,13 +326,14 @@ class ModelClient:
             data.write_data(self.election_id, self.office)
 
         n_reporting_expected_units = reporting_units.shape[0]
-        n_unexpected_units = unexpected_units.shape[0]
+        n_unexpected_units = len(unexpected_units[unexpected_units["predictive"]])
         n_nonreporting_units = nonreporting_units.shape[0]
-        # n_non_predictive_units = non_predictive_units.shape[0]
+        n_non_predictive_units = len(unexpected_units[~unexpected_units["predictive"]])
         LOG.info(
             f"""Running model
             There are {n_reporting_expected_units} reporting and expected units.
             There are {n_unexpected_units} unexpected units.
+            There are {n_non_predictive_units} non-predictive units.
             There are {n_nonreporting_units} nonreporting units."""
         )
 
@@ -345,8 +346,6 @@ class ModelClient:
         duplicate_units = units_by_count[units_by_count > 1].to_dict()
         if len(duplicate_units) > 0:
             raise ModelClientException(f"At least one unit appears twice: {duplicate_units}")
-
-        # unexpected_units = pd.concat([unexpected_units, non_predictive_units], ignore_index=True)
 
         self.results_handler = ModelResultsHandler(
             aggregates, prediction_intervals, reporting_units, nonreporting_units, unexpected_units

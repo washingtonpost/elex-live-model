@@ -103,6 +103,8 @@ class CombinedDataHandler:
         nonreporting_units["expected"] = True
 
         # finalize all unexpected/non-predictive units
+        unexpected_units["predictive"] = True
+        non_predictive_units["predictive"] = False
         all_unexpected_units = pd.concat([unexpected_units, non_predictive_units]).reset_index(drop=True)
         # since we were not expecting them, we have don't have their county or district
         # from preprocessed data. so we have to add that back in.
