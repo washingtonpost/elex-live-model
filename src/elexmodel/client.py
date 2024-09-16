@@ -325,9 +325,9 @@ class ModelClient:
         if APP_ENV != "local" and self.save_results:
             data.write_data(self.election_id, self.office)
 
-        non_predictive_units = unexpected_units[~unexpected_units["predictive"]]
+        non_predictive_units = unexpected_units[unexpected_units["unit_category"] == "non-modeled"]
         n_reporting_expected_units = reporting_units.shape[0]
-        n_unexpected_units = len(unexpected_units[unexpected_units["predictive"]])
+        n_unexpected_units = len(unexpected_units[unexpected_units["unit_category"] == "unexpected"])
         n_nonreporting_units = nonreporting_units.shape[0]
         n_non_predictive_units = len(non_predictive_units)
         LOG.info(

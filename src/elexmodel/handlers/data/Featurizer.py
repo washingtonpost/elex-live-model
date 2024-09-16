@@ -104,7 +104,7 @@ class Featurizer:
                 if x.startswith(tuple(fixed_effect + "_" for fixed_effect in self.fixed_effect_cols))
             ]
 
-            df_fitting = df[(df.reporting) & (df.expected)]
+            df_fitting = df.query('reporting & unit_category == "reporting"')
             # get the indices of all expanded fixed effects in the fitting data
             # (active fixed effects + the fixed effect we will drop for multicolinearity)
             active_fixed_effect_boolean_df = df_fitting[all_expanded_fixed_effects].sum(axis=0) > 0

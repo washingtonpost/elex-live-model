@@ -84,7 +84,7 @@ class CombinedDataHandler:
             ) / reporting_units[f"last_election_results_{estimand}"]
 
         reporting_units["reporting"] = int(1)
-        reporting_units["expected"] = True
+        reporting_units["unit_category"] = "reporting"
 
         # units where expected vote is less than the percent reporting threshold
         nonreporting_units = self.data[self.data.percent_expected_vote < percent_reporting_threshold].reset_index(
@@ -100,11 +100,12 @@ class CombinedDataHandler:
         ].reset_index(drop=True)
 
         nonreporting_units["reporting"] = int(0)
-        nonreporting_units["expected"] = True
+        nonreporting_units["unit_category"] = "non-reporting"
 
         # finalize all unexpected/non-predictive units
-        unexpected_units["predictive"] = True
-        non_predictive_units["predictive"] = False
+        unexpected_units["unit_category"] = "unexpected"
+        non_predictive_units["unit_category"] = "non-modeled"
+
         all_unexpected_units = pd.concat([unexpected_units, non_predictive_units]).reset_index(drop=True)
         # since we were not expecting them, we have don't have their county or district
         # from preprocessed data. so we have to add that back in.
@@ -118,7 +119,6 @@ class CombinedDataHandler:
             )
 
         all_unexpected_units["reporting"] = int(0)
-        all_unexpected_units["expected"] = False
 
         return (reporting_units, nonreporting_units, all_unexpected_units)
 
