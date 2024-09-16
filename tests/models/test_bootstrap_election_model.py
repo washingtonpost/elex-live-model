@@ -584,37 +584,45 @@ def test_format_called_contests_dictionary(bootstrap_election_model, rng):
     bootstrap_election_model.n_contests = n_contests
 
     # test that if dictionary is None or empty, the functions returns with entirely -1 values
-    called_contests = bootstrap_election_model._format_called_contests_dictionary(None)
+    called_contests = bootstrap_election_model._format_called_contests_dictionary(None, -1)
     assert len(called_contests) == n_contests
     assert all(x == -1 for x in called_contests.values())
 
-    called_contests = bootstrap_election_model._format_called_contests_dictionary({})
+    called_contests = bootstrap_election_model._format_called_contests_dictionary(None, True)
+    assert len(called_contests) == n_contests
+    assert all(x for x in called_contests.values())
+
+    called_contests = bootstrap_election_model._format_called_contests_dictionary(None, 0)
+    assert len(called_contests) == n_contests
+    assert all(x == 0 for x in called_contests.values())
+
+    called_contests = bootstrap_election_model._format_called_contests_dictionary({}, -1)
     assert len(called_contests) == n_contests
     assert all(x == -1 for x in called_contests.values())
 
     # test that if too few contests are passed it breaks
     called_contests_break = {x: -1 for x in range(n_contests - 1)}
     with pytest.raises(BootstrapElectionModelException):
-        bootstrap_election_model._format_called_contests_dictionary(called_contests_break)
+        bootstrap_election_model._format_called_contests_dictionary(called_contests_break, -1)
 
     # test that if too many contests are passed it breaks
     called_contests_break = {x: -1 for x in range(n_contests + 1)}
     with pytest.raises(BootstrapElectionModelException):
-        bootstrap_election_model._format_called_contests_dictionary(called_contests_break)
+        bootstrap_election_model._format_called_contests_dictionary(called_contests_break, -1)
 
     # test that if something isn't 0, 1 or -1 passed it fails
     called_contests_break = {x: -1 for x in range(4)}
     called_contests_break[4] = 3
     with pytest.raises(BootstrapElectionModelException):
-        bootstrap_election_model._format_called_contests_dictionary(called_contests_break)
+        bootstrap_election_model._format_called_contests_dictionary(called_contests_break, -1)
 
     # this should just work
     called_contests = {x: rng.choice([0, 1, -1], size=None, replace=True) for x in range(n_contests)}
-    assert called_contests == bootstrap_election_model._format_called_contests_dictionary(called_contests)
+    assert called_contests == bootstrap_election_model._format_called_contests_dictionary(called_contests, -1)
 
     # perturbed should also work because using isclose
     called_contests = {x: rng.choice([0, 1, -1], size=None, replace=True) + 1e-15 for x in range(n_contests)}
-    assert called_contests == bootstrap_election_model._format_called_contests_dictionary(called_contests)
+    assert called_contests == bootstrap_election_model._format_called_contests_dictionary(called_contests, -1)
 
 
 def test_adjust_called_contests(bootstrap_election_model, rng):
@@ -1104,6 +1112,13 @@ def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
     assert (bootstrap_election_model.divided_error_B_1 == bootstrap_election_model.rhs_called_threshold).all()
     assert (bootstrap_election_model.divided_error_B_2 == bootstrap_election_model.rhs_called_threshold).all()
 
+    # test with allow race call being set to False
+    allow_model_call = {x: False for x in range(bootstrap_election_model.n_contests)}
+    called_contests = {x: -1 for x in range(bootstrap_election_model.n_contests)}
+    lower, upper = bootstrap_election_model.get_aggregate_prediction_intervals(reporting_units, nonreporting_units, unexpected_units, ["postal_code"], 0.95, None, None, called_contests=called_contests, allow_model_call=allow_model_call)
+    # note that (c) is totally reporting, so there is zero uncertainty left, so we expect that 
+    assert (lower[3] < 0) & (upper[3] > 0) # prior to this, (d) has an upper interval below zero also
+
     # test with more complicated aggregate
     bootstrap_election_model.n_contests = 8  # (a, c), (a, a), (b, a), (c, c), (d, c), (e, e), (e, a), (f, f)
     bootstrap_election_model.get_aggregate_predictions(
@@ -1121,6 +1136,8 @@ def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
     assert lower[7] == pytest.approx(upper[7])  # c-c is fully reporting
     assert lower[7] == pytest.approx(upper[7])  # f-f is fully unexpected
     assert all(lower <= upper)
+
+
 
 
 def test_get_national_summary_estimates(bootstrap_election_model, rng):
@@ -1297,7 +1314,6 @@ def test_get_national_summary_estimates(bootstrap_election_model, rng):
     with pytest.raises(BootstrapElectionModelException):
         nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(nat_sum_data_dict, 0, 0.95)
 
-
 # TODO: write unit test for combined aggregation (e.g. prediction, intervals, aggregate etc.)
 # also where an unexpected or non reporting unit starts ahead of an reporting unit
 def test_total_aggregation(bootstrap_election_model, va_assembly_precinct_data):
@@ -1372,3 +1388,4 @@ def test_total_aggregation(bootstrap_election_model, va_assembly_precinct_data):
 
     assert all(district_lower.flatten() <= district_predictions.pred_margin + TOL)
     assert all(district_predictions.pred_margin <= district_upper.flatten() + TOL)
+
