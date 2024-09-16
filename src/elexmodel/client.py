@@ -325,10 +325,11 @@ class ModelClient:
         if APP_ENV != "local" and self.save_results:
             data.write_data(self.election_id, self.office)
 
+        non_predictive_units = unexpected_units[~unexpected_units["predictive"]]
         n_reporting_expected_units = reporting_units.shape[0]
         n_unexpected_units = len(unexpected_units[unexpected_units["predictive"]])
         n_nonreporting_units = nonreporting_units.shape[0]
-        n_non_predictive_units = len(unexpected_units[~unexpected_units["predictive"]])
+        n_non_predictive_units = len(non_predictive_units)
         LOG.info(
             f"""Running model
             There are {n_reporting_expected_units} reporting and expected units.
@@ -336,6 +337,11 @@ class ModelClient:
             There are {n_non_predictive_units} non-predictive units.
             There are {n_nonreporting_units} nonreporting units."""
         )
+        if len(non_predictive_units) > 0:
+            non_predictive_units = (
+                non_predictive_units.groupby("postal_code")["geographic_unit_fips"].apply(list).to_dict()
+            )
+            LOG.info(f"non-predictive units:\n{non_predictive_units}")
 
         if n_reporting_expected_units < minimum_reporting_units_max:
             raise ModelNotEnoughSubunitsException(
