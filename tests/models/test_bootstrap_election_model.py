@@ -1115,9 +1115,19 @@ def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
     # test with allow race call being set to False
     allow_model_call = {x: False for x in range(bootstrap_election_model.n_contests)}
     called_contests = {x: -1 for x in range(bootstrap_election_model.n_contests)}
-    lower, upper = bootstrap_election_model.get_aggregate_prediction_intervals(reporting_units, nonreporting_units, unexpected_units, ["postal_code"], 0.95, None, None, called_contests=called_contests, allow_model_call=allow_model_call)
-    # note that (c) is totally reporting, so there is zero uncertainty left, so we expect that 
-    assert (lower[3] < 0) & (upper[3] > 0) # prior to this, (d) has an upper interval below zero also
+    lower, upper = bootstrap_election_model.get_aggregate_prediction_intervals(
+        reporting_units,
+        nonreporting_units,
+        unexpected_units,
+        ["postal_code"],
+        0.95,
+        None,
+        None,
+        called_contests=called_contests,
+        allow_model_call=allow_model_call,
+    )
+    # note that (c) is totally reporting, so there is zero uncertainty left, so we expect that
+    assert (lower[3] < 0) & (upper[3] > 0)  # prior to this, (d) has an upper interval below zero also
 
     # test with more complicated aggregate
     bootstrap_election_model.n_contests = 8  # (a, c), (a, a), (b, a), (c, c), (d, c), (e, e), (e, a), (f, f)
@@ -1136,8 +1146,6 @@ def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
     assert lower[7] == pytest.approx(upper[7])  # c-c is fully reporting
     assert lower[7] == pytest.approx(upper[7])  # f-f is fully unexpected
     assert all(lower <= upper)
-
-
 
 
 def test_get_national_summary_estimates(bootstrap_election_model, rng):
@@ -1314,6 +1322,7 @@ def test_get_national_summary_estimates(bootstrap_election_model, rng):
     with pytest.raises(BootstrapElectionModelException):
         nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(nat_sum_data_dict, 0, 0.95)
 
+
 # TODO: write unit test for combined aggregation (e.g. prediction, intervals, aggregate etc.)
 # also where an unexpected or non reporting unit starts ahead of an reporting unit
 def test_total_aggregation(bootstrap_election_model, va_assembly_precinct_data):
@@ -1388,4 +1397,3 @@ def test_total_aggregation(bootstrap_election_model, va_assembly_precinct_data):
 
     assert all(district_lower.flatten() <= district_predictions.pred_margin + TOL)
     assert all(district_predictions.pred_margin <= district_upper.flatten() + TOL)
-
