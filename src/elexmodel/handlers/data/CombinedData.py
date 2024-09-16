@@ -128,23 +128,47 @@ class CombinedDataHandler:
         return components[0]
 
     # TODO: rename unexpected units to be non-modeled units
-    def _get_unexpected_units(self, percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper):
+    def _get_unexpected_units(
+        self, percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper, distinguish=False
+    ):
         expected_geographic_units = self._get_expected_geographic_unit_fips().tolist()
         no_baseline_units = self._get_units_without_baseline()
         # Note: this uses current_data because self.data drops unexpected units
-        unexpected_units = self.current_data[
-            ~self.current_data["geographic_unit_fips"].isin(expected_geographic_units)
-            | self.current_data.geographic_unit_fips.isin(no_baseline_units)
-        ].reset_index(drop=True)
+        unexpected_units = (
+            self.current_data[
+                ~self.current_data["geographic_unit_fips"].isin(expected_geographic_units)
+                | self.current_data.geographic_unit_fips.isin(no_baseline_units)
+            ]
+            .reset_index(drop=True)
+            .drop_duplicates(subset="geographic_unit_fips")
+            .copy()
+        )
 
-        units_with_strange_turnout_factor = self.data[
-            (self.data.percent_expected_vote >= percent_reporting_threshold)
-            & ((self.data.turnout_factor <= turnout_factor_lower) | (self.data.turnout_factor >= turnout_factor_upper))
-        ][self.current_data.columns]
+        units_with_strange_turnout_factor = (
+            self.data[
+                (self.data.percent_expected_vote >= percent_reporting_threshold)
+                & (
+                    (self.data.turnout_factor <= turnout_factor_lower)
+                    | (self.data.turnout_factor >= turnout_factor_upper)
+                )
+            ][self.current_data.columns]
+            .drop_duplicates(subset="geographic_unit_fips")
+            .copy()
+        )
 
-        all_unexpected_units = pd.concat([unexpected_units, units_with_strange_turnout_factor]).reset_index(drop=True)
-        all_unexpected_units.drop_duplicates(subset="geographic_unit_fips", inplace=True)
-        return all_unexpected_units
+        # if a unit is somehow genuinely unexpected and has a strange turnout factor,
+        # report it as a unit that is genuinely unexpected
+        units_with_strange_turnout_factor = units_with_strange_turnout_factor[
+            ~units_with_strange_turnout_factor["geographic_unit_fips"].isin(unexpected_units["geographic_unit_fips"])
+        ].copy()
+
+        if not distinguish:
+            all_unexpected_units = pd.concat([unexpected_units, units_with_strange_turnout_factor]).reset_index(
+                drop=True
+            )
+            return all_unexpected_units
+
+        return (unexpected_units, units_with_strange_turnout_factor)
 
     def get_unexpected_units(self, percent_reporting_threshold, aggregates, turnout_factor_lower, turnout_factor_upper):
         """
@@ -154,26 +178,27 @@ class CombinedDataHandler:
             - units with strange turnout factors (ie. units that are likely precinct mismatches)
         """
 
-        unexpected_units = self._get_unexpected_units(
-            percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper
+        def finalize(df):
+            # since we were not expecting them, we have don't have their county or district
+            # from preprocessed data. so we have to add that back in.
+            if "county_fips" in aggregates:
+                df["county_fips"] = df["geographic_unit_fips"].apply(self._get_county_fips_from_geographic_unit_fips)
+            if "district" in aggregates:
+                df["district"] = df["geographic_unit_fips"].apply(self._get_district_from_geographic_unit_fips)
+            df["reporting"] = int(0)
+            df["expected"] = False
+            return df
+
+        (unexpected_units, non_predictive_units) = self._get_unexpected_units(
+            percent_reporting_threshold,
+            turnout_factor_lower,
+            turnout_factor_upper,
+            distinguish=True,
         )
+        unexpected_units = finalize(unexpected_units)
+        non_predictive_units = finalize(non_predictive_units)
 
-        # since we were not expecting them, we have don't have their county or district
-        # from preprocessed data. so we have to add that back in.
-        if "county_fips" in aggregates:
-            unexpected_units["county_fips"] = unexpected_units["geographic_unit_fips"].apply(
-                self._get_county_fips_from_geographic_unit_fips
-            )
-
-        if "district" in aggregates:
-            unexpected_units["district"] = unexpected_units["geographic_unit_fips"].apply(
-                self._get_district_from_geographic_unit_fips
-            )
-
-        unexpected_units["reporting"] = int(0)
-        unexpected_units["expected"] = False
-
-        return unexpected_units
+        return (unexpected_units, non_predictive_units)
 
     def write_data(self, election_id, office):
         s3_client = s3.S3CsvUtil(TARGET_BUCKET)
