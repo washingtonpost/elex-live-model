@@ -492,21 +492,11 @@ def test_compute_bootstrap_errors(bootstrap_election_model, va_governor_county_d
 
     turnout_factor_lower = 0.5
     turnout_factor_upper = 2.0
-    reporting_units = combined_data_handler.get_reporting_units(
+    (reporting_units, nonreporting_units, unexpected_units) = combined_data_handler.get_units(
         percent_reporting_threshold,
         turnout_factor_lower=turnout_factor_lower,
         turnout_factor_upper=turnout_factor_upper,
-    )
-    nonreporting_units = combined_data_handler.get_nonreporting_units(
-        percent_reporting_threshold,
-        turnout_factor_lower=turnout_factor_lower,
-        turnout_factor_upper=turnout_factor_upper,
-    )
-    unexpected_units = combined_data_handler.get_unexpected_units(
-        percent_reporting_threshold,
-        ["postal_code"],
-        turnout_factor_lower=turnout_factor_lower,
-        turnout_factor_upper=turnout_factor_upper,
+        aggregates=["postal_code"],
     )
 
     assert not bootstrap_election_model.ran_bootstrap
@@ -545,18 +535,11 @@ def test_get_unit_predictions(bootstrap_election_model, va_governor_county_data)
 
     turnout_factor_lower = 0.5
     turnout_factor_upper = 2.0
-    reporting_units = combined_data_handler.get_reporting_units(
+    (reporting_units, nonreporting_units, unexpected_units) = combined_data_handler.get_units(
         percent_reporting_threshold,
         turnout_factor_lower=turnout_factor_lower,
         turnout_factor_upper=turnout_factor_upper,
-    )
-    nonreporting_units = combined_data_handler.get_nonreporting_units(
-        percent_reporting_threshold,
-        turnout_factor_lower=turnout_factor_lower,
-        turnout_factor_upper=turnout_factor_upper,
-    )
-    unexpected_units = combined_data_handler.get_unexpected_units(
-        percent_reporting_threshold, ["postal_code"], turnout_factor_lower, turnout_factor_upper
+        aggregates=["postal_code"],
     )
 
     bootstrap_election_model.B = 10
@@ -1316,13 +1299,8 @@ def test_total_aggregation(bootstrap_election_model, va_assembly_precinct_data):
         preprocessed_data_handler.data, current_data, estimands, geographic_unit_type
     )
 
-    reporting_units = combined_data_handler.get_reporting_units(percent_reporting_threshold, 0.5, 1.5)
-    nonreporting_units = combined_data_handler.get_nonreporting_units(percent_reporting_threshold, 0.5, 1.5)
-    unexpected_units = combined_data_handler.get_unexpected_units(
-        percent_reporting_threshold,
-        aggregates=["postal_code", "district"],
-        turnout_factor_lower=0.5,
-        turnout_factor_upper=1.5,
+    (reporting_units, nonreporting_units, unexpected_units) = combined_data_handler.get_units(
+        percent_reporting_threshold, 0.5, 1.5, ["postal_code", "district"]
     )
 
     bootstrap_election_model.B = 300

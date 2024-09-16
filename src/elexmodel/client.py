@@ -295,14 +295,8 @@ class ModelClient:
         turnout_factor_lower = model_parameters.get("turnout_factor_lower", 0.2)
         turnout_factor_upper = model_parameters.get("turnout_factor_upper", 2.5)
 
-        reporting_units = data.get_reporting_units(
-            percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper
-        )
-        nonreporting_units = data.get_nonreporting_units(
-            percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper
-        )
-        (unexpected_units, non_predictive_units) = data.get_unexpected_units(
-            percent_reporting_threshold, aggregates, turnout_factor_lower, turnout_factor_upper
+        (reporting_units, nonreporting_units, unexpected_units) = data.get_units(
+            percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper, aggregates
         )
 
         LOG.info(
@@ -334,12 +328,11 @@ class ModelClient:
         n_reporting_expected_units = reporting_units.shape[0]
         n_unexpected_units = unexpected_units.shape[0]
         n_nonreporting_units = nonreporting_units.shape[0]
-        n_non_predictive_units = non_predictive_units.shape[0]
+        # n_non_predictive_units = non_predictive_units.shape[0]
         LOG.info(
             f"""Running model
             There are {n_reporting_expected_units} reporting and expected units.
             There are {n_unexpected_units} unexpected units.
-            There are {n_non_predictive_units} non-predictive units.
             There are {n_nonreporting_units} nonreporting units."""
         )
 
@@ -353,7 +346,7 @@ class ModelClient:
         if len(duplicate_units) > 0:
             raise ModelClientException(f"At least one unit appears twice: {duplicate_units}")
 
-        unexpected_units = pd.concat([unexpected_units, non_predictive_units], ignore_index=True)
+        # unexpected_units = pd.concat([unexpected_units, non_predictive_units], ignore_index=True)
 
         self.results_handler = ModelResultsHandler(
             aggregates, prediction_intervals, reporting_units, nonreporting_units, unexpected_units
