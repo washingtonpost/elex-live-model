@@ -196,24 +196,14 @@ def test_get_reporting_data_dropping_with_turnout_factor(va_governor_county_data
 
     combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
 
+    turnout_factor_lower = 0.95
+    turnout_factor_upper = 1.2
     reporting_units_above_turnout_factor_threshold = combined_data_handler.data[
-        combined_data_handler.data.turnout_factor
-        > (combined_data_handler.data.turnout_factor.mean() + (3 * combined_data_handler.data.turnout_factor.std()))
+        combined_data_handler.data.turnout_factor > turnout_factor_upper
     ].shape[0]
-
     reporting_units_below_turnout_factor_threshold = combined_data_handler.data[
         (combined_data_handler.data.percent_expected_vote == 100)
-    ]
-    # note that the mean and std of turnout_factor are recomputed here because
-    # reporting_units_below_turnout_factor_threshold first selects only those
-    # units whose percent EV is 100, whereas reporting_units_above_turnout_factor_threshold
-    # uses all units regardless of their percent EV
-    (m, s) = (
-        reporting_units_below_turnout_factor_threshold.turnout_factor.mean(),
-        reporting_units_below_turnout_factor_threshold.turnout_factor.std(),
-    )
-    reporting_units_below_turnout_factor_threshold = reporting_units_below_turnout_factor_threshold[
-        reporting_units_below_turnout_factor_threshold.turnout_factor < (m - (3 * s))
+        & (combined_data_handler.data.turnout_factor < turnout_factor_lower)
     ].shape[0]
 
     observed_data = combined_data_handler.get_reporting_units(100)
@@ -331,12 +321,9 @@ def test_turnout_factor_as_unexpected(va_governor_county_data):
     va_governor_county_data["baseline_weights"] = va_governor_county_data.baseline_turnout
     va_governor_county_data["last_election_results_turnout"] = va_governor_county_data.baseline_turnout + 1
     combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
-
+    turnout_factor_lower = 0.95
+    turnout_factor_upper = 1.2
     unexpected_data = combined_data_handler.get_unexpected_units(100, ["county_fips"])
-
-    (m, s) = (combined_data_handler.data.turnout_factor.mean(), combined_data_handler.data.turnout_factor.std())
-    (lower, upper) = (m - (3 * s), m + (3 * s))
-    over = combined_data_handler.data[combined_data_handler.data.turnout_factor > upper].shape[0]
-    under = combined_data_handler.data[combined_data_handler.data.turnout_factor < lower].shape[0]
-
-    assert unexpected_data.shape == (over + under, 9)
+    over = combined_data_handler.data[combined_data_handler.data.turnout_factor >= turnout_factor_upper].shape[0]
+    under = combined_data_handler.data[combined_data_handler.data.turnout_factor < turnout_factor_lower].shape[0]
+    assert unexpected_data.shape[0] == over + under
