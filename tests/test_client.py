@@ -459,7 +459,7 @@ def test_get_estimates_fully_reporting(model_client, va_governor_county_data, va
     )
 
     assert result["state_data"].shape == (1, 6)
-    assert result["unit_data"].shape == (133, 7)
+    assert result["unit_data"].shape == (133, 8)
 
     assert list(result["state_data"].columns.values) == [
         "postal_code",
@@ -477,6 +477,7 @@ def test_get_estimates_fully_reporting(model_client, va_governor_county_data, va
         "lower_0.9_turnout",
         "upper_0.9_turnout",
         "results_turnout",
+        "unit_category",
     ]
 
     assert result["state_data"]["postal_code"][0] == "VA"
@@ -632,7 +633,7 @@ def test_get_estimates_some_reporting(model_client, va_governor_county_data, va_
         save_output=[],
     )
     assert result["state_data"].shape == (1, 6)
-    assert result["unit_data"].shape == (133, 7)
+    assert result["unit_data"].shape == (133, 8)
 
     assert list(result["state_data"].columns.values) == [
         "postal_code",
@@ -650,6 +651,7 @@ def test_get_estimates_some_reporting(model_client, va_governor_county_data, va_
         "lower_0.9_turnout",
         "upper_0.9_turnout",
         "results_turnout",
+        "unit_category",
     ]
     assert result["state_data"]["postal_code"][0] == "VA"
     assert result["state_data"]["pred_turnout"][0] == 2587563.0

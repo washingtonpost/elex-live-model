@@ -105,6 +105,13 @@ class ModelResultsHandler:
             self.final_results["unit_data"] = reduce(
                 lambda x, y: pd.merge(x, y, how="inner", on=merge_on), self.unit_data.values()
             )
+            self.final_results["unit_data"] = self.final_results["unit_data"].merge(
+                pd.concat([self.reporting_units, self.nonreporting_units, self.unexpected_units], ignore_index=True)[
+                    ["geographic_unit_fips", "unit_category"]
+                ],
+                on=["geographic_unit_fips"],
+                how="left",
+            )
 
     def add_national_summary_estimates(self, national_summary_dict):
         df = pd.DataFrame.from_dict(
