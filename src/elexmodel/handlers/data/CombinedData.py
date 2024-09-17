@@ -65,7 +65,7 @@ class CombinedDataHandler:
         )
 
         # identify unexpected and non-predictive units
-        unexpected_units = self._get_unexpected_units()
+        unexpected_units = self._get_unexpected_units(aggregates)
         non_modeled_units = self._get_non_modeled_units(
             percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper
         )
@@ -106,19 +106,7 @@ class CombinedDataHandler:
         # finalize all unexpected/non-modeled units
         unexpected_units["unit_category"] = "unexpected"
         non_modeled_units["unit_category"] = "non-modeled"
-
         all_unexpected_units = pd.concat([unexpected_units, non_modeled_units]).reset_index(drop=True)
-        # since we were not expecting them, we have don't have their county or district
-        # from preprocessed data. so we have to add that back in.
-        if "county_fips" in aggregates:
-            all_unexpected_units["county_fips"] = all_unexpected_units["geographic_unit_fips"].apply(
-                self._get_county_fips_from_geographic_unit_fips
-            )
-        if "district" in aggregates:
-            all_unexpected_units["district"] = all_unexpected_units["geographic_unit_fips"].apply(
-                self._get_district_from_geographic_unit_fips
-            )
-
         all_unexpected_units["reporting"] = int(0)
 
         return (reporting_units, nonreporting_units, all_unexpected_units)
@@ -152,7 +140,7 @@ class CombinedDataHandler:
         components = geographic_unit_fips.split("_")
         return components[0]
 
-    def _get_unexpected_units(self):
+    def _get_unexpected_units(self, aggregates):
         expected_geographic_units = self._get_expected_geographic_unit_fips().tolist()
         no_baseline_units = self._get_units_without_baseline()
         # Note: this uses current_data because self.data drops unexpected units
@@ -165,6 +153,18 @@ class CombinedDataHandler:
             .drop_duplicates(subset="geographic_unit_fips")
             .copy()
         )
+
+        # since we were not expecting them, we have don't have their county or district
+        # from preprocessed data. so we have to add that back in.
+        if "county_fips" in aggregates:
+            unexpected_units["county_fips"] = unexpected_units["geographic_unit_fips"].apply(
+                self._get_county_fips_from_geographic_unit_fips
+            )
+        if "district" in aggregates:
+            unexpected_units["district"] = unexpected_units["geographic_unit_fips"].apply(
+                self._get_district_from_geographic_unit_fips
+            )
+
         return unexpected_units
 
     def _get_non_modeled_units(self, percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper):
@@ -180,7 +180,7 @@ class CombinedDataHandler:
                     (self.data.turnout_factor <= turnout_factor_lower)
                     | (self.data.turnout_factor >= turnout_factor_upper)
                 )
-            ][self.current_data.columns]
+            ]
             .drop_duplicates(subset="geographic_unit_fips")
             .copy()
         )
