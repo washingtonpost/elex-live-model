@@ -31,7 +31,7 @@ class ModelResultsHandler:
         self.nonreporting_units = nonreporting_units
         self.unexpected_units = unexpected_units
 
-    def add_unit_predictions(self, estimand, unit_predictions, unit_turnout_predictions):
+    def add_unit_predictions(self, estimand, unit_predictions):
         """
         unit_predictions: data frame with unit predictions, as produced by model.get_unit_predictions
 
@@ -40,10 +40,10 @@ class ModelResultsHandler:
         self.nonreporting_units[f"pred_{estimand}"] = unit_predictions
         self.unexpected_units[f"pred_{estimand}"] = self.unexpected_units[f"results_{estimand}"]
 
-        if unit_turnout_predictions is not None:
-            self.reporting_units["pred_turnout"] = self.reporting_units["results_weights"]
-            self.nonreporting_units["pred_turnout"] = unit_turnout_predictions
-            self.unexpected_units["pred_turnout"] = self.unexpected_units["results_weights"]
+    def add_unit_turnout_predictions(self, unit_turnout_predictions):
+        self.reporting_units["pred_turnout"] = self.reporting_units["results_weights"]
+        self.nonreporting_units["pred_turnout"] = unit_turnout_predictions
+        self.unexpected_units["pred_turnout"] = self.unexpected_units["results_weights"]
 
     def add_unit_intervals(self, estimand, prediction_intervals_unit):
         """
