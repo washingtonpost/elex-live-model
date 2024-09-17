@@ -1345,7 +1345,7 @@ def test_total_aggregation(bootstrap_election_model, va_assembly_precinct_data):
     )
 
     live_data_handler.shuffle()
-    current_data = live_data_handler.get_percent_fully_reported(400)
+    current_data = live_data_handler.get_percent_fully_reported(95)
 
     preprocessed_data_handler = PreprocessedDataHandler(
         election_id, office_id, geographic_unit_type, estimands, estimands_baseline, data=va_assembly_precinct_data
@@ -1397,3 +1397,4 @@ def test_total_aggregation(bootstrap_election_model, va_assembly_precinct_data):
 
     assert all(district_lower.flatten() <= district_predictions.pred_margin + TOL)
     assert all(district_predictions.pred_margin <= district_upper.flatten() + TOL)
+
