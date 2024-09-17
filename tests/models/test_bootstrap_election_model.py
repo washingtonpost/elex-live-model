@@ -1397,4 +1397,3 @@ def test_total_aggregation(bootstrap_election_model, va_assembly_precinct_data):
 
     assert all(district_lower.flatten() <= district_predictions.pred_margin + TOL)
     assert all(district_predictions.pred_margin <= district_upper.flatten() + TOL)
-
