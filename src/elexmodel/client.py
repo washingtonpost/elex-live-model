@@ -325,23 +325,21 @@ class ModelClient:
         if APP_ENV != "local" and self.save_results:
             data.write_data(self.election_id, self.office)
 
-        non_predictive_units = unexpected_units[unexpected_units["unit_category"] == "non-modeled"]
+        non_modeled_units = unexpected_units[unexpected_units["unit_category"] == "non-modeled"]
         n_reporting_expected_units = reporting_units.shape[0]
         n_unexpected_units = len(unexpected_units[unexpected_units["unit_category"] == "unexpected"])
         n_nonreporting_units = nonreporting_units.shape[0]
-        n_non_predictive_units = len(non_predictive_units)
+        n_non_modeled_units = len(non_modeled_units)
         LOG.info(
             f"""Running model
             There are {n_reporting_expected_units} reporting and expected units.
             There are {n_unexpected_units} unexpected units.
-            There are {n_non_predictive_units} non-predictive units.
+            There are {n_non_modeled_units} non-modeled units.
             There are {n_nonreporting_units} nonreporting units."""
         )
-        if len(non_predictive_units) > 0:
-            non_predictive_units = (
-                non_predictive_units.groupby("postal_code")["geographic_unit_fips"].apply(list).to_dict()
-            )
-            LOG.info(f"non-predictive units:\n{non_predictive_units}")
+        if len(non_modeled_units) > 0:
+            non_modeled_units = non_modeled_units.groupby("postal_code")["geographic_unit_fips"].apply(list).to_dict()
+            LOG.info(f"non-modeled units:\n{non_modeled_units}")
 
         if n_reporting_expected_units < minimum_reporting_units_max:
             raise ModelNotEnoughSubunitsException(
