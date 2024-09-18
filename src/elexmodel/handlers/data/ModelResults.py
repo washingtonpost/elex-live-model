@@ -66,7 +66,7 @@ class ModelResultsHandler:
         self.unit_data[estimand] = pd.concat(
             [self.reporting_units, self.nonreporting_units, self.unexpected_units]
         ).sort_values("geographic_unit_fips")[
-            ["postal_code", "geographic_unit_fips", f"pred_{estimand}", "reporting"]
+            ["postal_code", "geographic_unit_fips", f"pred_{estimand}", "reporting", "unit_category"]
             + interval_cols
             + [f"results_{estimand}"]
             + (["pred_turnout"] if estimand == "margin" else [])
@@ -104,13 +104,6 @@ class ModelResultsHandler:
             # joins together unit data dfs (for different estimands)
             self.final_results["unit_data"] = reduce(
                 lambda x, y: pd.merge(x, y, how="inner", on=merge_on), self.unit_data.values()
-            )
-            self.final_results["unit_data"] = self.final_results["unit_data"].merge(
-                pd.concat([self.reporting_units, self.nonreporting_units, self.unexpected_units], ignore_index=True)[
-                    ["geographic_unit_fips", "unit_category"]
-                ],
-                on=["geographic_unit_fips"],
-                how="left",
             )
 
     def add_national_summary_estimates(self, national_summary_dict):
