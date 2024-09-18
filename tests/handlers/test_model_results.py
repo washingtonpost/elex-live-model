@@ -11,7 +11,7 @@ reporting = pd.DataFrame(
         "results_e1": [1000, 2000],
         "results_e2": [400, 1200],
         "reporting": [1, 1],
-        "unit_category": ["reporting", "reporting"],
+        "unit_category": ["expected", "expected"],
     }
 )
 nonreporting = pd.DataFrame(
@@ -20,7 +20,7 @@ nonreporting = pd.DataFrame(
         "postal_code": ["AB"],
         "district": ["8"],
         "reporting": [0],
-        "unit_category": ["non-reporting"],
+        "unit_category": ["expected"],
     }
 )
 notexpected = pd.DataFrame(

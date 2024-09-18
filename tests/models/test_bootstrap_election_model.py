@@ -73,11 +73,11 @@ def test_estimate_model_error(bootstrap_election_model, rng):
 
 def test_get_strata(bootstrap_election_model):
     reporting_units = pd.DataFrame(
-        [["a", 1, "reporting"], ["b", 1, "reporting"], ["c", 1, "reporting"]],
+        [["a", 1, "expected"], ["b", 1, "expected"], ["c", 1, "expected"]],
         columns=["county_classification", "reporting", "unit_category"],
     )
     nonreporting_units = pd.DataFrame(
-        [["c", 0, "non-reporting"], ["d", 0, "non-reporting"]],
+        [["c", 0, "expected"], ["d", 0, "expected"]],
         columns=["county_classification", "reporting", "unit_category"],
     )
     x_train_strata, x_test_strata = bootstrap_election_model._get_strata(reporting_units, nonreporting_units)

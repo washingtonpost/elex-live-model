@@ -85,7 +85,7 @@ class CombinedDataHandler:
             ) / reporting_units[f"last_election_results_{estimand}"]
 
         reporting_units["reporting"] = int(1)
-        reporting_units["unit_category"] = "reporting"
+        reporting_units["unit_category"] = "expected"
 
         # units where expected vote is less than the percent reporting threshold
         nonreporting_units = self.data[self.data.percent_expected_vote < percent_reporting_threshold].reset_index(
@@ -101,7 +101,7 @@ class CombinedDataHandler:
         ].reset_index(drop=True)
 
         nonreporting_units["reporting"] = int(0)
-        nonreporting_units["unit_category"] = "non-reporting"
+        nonreporting_units["unit_category"] = "expected"
 
         # finalize all unexpected/non-modeled units
         unexpected_units["unit_category"] = "unexpected"

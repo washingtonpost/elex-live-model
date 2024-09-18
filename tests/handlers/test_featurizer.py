@@ -88,16 +88,7 @@ def test_column_names():
             "fe_a": ["a", "a", "b", "c", "a", "a", "b", "d"],
             "fe_b": ["1", "x", "7", "y", "1", "z", "z", "w"],
             "reporting": [1, 1, 1, 1, 0, 0, 0, 0],
-            "unit_category": [
-                "reporting",
-                "reporting",
-                "reporting",
-                "reporting",
-                "non-reporting",
-                "non-reporting",
-                "non-reporting",
-                "non-reporting",
-            ],
+            "unit_category": ["expected"] * 8,
         }
     )
     df_new = featurizer.prepare_data(df, center_features=False, scale_features=False, add_intercept=True)
@@ -168,16 +159,7 @@ def test_generating_heldout_set():
             "fe_a": ["a", "a", "b", "c", "a", "a", "b", "d"],
             "fe_b": ["1", "x", "7", "y", "1", "z", "z", "w"],
             "reporting": [1, 1, 1, 1, 0, 0, 0, 0],
-            "unit_category": [
-                "reporting",
-                "reporting",
-                "reporting",
-                "reporting",
-                "non-reporting",
-                "non-reporting",
-                "non-reporting",
-                "non-reporting",
-            ],
+            "unit_category": ["expected"] * 8,
         }
     )
 
