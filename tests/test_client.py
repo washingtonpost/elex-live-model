@@ -474,10 +474,10 @@ def test_get_estimates_fully_reporting(model_client, va_governor_county_data, va
         "geographic_unit_fips",
         "pred_turnout",
         "reporting",
+        "unit_category",
         "lower_0.9_turnout",
         "upper_0.9_turnout",
         "results_turnout",
-        "unit_category",
     ]
 
     assert result["state_data"]["postal_code"][0] == "VA"
@@ -648,10 +648,10 @@ def test_get_estimates_some_reporting(model_client, va_governor_county_data, va_
         "geographic_unit_fips",
         "pred_turnout",
         "reporting",
+        "unit_category",
         "lower_0.9_turnout",
         "upper_0.9_turnout",
         "results_turnout",
-        "unit_category",
     ]
     assert result["state_data"]["postal_code"][0] == "VA"
     assert result["state_data"]["pred_turnout"][0] == 2587563.0
