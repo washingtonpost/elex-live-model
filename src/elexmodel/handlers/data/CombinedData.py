@@ -140,8 +140,8 @@ class CombinedDataHandler:
         )
         tf_by_state.columns = tf_by_state.columns.map(lambda x: "_".join(x))
         tf_by_state = tf_by_state.reset_index()
-        tf_by_state["tf_lower"] = tf_by_state["turnout_factor_mean"] - (tf_by_state["turnout_factor_std"] * 3)
-        tf_by_state["tf_upper"] = tf_by_state["turnout_factor_mean"] + (tf_by_state["turnout_factor_std"] * 3)
+        tf_by_state["tf_lower"] = tf_by_state["turnout_factor_mean"] - (tf_by_state["turnout_factor_std"] * 5)
+        tf_by_state["tf_upper"] = tf_by_state["turnout_factor_mean"] + (tf_by_state["turnout_factor_std"] * 5)
 
         units_with_strange_turnout_factor = units_with_strange_turnout_factor.merge(
             tf_by_state, on="postal_code", how="left"
