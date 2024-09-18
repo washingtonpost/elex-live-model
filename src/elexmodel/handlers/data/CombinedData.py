@@ -118,7 +118,7 @@ class CombinedDataHandler:
         # data is only expected units since left join of preprocessed data in initialization
         return self.data.geographic_unit_fips
 
-    def _get_units_without_baseline(self):
+    def _get_units_with_baseline_of_zero(self):
         return self.data[np.isclose(self.data.baseline_weights, 0)].geographic_unit_fips
 
     def _get_county_fips_from_geographic_unit_fips(self, geographic_unit_fips):
@@ -142,13 +142,9 @@ class CombinedDataHandler:
 
     def _get_unexpected_units(self, aggregates):
         expected_geographic_units = self._get_expected_geographic_unit_fips().tolist()
-        no_baseline_units = self._get_units_without_baseline()
         # Note: this uses current_data because self.data drops unexpected units
         unexpected_units = (
-            self.current_data[
-                ~self.current_data["geographic_unit_fips"].isin(expected_geographic_units)
-                | self.current_data.geographic_unit_fips.isin(no_baseline_units)
-            ]
+            self.current_data[~self.current_data["geographic_unit_fips"].isin(expected_geographic_units)]
             .reset_index(drop=True)
             .drop_duplicates(subset="geographic_unit_fips")
             .copy()
@@ -169,15 +165,15 @@ class CombinedDataHandler:
 
     def _get_non_modeled_units(self, percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper):
         expected_geographic_units = self._get_expected_geographic_unit_fips().tolist()
-        no_baseline_units = self._get_units_without_baseline()
+        zero_baseline_units = self._get_units_with_baseline_of_zero()
 
         units_with_strange_turnout_factor = (
             self.data[
                 (self.data.percent_expected_vote >= percent_reporting_threshold)
                 & (self.data["geographic_unit_fips"].isin(expected_geographic_units))
-                & (~self.data["geographic_unit_fips"].isin(no_baseline_units))
                 & (
-                    (self.data.turnout_factor <= turnout_factor_lower)
+                    (self.data["geographic_unit_fips"].isin(zero_baseline_units))
+                    | (self.data.turnout_factor <= turnout_factor_lower)
                     | (self.data.turnout_factor >= turnout_factor_upper)
                 )
             ]

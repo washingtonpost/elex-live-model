@@ -318,7 +318,7 @@ def test_zero_baseline_turnout_as_unexpected(va_governor_county_data):
 
     assert va_governor_county_data.loc[0].geographic_unit_fips in unexpected_data.geographic_unit_fips.tolist()
     assert len(unexpected_data) == 1
-    assert len(unexpected_data[unexpected_data["unit_category"] == "unexpected"]) == 1
+    assert len(unexpected_data[unexpected_data["unit_category"] == "non-modeled"]) == 1
 
     assert len(reporting_units) == 20 - 1
     assert va_governor_county_data.loc[0].geographic_unit_fips not in reporting_units.geographic_unit_fips.tolist()
@@ -349,6 +349,4 @@ def test_turnout_factor_as_non_predictive(va_governor_county_data):
     over = combined_data_handler.data[combined_data_handler.data.turnout_factor >= turnout_factor_upper].shape[0]
     under = combined_data_handler.data[combined_data_handler.data.turnout_factor < turnout_factor_lower].shape[0]
     assert unexpected_data.shape[0] == over + under
-    assert (
-        len(unexpected_data[unexpected_data["unit_category"] == "non-modeled"]) == (over + under) - 1
-    )  # data contains one predictive unit
+    assert len(unexpected_data[unexpected_data["unit_category"] == "non-modeled"]) == over + under
