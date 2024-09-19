@@ -1082,30 +1082,44 @@ class BootstrapElectionModel(BaseElectionModel):
 
     #     return called_contests
 
-    def _format_called_contests(self, lhs_called_contests: list, rhs_called_contests: list | None, contests: list, lhs_value: int | bool, rhs_value: int | bool | None, fill_value: int | bool) -> np.ndarray:
+    def _format_called_contests(
+        self,
+        lhs_called_contests: list,
+        rhs_called_contests: list | None,
+        contests: list,
+        lhs_value: int | bool,
+        rhs_value: int | bool | None,
+        fill_value: int | bool,
+    ) -> np.ndarray:
         """
         Create called contest numpy array
         """
         lhs_rhs_intersection = set(lhs_called_contests) & set(rhs_called_contests)
         if len(lhs_rhs_intersection) > 0:
-            raise BootstrapElectionModelException(f"You can only call a contest for one party, not for both. Currently these contests are called for both parties: {lhs_rhs_intersection}")
+            raise BootstrapElectionModelException(
+                f"You can only call a contest for one party, not for both. Currently these contests are called for both parties: {lhs_rhs_intersection}"
+            )
 
         lhs_difference_with_contests = set(lhs_called_contests) - set(contests)
         if len(lhs_difference_with_contests) > 0:
-            raise BootstrapElectionModelException(f"You can only call contests that are being run by the model. These LHS called contests do not exist: {lhs_difference_with_contests}")
+            raise BootstrapElectionModelException(
+                f"You can only call contests that are being run by the model. These LHS called contests do not exist: {lhs_difference_with_contests}"
+            )
 
         rhs_difference_with_contests = set(rhs_called_contests) - set(contests)
         if len(rhs_difference_with_contests) > 0:
-            raise BootstrapElectionModelException(f"You can only call contests that are being run by the model. These RHS called contests do not exist: {rhs_difference_with_contests}")
+            raise BootstrapElectionModelException(
+                f"You can only call contests that are being run by the model. These RHS called contests do not exist: {rhs_difference_with_contests}"
+            )
 
-        # the order in called_coteests need 
+        # the order in called_coteests need
         called_contests = np.full(len(contests), fill_value)
         for i, contest in enumerate(contests):
             if contest in lhs_called_contests:
                 called_contests[i] = lhs_value
             elif contest in rhs_called_contests:
                 called_contests[i] = rhs_value
-        
+
         return called_contests
 
     def _adjust_called_contests(self, to_call: np.array, called_contests: dict) -> np.array:
@@ -1161,11 +1175,11 @@ class BootstrapElectionModel(BaseElectionModel):
             all_units[aggregate_temp_column_name] = all_units[aggregate].agg("_".join, axis=1)
             dummies = pd.get_dummies(all_units[aggregate_temp_column_name])
             aggregate_indicator = dummies.values
-            contests = [x.split('_')[-1] for x in dummies.columns]
+            contests = [x.split("_")[-1] for x in dummies.columns]
         else:
             dummies = pd.get_dummies(all_units[aggregate])
             aggregate_indicator = dummies.values
-            contests = [x.split('_')[-1] for x in dummies.columns]
+            contests = [x.split("_")[-1] for x in dummies.columns]
             aggregate_temp_column_name = aggregate
 
         # the unit level predictions that come in through reporting_units and nonreporting_units
@@ -1307,11 +1321,11 @@ class BootstrapElectionModel(BaseElectionModel):
             all_units[aggregate_temp_column_name] = all_units[aggregate].agg("_".join, axis=1)
             dummies = pd.get_dummies(all_units[aggregate_temp_column_name])
             aggregate_indicator = dummies.values
-            contests = [x.split('_')[-1] for x in dummies.columns]
+            contests = [x.split("_")[-1] for x in dummies.columns]
         else:
             dummies = pd.get_dummies(all_units[aggregate])
             aggregate_indicator = dummies.values
-            contests = [x.split('_')[-1] for x in dummies.columns]
+            contests = [x.split("_")[-1] for x in dummies.columns]
         aggregate_indicator_expected = aggregate_indicator[: (n_train + n_test)]
 
         # first compute turnout and unnormalized margin for unexpected units.

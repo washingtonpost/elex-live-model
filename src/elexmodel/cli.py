@@ -53,9 +53,19 @@ class PythonLiteralOption(click.Option):
     help="A dictionary of model parameters",
 )
 @click.option(
-    "--lhs_called_contests", "lhs_called_contests", help="contests called for the lhs party (ie. the party for which margin predictions > 0 are winners)", default=None, multiple=True)
+    "--lhs_called_contests",
+    "lhs_called_contests",
+    help="contests called for the lhs party (ie. the party for which margin predictions > 0 are winners)",
+    default=None,
+    multiple=True,
+)
 @click.option(
-    "--rhs_called_contests", "rhs_called_contests", help="contests called for the rhs party (ie. the party for which margin predictions < 0 are winners)", default=None, multiple=True)
+    "--rhs_called_contests",
+    "rhs_called_contests",
+    help="contests called for the rhs party (ie. the party for which margin predictions < 0 are winners)",
+    default=None,
+    multiple=True,
+)
 @click.option(
     "--stop_model_call",
     "stop_model_call",

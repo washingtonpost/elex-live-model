@@ -387,7 +387,7 @@ class ModelClient:
                     aggregate_list,
                     estimand,
                     lhs_called_contests=lhs_called_contests,
-                    rhs_called_contests=rhs_called_contests
+                    rhs_called_contests=rhs_called_contests,
                 )
                 alpha_to_agg_prediction_intervals = {}
                 for alpha in prediction_intervals:
