@@ -53,14 +53,15 @@ class PythonLiteralOption(click.Option):
     help="A dictionary of model parameters",
 )
 @click.option(
-    "--called_contests", "called_contests", default="{}", cls=PythonLiteralOption, help="A dictionary with race calls"
-)
+    "--lhs_called_contests", "lhs_called_contests", help="contests called for the lhs party (ie. the party for which margin predictions > 0 are winners)", default=None, multiple=True)
 @click.option(
-    "--allow_model_call",
-    "allow_model_call",
-    default="{}",
-    cls=PythonLiteralOption,
-    help="A dictionary to allow model race calls",
+    "--rhs_called_contests", "rhs_called_contests", help="contests called for the rhs party (ie. the party for which margin predictions < 0 are winners)", default=None, multiple=True)
+@click.option(
+    "--stop_model_call",
+    "stop_model_call",
+    default=None,
+    multiple=True,
+    help="contests for which we don't allow model calls",
 )
 @click.option(
     "--percent_reporting",
