@@ -1122,7 +1122,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         return called_contests
 
-    def _adjust_called_contests(self, to_call: np.array, called_contests: dict) -> np.array:
+    def _adjust_called_contests(self, to_call: np.array, called_contests: list) -> np.array:
         """
         This functions applies race calls to the point prediction
         """
@@ -1132,8 +1132,8 @@ class BootstrapElectionModel(BaseElectionModel):
         # array sorted by contest, where the element is the call indicator (1, 0 or -1)
         # contest_call_array = np.array([contest_tuple[1] for contest_tuple in sorted(called_contests.items())])
         to_call_mod = to_call.values.copy()
-        to_call_mod[np.isclose(called_contests, 1)] == self.lhs_called_threshold
-        to_call_mod[np.isclose(called_contests, 0)] = self.rhs_called_threshold
+        to_call_mod[np.isclose(called_contests, 1)] = np.maximum(self.lhs_called_threshold, to_call[np.isclose(called_contests, 1)])
+        to_call_mod[np.isclose(called_contests, 0)] = np.minimum(self.rhs_called_threshold, to_call[np.isclose(called_contests, 0)])
         return to_call_mod
         # return np.where(
         #     np.isclose(called_contests, -1),
@@ -1226,7 +1226,7 @@ class BootstrapElectionModel(BaseElectionModel):
             lhs_called_contests = kwargs.get("lhs_called_contests")
             rhs_called_contests = kwargs.get("rhs_called_contests")
             called_contests = self._format_called_contests(lhs_called_contests, rhs_called_contests, contests, 1, 0, -1)
-
+            
             self.aggregate_pred_margin = self._adjust_called_contests(
                 raw_margin_df.pred_margin, called_contests
             ).reshape(-1, 1)
@@ -1416,7 +1416,7 @@ class BootstrapElectionModel(BaseElectionModel):
                 interval_lower_i = interval_lower[i]
                 interval_upper_i = interval_upper[i]
 
-                if stop_model_call:
+                if stop_model_call_i:
                     # if we don't allow the model call, then force the lower interval to be below zero and the upper interval to be above zero
                     if interval_lower_i > 0:
                         # if interval_lower_i > 0 then our model thinks the race is called for the LHS party.
