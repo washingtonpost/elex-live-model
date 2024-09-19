@@ -1101,8 +1101,12 @@ class BootstrapElectionModel(BaseElectionModel):
         This functions applies race calls to the point prediction
         """
         to_call_mod = to_call.copy()
-        to_call_mod[np.isclose(called_contests, 1)] = np.maximum(self.lhs_called_threshold, to_call[np.isclose(called_contests, 1)])
-        to_call_mod[np.isclose(called_contests, 0)] = np.minimum(self.rhs_called_threshold, to_call[np.isclose(called_contests, 0)])
+        to_call_mod[np.isclose(called_contests, 1)] = np.maximum(
+            self.lhs_called_threshold, to_call[np.isclose(called_contests, 1)]
+        )
+        to_call_mod[np.isclose(called_contests, 0)] = np.minimum(
+            self.rhs_called_threshold, to_call[np.isclose(called_contests, 0)]
+        )
         return to_call_mod
 
     def get_aggregate_predictions(
@@ -1183,7 +1187,7 @@ class BootstrapElectionModel(BaseElectionModel):
             lhs_called_contests = kwargs.get("lhs_called_contests", [])
             rhs_called_contests = kwargs.get("rhs_called_contests", [])
             called_contests = self._format_called_contests(lhs_called_contests, rhs_called_contests, contests, 1, 0, -1)
-            
+
             self.aggregate_pred_margin = self._adjust_called_contests(
                 raw_margin_df.pred_margin.values, called_contests
             ).reshape(-1, 1)
