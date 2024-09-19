@@ -1056,38 +1056,12 @@ class BootstrapElectionModel(BaseElectionModel):
             len(aggregate) == 2 and "postal_code" in aggregate and "district" in aggregate
         )
 
-    # def _format_called_contests_dictionary(self, called_contests: dict | None, fill_value: int | bool) -> dict:
-    #     """
-    #     Make sure that the called contest dictionary has the correct format
-    #     """
-    #     # called_contests is a dictionary where 1 means that the LHS party has won, 0 means that the RHS party has won
-    #     # and -1 means that the contest is not called. If called_contests is None, assume that all contests are not called.
-    #     if called_contests is None or len(called_contests) == 0:
-    #         called_contests = {i: fill_value for i in range(self.n_contests)}
-
-    #     if len(called_contests) != self.n_contests:
-    #         raise BootstrapElectionModelException(
-    #             f"called_contests is of length {len(called_contests)} but there are {self.n_contests} contests"
-    #         )
-
-    #     called_contest_acceptable_values = {0, 1, -1}
-    #     if not all(
-    #         any(np.isclose(value, acceptable_value) for acceptable_value in called_contest_acceptable_values)
-    #         in called_contest_acceptable_values
-    #         for value in called_contests.values()
-    #     ):
-    #         raise BootstrapElectionModelException(
-    #             f"called_contest values need to be either 0, 1, or -1. But current value is {called_contests}"
-    #         )
-
-    #     return called_contests
-
     def _format_called_contests(
         self,
         lhs_called_contests: list,
-        rhs_called_contests: list | None,
+        rhs_called_contests: list,
         contests: list,
-        lhs_value: int | bool,
+        lhs_value: int | bool | None,
         rhs_value: int | bool | None,
         fill_value: int | bool,
     ) -> np.ndarray:
@@ -1126,28 +1100,10 @@ class BootstrapElectionModel(BaseElectionModel):
         """
         This functions applies race calls to the point prediction
         """
-
-        # called_contests = self._format_called_contests_dictionary(called_contests, fill_value=-1)
-
-        # array sorted by contest, where the element is the call indicator (1, 0 or -1)
-        # contest_call_array = np.array([contest_tuple[1] for contest_tuple in sorted(called_contests.items())])
-        to_call_mod = to_call.values.copy()
+        to_call_mod = to_call.copy()
         to_call_mod[np.isclose(called_contests, 1)] = np.maximum(self.lhs_called_threshold, to_call[np.isclose(called_contests, 1)])
         to_call_mod[np.isclose(called_contests, 0)] = np.minimum(self.rhs_called_threshold, to_call[np.isclose(called_contests, 0)])
         return to_call_mod
-        # return np.where(
-        #     np.isclose(called_contests, -1),
-        #     to_call,  # if contest i is uncalled then we continue to use the value that was present before
-        #     np.where(
-        #         np.isclose(called_contests, 1),  # if contest i is called for LHS party
-        #         np.maximum(
-        #             to_call, self.lhs_called_threshold
-        #         ),  # then value is max of what is was and lhs_called_threshold
-        #         np.minimum(
-        #             to_call, self.rhs_called_threshold
-        #         ),  # in this case the contest is called for RHS party so the value should be min of what it was and rhs_called_threshold (min because negative)
-        #     ),
-        # )
 
     def get_aggregate_predictions(
         self,
@@ -1175,11 +1131,12 @@ class BootstrapElectionModel(BaseElectionModel):
             all_units[aggregate_temp_column_name] = all_units[aggregate].agg("_".join, axis=1)
             dummies = pd.get_dummies(all_units[aggregate_temp_column_name])
             aggregate_indicator = dummies.values
-            contests = [x.split("_")[-1] for x in dummies.columns]
+            contests = dummies.columns
         else:
-            dummies = pd.get_dummies(all_units[aggregate])
+            # since aggregate is of length zero we can grab the first element
+            dummies = pd.get_dummies(all_units[aggregate[0]])
             aggregate_indicator = dummies.values
-            contests = [x.split("_")[-1] for x in dummies.columns]
+            contests = dummies.columns
             aggregate_temp_column_name = aggregate
 
         # the unit level predictions that come in through reporting_units and nonreporting_units
@@ -1223,12 +1180,12 @@ class BootstrapElectionModel(BaseElectionModel):
         # if we are in the top level prediction, then save the aggregated baseline margin,
         # which we will need for the national summary (e.g. ecv) model
         if self._is_top_level_aggregate(aggregate):
-            lhs_called_contests = kwargs.get("lhs_called_contests")
-            rhs_called_contests = kwargs.get("rhs_called_contests")
+            lhs_called_contests = kwargs.get("lhs_called_contests", [])
+            rhs_called_contests = kwargs.get("rhs_called_contests", [])
             called_contests = self._format_called_contests(lhs_called_contests, rhs_called_contests, contests, 1, 0, -1)
             
             self.aggregate_pred_margin = self._adjust_called_contests(
-                raw_margin_df.pred_margin, called_contests
+                raw_margin_df.pred_margin.values, called_contests
             ).reshape(-1, 1)
             raw_margin_df["pred_margin"] = self.aggregate_pred_margin
 
@@ -1321,11 +1278,12 @@ class BootstrapElectionModel(BaseElectionModel):
             all_units[aggregate_temp_column_name] = all_units[aggregate].agg("_".join, axis=1)
             dummies = pd.get_dummies(all_units[aggregate_temp_column_name])
             aggregate_indicator = dummies.values
-            contests = [x.split("_")[-1] for x in dummies.columns]
+            contests = dummies.columns
         else:
-            dummies = pd.get_dummies(all_units[aggregate])
+            # since aggregate is of length one, we can grab the first element
+            dummies = pd.get_dummies(all_units[aggregate[0]])
             aggregate_indicator = dummies.values
-            contests = [x.split("_")[-1] for x in dummies.columns]
+            contests = dummies.columns
         aggregate_indicator_expected = aggregate_indicator[: (n_train + n_test)]
 
         # first compute turnout and unnormalized margin for unexpected units.
@@ -1401,11 +1359,11 @@ class BootstrapElectionModel(BaseElectionModel):
         if self._is_top_level_aggregate(aggregate):
             aggregate_perc_margin_total = self.aggregate_pred_margin
 
-            lhs_called_contests = kwargs.get("lhs_called_contests")
-            rhs_called_contests = kwargs.get("rhs_called_contests")
+            lhs_called_contests = kwargs.get("lhs_called_contests", [])
+            rhs_called_contests = kwargs.get("rhs_called_contests", [])
             called_contests = self._format_called_contests(lhs_called_contests, rhs_called_contests, contests, 1, 0, -1)
 
-            stop_model_call = kwargs.get("stop_model_call")
+            stop_model_call = kwargs.get("stop_model_call", [])
             stop_model_call = self._format_called_contests(stop_model_call, [], contests, True, None, False)
 
             interval_upper, interval_lower = (
