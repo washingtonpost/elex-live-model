@@ -87,8 +87,8 @@ def test_column_names():
             "d": [1, 2, 3, 4, 5, 3, 1, 5],
             "fe_a": ["a", "a", "b", "c", "a", "a", "b", "d"],
             "fe_b": ["1", "x", "7", "y", "1", "z", "z", "w"],
-            "reporting": [True, True, True, True, False, False, False, False],
-            "expected": [True, True, True, True, False, False, False, False],
+            "reporting": [1, 1, 1, 1, 0, 0, 0, 0],
+            "unit_category": ["expected"] * 8,
         }
     )
     df_new = featurizer.prepare_data(df, center_features=False, scale_features=False, add_intercept=True)
@@ -158,8 +158,8 @@ def test_generating_heldout_set():
             "d": [1, 2, 3, 4, 5, 3, 1, 5],
             "fe_a": ["a", "a", "b", "c", "a", "a", "b", "d"],
             "fe_b": ["1", "x", "7", "y", "1", "z", "z", "w"],
-            "reporting": [True, True, True, True, False, False, False, False],
-            "expected": [True, True, True, True, False, False, False, False],
+            "reporting": [1, 1, 1, 1, 0, 0, 0, 0],
+            "unit_category": ["expected"] * 8,
         }
     )
 
@@ -347,8 +347,7 @@ def test_generate_fixed_effects(va_governor_county_data):
         handle_unreporting="drop",
     )
 
-    reporting_data = combined_data_handler.get_reporting_units(99, 0.5, 1.5)
-    nonreporting_data = combined_data_handler.get_nonreporting_units(99, 0.5, 1.5)
+    (reporting_data, nonreporting_data, _) = combined_data_handler.get_units(99, 0.5, 1.5, [])
 
     featurizer = Featurizer([], {"county_classification": "all"})
 
@@ -382,8 +381,7 @@ def test_generate_fixed_effects(va_governor_county_data):
 
     featurizer = Featurizer([], {"county_classification": ["all"], "county_fips": ["all"]})
 
-    reporting_data = combined_data_handler.get_reporting_units(99, 0.5, 1.5)
-    nonreporting_data = combined_data_handler.get_nonreporting_units(99, 0.5, 1.5)
+    (reporting_data, nonreporting_data, _) = combined_data_handler.get_units(99, 0.5, 1.5, [])
 
     n_train = reporting_data.shape[0]
     all_units = pd.concat([reporting_data, nonreporting_data], axis=0)
@@ -438,8 +436,7 @@ def test_generate_fixed_effects_not_all_reporting(va_governor_county_data):
         handle_unreporting="drop",
     )
 
-    reporting_data = combined_data_handler.get_reporting_units(99, 0.5, 1.5)
-    nonreporting_data = combined_data_handler.get_nonreporting_units(99, 0.5, 1.5)
+    (reporting_data, nonreporting_data, _) = combined_data_handler.get_units(99, 0.5, 1.5, [])
 
     featurizer = Featurizer([], {"county_fips": ["all"]})
     n_train = reporting_data.shape[0]
@@ -504,8 +501,7 @@ def test_generate_fixed_effects_mixed_reporting(va_governor_precinct_data):
         handle_unreporting="drop",
     )
 
-    reporting_data = combined_data_handler.get_reporting_units(99, 0.5, 1.5)
-    nonreporting_data = combined_data_handler.get_nonreporting_units(99, 0.5, 1.5)
+    (reporting_data, nonreporting_data, _) = combined_data_handler.get_units(99, 0.5, 1.5, [])
 
     featurizer = Featurizer([], ["county_fips"])
 

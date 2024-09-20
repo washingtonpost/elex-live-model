@@ -66,7 +66,7 @@ class ModelResultsHandler:
         self.unit_data[estimand] = pd.concat(
             [self.reporting_units, self.nonreporting_units, self.unexpected_units]
         ).sort_values("geographic_unit_fips")[
-            ["postal_code", "geographic_unit_fips", f"pred_{estimand}", "reporting"]
+            ["postal_code", "geographic_unit_fips", f"pred_{estimand}", "reporting", "unit_category"]
             + interval_cols
             + [f"results_{estimand}"]
             + (["pred_turnout"] if estimand == "margin" else [])
