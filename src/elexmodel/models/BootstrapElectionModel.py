@@ -1282,7 +1282,7 @@ class BootstrapElectionModel(BaseElectionModel):
         else:
             # since aggregate is of length one, we can grab the first element
             dummies = pd.get_dummies(all_units[aggregate[0]])
-        
+
         aggregate_indicator = dummies.values
         contests = dummies.columns
         aggregate_indicator_expected = aggregate_indicator[: (n_train + n_test)]
