@@ -196,25 +196,10 @@ def test_get_reporting_data_dropping_with_turnout_factor(va_governor_county_data
     va_governor_county_data["last_election_results_turnout"] = va_governor_county_data.baseline_turnout + 1
 
     combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
-
-    turnout_factor_lower = 0.95
-    turnout_factor_upper = 1.2
-    reporting_units_above_turnout_factor_threshold = combined_data_handler.data[
-        combined_data_handler.data.turnout_factor > turnout_factor_upper
-    ].shape[0]
-    reporting_units_below_turnout_factor_threshold = combined_data_handler.data[
-        (combined_data_handler.data.percent_expected_vote == 100)
-        & (combined_data_handler.data.turnout_factor < turnout_factor_lower)
-    ].shape[0]
-
     (observed_data, _, _) = combined_data_handler.get_units(100, [])
 
-    # 20 units should be reporting,
-    # but the additional ones are dropped to unexpected because they are above/below threshold
-    # and so are subtracted from the reporting ones
-    assert observed_data.shape[0] == 20 - (
-        reporting_units_above_turnout_factor_threshold + reporting_units_below_turnout_factor_threshold
-    )
+    # 20 units should be reporting, all are expected and non are non-modeled
+    assert observed_data.shape[0] == 20
 
 
 def test_get_unexpected_units_county_district(va_assembly_county_data):
@@ -246,7 +231,7 @@ def test_get_unexpected_units_county_district(va_assembly_county_data):
     assert unexpected_data["county_fips"].map(lambda x: len(x) == 6).all()
     assert unexpected_data[unexpected_data.district == ""].shape[0] == 0
     assert unexpected_data["district"].map(lambda x: len(x) < 6).all()
-    # no non-predictive units here
+    # no non-modeled units here
     assert len(unexpected_data[unexpected_data["unit_category"] == "unexpected"]) == unexpected_units
 
 
@@ -284,7 +269,7 @@ def test_get_unexpected_units_county(va_governor_county_data):
     assert unexpected_data["county_fips"].map(lambda x: len(x) == 6).all()
     # test that nonreporting unexpected unit is captured here
     assert unexpected_data[unexpected_data.percent_expected_vote == 50].shape[0] == 1
-    # no non-predictive units here
+    # no non-modeled units here
     assert len(unexpected_data[unexpected_data["unit_category"] == "unexpected"]) == reporting_unexpected_units + 1
 
 
@@ -309,10 +294,12 @@ def test_zero_baseline_turnout_as_unexpected(va_governor_county_data):
     assert va_governor_county_data.loc[0].geographic_unit_fips in unexpected_data.geographic_unit_fips.tolist()
     assert len(unexpected_data) == 1
     assert len(unexpected_data[unexpected_data["unit_category"] == "non-modeled"]) == 1
+    assert len(reporting_units) == 20 - 1
+    assert va_governor_county_data.loc[0].geographic_unit_fips not in reporting_units.geographic_unit_fips.tolist()
     assert va_governor_county_data.loc[0].geographic_unit_fips not in nonreporting_units.geographic_unit_fips.tolist()
 
 
-def test_turnout_factor_as_non_predictive(va_governor_county_data):
+def test_turnout_factor_as_non_modeled(va_governor_county_data):
     election_id = "2017-11-07_VA_G"
     office = "G"
     geographic_unit_type = "county"
@@ -327,12 +314,6 @@ def test_turnout_factor_as_non_predictive(va_governor_county_data):
     va_governor_county_data["baseline_weights"] = va_governor_county_data.baseline_turnout
     va_governor_county_data["last_election_results_turnout"] = va_governor_county_data.baseline_turnout + 1
     combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
-    turnout_factor_lower = 0.95
-    turnout_factor_upper = 1.2
-
     (_, _, unexpected_data) = combined_data_handler.get_units(100, ["county_fips"])
 
-    over = combined_data_handler.data[combined_data_handler.data.turnout_factor >= turnout_factor_upper].shape[0]
-    under = combined_data_handler.data[combined_data_handler.data.turnout_factor < turnout_factor_lower].shape[0]
-    assert unexpected_data.shape[0] == over + under
-    assert len(unexpected_data[unexpected_data["unit_category"] == "non-modeled"]) == over + under
+    assert len(unexpected_data[unexpected_data["unit_category"] == "non-modeled"]) == 1
