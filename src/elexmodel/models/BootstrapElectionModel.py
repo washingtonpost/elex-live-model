@@ -1134,14 +1134,12 @@ class BootstrapElectionModel(BaseElectionModel):
             aggregate_temp_column_name = "-".join(aggregate)
             all_units[aggregate_temp_column_name] = all_units[aggregate].agg("_".join, axis=1)
             dummies = pd.get_dummies(all_units[aggregate_temp_column_name])
-            aggregate_indicator = dummies.values
-            contests = dummies.columns
         else:
             # since aggregate is of length zero we can grab the first element
             dummies = pd.get_dummies(all_units[aggregate[0]])
-            aggregate_indicator = dummies.values
-            contests = dummies.columns
             aggregate_temp_column_name = aggregate
+        aggregate_indicator = dummies.values
+        contests = dummies.columns
 
         # the unit level predictions that come in through reporting_units and nonreporting_units
         # are unnormalized. Since we want the normalized margin for the aggregate predictions
@@ -1281,13 +1279,12 @@ class BootstrapElectionModel(BaseElectionModel):
             aggregate_temp_column_name = "-".join(aggregate)
             all_units[aggregate_temp_column_name] = all_units[aggregate].agg("_".join, axis=1)
             dummies = pd.get_dummies(all_units[aggregate_temp_column_name])
-            aggregate_indicator = dummies.values
-            contests = dummies.columns
         else:
             # since aggregate is of length one, we can grab the first element
             dummies = pd.get_dummies(all_units[aggregate[0]])
-            aggregate_indicator = dummies.values
-            contests = dummies.columns
+        
+        aggregate_indicator = dummies.values
+        contests = dummies.columns
         aggregate_indicator_expected = aggregate_indicator[: (n_train + n_test)]
 
         # first compute turnout and unnormalized margin for unexpected units.
