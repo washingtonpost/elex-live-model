@@ -11,9 +11,18 @@ reporting = pd.DataFrame(
         "results_e1": [1000, 2000],
         "results_e2": [400, 1200],
         "reporting": [1, 1],
+        "unit_category": ["expected", "expected"],
     }
 )
-nonreporting = pd.DataFrame({"geographic_unit_fips": ["c"], "postal_code": ["AB"], "district": ["8"], "reporting": [0]})
+nonreporting = pd.DataFrame(
+    {
+        "geographic_unit_fips": ["c"],
+        "postal_code": ["AB"],
+        "district": ["8"],
+        "reporting": [0],
+        "unit_category": ["expected"],
+    }
+)
 notexpected = pd.DataFrame(
     {
         "geographic_unit_fips": ["d"],
@@ -22,6 +31,7 @@ notexpected = pd.DataFrame(
         "results_e1": [0],
         "results_e2": [0],
         "reporting": [0],
+        "unit_category": ["unexpected"],
     }
 )
 predictions_e1 = [1200]

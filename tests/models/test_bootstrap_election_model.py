@@ -73,11 +73,12 @@ def test_estimate_model_error(bootstrap_election_model, rng):
 
 def test_get_strata(bootstrap_election_model):
     reporting_units = pd.DataFrame(
-        [["a", True, True], ["b", True, True], ["c", True, True]],
-        columns=["county_classification", "reporting", "expected"],
+        [["a", 1, "expected"], ["b", 1, "expected"], ["c", 1, "expected"]],
+        columns=["county_classification", "reporting", "unit_category"],
     )
     nonreporting_units = pd.DataFrame(
-        [["c", False, True], ["d", False, True]], columns=["county_classification", "reporting", "expected"]
+        [["c", 0, "expected"], ["d", 0, "expected"]],
+        columns=["county_classification", "reporting", "unit_category"],
     )
     x_train_strata, x_test_strata = bootstrap_election_model._get_strata(reporting_units, nonreporting_units)
 
@@ -490,9 +491,9 @@ def test_compute_bootstrap_errors(bootstrap_election_model, va_governor_county_d
         preprocessed_data_handler.data, current_data, estimands, geographic_unit_type, handle_unreporting="drop"
     )
 
-    reporting_units = combined_data_handler.get_reporting_units(percent_reporting_threshold)
-    nonreporting_units = combined_data_handler.get_nonreporting_units(percent_reporting_threshold)
-    unexpected_units = combined_data_handler.get_unexpected_units(percent_reporting_threshold, ["postal_code"])
+    (reporting_units, nonreporting_units, unexpected_units) = combined_data_handler.get_units(
+        percent_reporting_threshold, aggregates=["postal_code"]
+    )
 
     assert not bootstrap_election_model.ran_bootstrap
     bootstrap_election_model.B = 10
@@ -528,9 +529,9 @@ def test_get_unit_predictions(bootstrap_election_model, va_governor_county_data)
         preprocessed_data_handler.data, current_data, estimands, geographic_unit_type, handle_unreporting="drop"
     )
 
-    reporting_units = combined_data_handler.get_reporting_units(percent_reporting_threshold)
-    nonreporting_units = combined_data_handler.get_nonreporting_units(percent_reporting_threshold)
-    unexpected_units = combined_data_handler.get_unexpected_units(percent_reporting_threshold, ["postal_code"])
+    (reporting_units, nonreporting_units, unexpected_units) = combined_data_handler.get_units(
+        percent_reporting_threshold, aggregates=["postal_code"]
+    )
 
     bootstrap_election_model.B = 10
     assert not bootstrap_election_model.ran_bootstrap
@@ -1303,11 +1304,8 @@ def test_total_aggregation(bootstrap_election_model, va_assembly_precinct_data):
         preprocessed_data_handler.data, current_data, estimands, geographic_unit_type
     )
 
-    reporting_units = combined_data_handler.get_reporting_units(percent_reporting_threshold)
-    nonreporting_units = combined_data_handler.get_nonreporting_units(percent_reporting_threshold)
-    unexpected_units = combined_data_handler.get_unexpected_units(
-        percent_reporting_threshold,
-        aggregates=["postal_code", "district"],
+    (reporting_units, nonreporting_units, unexpected_units) = combined_data_handler.get_units(
+        percent_reporting_threshold, ["postal_code", "district"]
     )
 
     bootstrap_election_model.B = 300
