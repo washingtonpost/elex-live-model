@@ -69,7 +69,9 @@ Parameters for the CLI tool:
 | aggregates           | list    | list of geographies for which to calculate predictions beyond the original `postal_code`, `county_fips`, `district`, `county_classification` |
 | pi_method            | string  | method for constructing prediction intervals (`nonparametric` or `gaussian`) |
 | model_parameters     | dict    | dictionary of model specific parameters e.g. `--model_parameters='{"robust":True}'` |
-| called_contests      | dict    | a dictionary of called contests. specific to Bootstrap model for now. e.g. `--called_contests='{"VA": -1}'` |
+| lhs_called_contests  | list    | a list of states called for lhs party (ie. ones where prediction > 0) |
+| rhs_called_contests  | list    | a list of states called for rhs party (ie. ones where prediction < 0) |
+| stop_model_call      | list    | a list of states for which we should override the model call |
 | save_output          | list    | `results`, `data`, `config` |
 | unexpected_units     | int     | number of unexpected units to simulate; only used for testing and does not work with historical run |
 | national_summary     | flag    | When not running a historical election, specify this flag to output national summary (aggregate model) estimates. |

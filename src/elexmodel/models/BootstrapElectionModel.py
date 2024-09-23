@@ -1056,55 +1056,58 @@ class BootstrapElectionModel(BaseElectionModel):
             len(aggregate) == 2 and "postal_code" in aggregate and "district" in aggregate
         )
 
-    def _format_called_contests_dictionary(self, called_contests: dict | None) -> dict:
+    def _format_called_contests(
+        self,
+        lhs_called_contests: list,
+        rhs_called_contests: list,
+        contests: list,
+        lhs_value: int | bool | None,
+        rhs_value: int | bool | None,
+        fill_value: int | bool,
+    ) -> np.ndarray:
         """
-        Make sure that the called contest dictionary has the correct format
+        Create called contest numpy array
         """
-        # called_contests is a dictionary where 1 means that the LHS party has won, 0 means that the RHS party has won
-        # and -1 means that the contest is not called. If called_contests is None, assume that all contests are not called.
-        if called_contests is None or len(called_contests) == 0:
-            called_contests = {i: -1 for i in range(self.n_contests)}
-
-        if len(called_contests) != self.n_contests:
+        lhs_rhs_intersection = set(lhs_called_contests) & set(rhs_called_contests)
+        if len(lhs_rhs_intersection) > 0:
             raise BootstrapElectionModelException(
-                f"called_contests is of length {len(called_contests)} but there are {self.n_contests} contests"
+                f"You can only call a contest for one party, not for both. Currently these contests are called for both parties: {lhs_rhs_intersection}"
             )
 
-        called_contest_acceptable_values = {0, 1, -1}
-        if not all(
-            any(np.isclose(value, acceptable_value) for acceptable_value in called_contest_acceptable_values)
-            in called_contest_acceptable_values
-            for value in called_contests.values()
-        ):
+        lhs_difference_with_contests = set(lhs_called_contests) - set(contests)
+        if len(lhs_difference_with_contests) > 0:
             raise BootstrapElectionModelException(
-                f"called_contest values need to be either 0, 1, or -1. But current value is {called_contests}"
+                f"You can only call contests that are being run by the model. These LHS called contests do not exist: {lhs_difference_with_contests}"
             )
+
+        rhs_difference_with_contests = set(rhs_called_contests) - set(contests)
+        if len(rhs_difference_with_contests) > 0:
+            raise BootstrapElectionModelException(
+                f"You can only call contests that are being run by the model. These RHS called contests do not exist: {rhs_difference_with_contests}"
+            )
+
+        # the order in called_coteests need
+        called_contests = np.full(len(contests), fill_value)
+        for i, contest in enumerate(contests):
+            if contest in lhs_called_contests:
+                called_contests[i] = lhs_value
+            elif contest in rhs_called_contests:
+                called_contests[i] = rhs_value
 
         return called_contests
 
-    def _adjust_called_contests(self, to_call: np.array, called_contests: dict) -> np.array:
+    def _adjust_called_contests(self, to_call: np.array, called_contests: list) -> np.array:
         """
         This functions applies race calls to the point prediction
         """
-
-        called_contests = self._format_called_contests_dictionary(called_contests)
-
-        # array sorted by contest, where the element is the call indicator (1, 0 or -1)
-        contest_call_array = np.array([contest_tuple[1] for contest_tuple in sorted(called_contests.items())])
-
-        return np.where(
-            np.isclose(contest_call_array, -1),
-            to_call,  # if contest i is uncalled then we continue to use the value that was present before
-            np.where(
-                np.isclose(contest_call_array, 1),  # if contest i is called for LHS party
-                np.maximum(
-                    to_call, self.lhs_called_threshold
-                ),  # then value is max of what is was and lhs_called_threshold
-                np.minimum(
-                    to_call, self.rhs_called_threshold
-                ),  # in this case the contest is called for RHS party so the value should be min of what it was and rhs_called_threshold (min because negative)
-            ),
+        to_call_mod = to_call.copy()
+        to_call_mod[np.isclose(called_contests, 1)] = np.maximum(
+            self.lhs_called_threshold, to_call[np.isclose(called_contests, 1)]
         )
+        to_call_mod[np.isclose(called_contests, 0)] = np.minimum(
+            self.rhs_called_threshold, to_call[np.isclose(called_contests, 0)]
+        )
+        return to_call_mod
 
     def get_aggregate_predictions(
         self,
@@ -1130,10 +1133,13 @@ class BootstrapElectionModel(BaseElectionModel):
         if len(aggregate) > 1:
             aggregate_temp_column_name = "-".join(aggregate)
             all_units[aggregate_temp_column_name] = all_units[aggregate].agg("_".join, axis=1)
-            aggregate_indicator = pd.get_dummies(all_units[aggregate_temp_column_name]).values
+            dummies = pd.get_dummies(all_units[aggregate_temp_column_name])
         else:
-            aggregate_indicator = pd.get_dummies(all_units[aggregate]).values
+            # since aggregate is of length zero we can grab the first element
+            dummies = pd.get_dummies(all_units[aggregate[0]])
             aggregate_temp_column_name = aggregate
+        aggregate_indicator = dummies.values
+        contests = dummies.columns
 
         # the unit level predictions that come in through reporting_units and nonreporting_units
         # are unnormalized. Since we want the normalized margin for the aggregate predictions
@@ -1176,9 +1182,12 @@ class BootstrapElectionModel(BaseElectionModel):
         # if we are in the top level prediction, then save the aggregated baseline margin,
         # which we will need for the national summary (e.g. ecv) model
         if self._is_top_level_aggregate(aggregate):
-            called_contests = kwargs.get("called_contests")
+            lhs_called_contests = kwargs.get("lhs_called_contests", [])
+            rhs_called_contests = kwargs.get("rhs_called_contests", [])
+            called_contests = self._format_called_contests(lhs_called_contests, rhs_called_contests, contests, 1, 0, -1)
+
             self.aggregate_pred_margin = self._adjust_called_contests(
-                raw_margin_df.pred_margin, called_contests
+                raw_margin_df.pred_margin.values, called_contests
             ).reshape(-1, 1)
             raw_margin_df["pred_margin"] = self.aggregate_pred_margin
 
@@ -1269,9 +1278,13 @@ class BootstrapElectionModel(BaseElectionModel):
         if len(aggregate) > 1:
             aggregate_temp_column_name = "-".join(aggregate)
             all_units[aggregate_temp_column_name] = all_units[aggregate].agg("_".join, axis=1)
-            aggregate_indicator = pd.get_dummies(all_units[aggregate_temp_column_name]).values
+            dummies = pd.get_dummies(all_units[aggregate_temp_column_name])
         else:
-            aggregate_indicator = pd.get_dummies(all_units[aggregate]).values
+            # since aggregate is of length one, we can grab the first element
+            dummies = pd.get_dummies(all_units[aggregate[0]])
+
+        aggregate_indicator = dummies.values
+        contests = dummies.columns
         aggregate_indicator_expected = aggregate_indicator[: (n_train + n_test)]
 
         # first compute turnout and unnormalized margin for unexpected units.
@@ -1347,14 +1360,49 @@ class BootstrapElectionModel(BaseElectionModel):
         if self._is_top_level_aggregate(aggregate):
             aggregate_perc_margin_total = self.aggregate_pred_margin
 
-            called_contests = self._format_called_contests_dictionary(kwargs.get("called_contests", {}))
+            lhs_called_contests = kwargs.get("lhs_called_contests", [])
+            rhs_called_contests = kwargs.get("rhs_called_contests", [])
+            called_contests = self._format_called_contests(lhs_called_contests, rhs_called_contests, contests, 1, 0, -1)
+
+            stop_model_call = kwargs.get("stop_model_call", [])
+            stop_model_call = self._format_called_contests(stop_model_call, [], contests, True, None, False)
+
             interval_upper, interval_lower = (
                 aggregate_perc_margin_total - np.quantile(error_diff, q=[lower_q, upper_q], axis=-1).T
             ).T
 
-            for i, (contest, call) in enumerate(sorted(called_contests.items(), key=lambda x: x[0])):
+            for i, (contest, call, stop_model_call_i) in enumerate(zip(contests, called_contests, stop_model_call)):
                 interval_lower_i = interval_lower[i]
                 interval_upper_i = interval_upper[i]
+
+                if stop_model_call_i:
+                    # if we don't allow the model call, then force the lower interval to be below zero and the upper interval to be above zero
+                    if interval_lower_i > 0:
+                        # if interval_lower_i > 0 then our model thinks the race is called for the LHS party.
+                        # error_diff > 0 means that the lower bound is smaller than the prediction, so for those we set error_diff to be the gap between
+                        # the prediction and the imposed lower bound. This forces the difference between error_diff and the prediction to be exactly the imposed
+                        # lower bound
+                        error_diff[i, error_diff[i] > 0] = (
+                            aggregate_perc_margin_total[i] - self.rhs_called_threshold
+                        ).flatten()
+                        # we are pushing divided_error_B_2 such that divided_error_B_2 is less than zero in 10% of cases (ie. that LHS party wins some simulations)
+                        # there will be a chance that this impacts our electoral college lower bound
+                        divided_error_B_2_quantile = np.quantile(divided_error_B_2[i, :], q=0.1)
+                        if divided_error_B_2_quantile > 0:
+                            divided_error_B_2[i, :] += self.rhs_called_threshold - divided_error_B_2_quantile
+                    if interval_upper_i < 0:
+                        # if interval_upper_i < 0 then our model thinks the race has been called for the RHS party.
+                        # error_diff < 0 means that the upper bound is larger than the prediction, so for those we set error_diff to be the gap between the prediction
+                        # and the imposed upper bound. This forces the difference between error_diff and the prediction to be exactly the imposed upper bound
+                        error_diff[i, error_diff[i] < 0] = (
+                            aggregate_perc_margin_total[i] - self.lhs_called_threshold
+                        ).flatten()
+                        # we are pushing divided error_B_2 such that divided_error_B_2 is greater than zero in 10% of cases (ie. that LHS party wins some simulations)
+                        # there will be some chance that this impacts our electoral college prediction upper bound
+                        divided_error_B_2_quantile = np.quantile(divided_error_B_2[i, :], q=0.9)
+                        if divided_error_B_2_quantile < 0:
+                            divided_error_B_2[i, :] += self.lhs_called_threshold - divided_error_B_2_quantile
+
                 if np.isclose(call, 1):
                     if interval_lower_i < 0:
                         # if a contest has been called for the LHS party but the interval_lower is below zero (ie. our model does not think that this is called)
