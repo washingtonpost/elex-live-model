@@ -25,12 +25,13 @@ class ModelResultsHandler:
         self.aggregates = [agg for agg in aggregates if agg != "unit"]
         self.estimates = {agg: [] for agg in self.aggregates}
         self.unit_data = {}
+        self.final_results = {}
 
         self.reporting_units = reporting_units
         self.nonreporting_units = nonreporting_units
         self.unexpected_units = unexpected_units
 
-    def add_unit_predictions(self, estimand, unit_predictions, unit_turnout_predictions):
+    def add_unit_predictions(self, estimand, unit_predictions):
         """
         unit_predictions: data frame with unit predictions, as produced by model.get_unit_predictions
 
@@ -39,10 +40,10 @@ class ModelResultsHandler:
         self.nonreporting_units[f"pred_{estimand}"] = unit_predictions
         self.unexpected_units[f"pred_{estimand}"] = self.unexpected_units[f"results_{estimand}"]
 
-        if unit_turnout_predictions is not None:
-            self.reporting_units["pred_turnout"] = self.reporting_units["results_weights"]
-            self.nonreporting_units["pred_turnout"] = unit_turnout_predictions
-            self.unexpected_units["pred_turnout"] = self.unexpected_units["results_weights"]
+    def add_unit_turnout_predictions(self, unit_turnout_predictions):
+        self.reporting_units["pred_turnout"] = self.reporting_units["results_weights"]
+        self.nonreporting_units["pred_turnout"] = unit_turnout_predictions
+        self.unexpected_units["pred_turnout"] = self.unexpected_units["results_weights"]
 
     def add_unit_intervals(self, estimand, prediction_intervals_unit):
         """
@@ -65,7 +66,7 @@ class ModelResultsHandler:
         self.unit_data[estimand] = pd.concat(
             [self.reporting_units, self.nonreporting_units, self.unexpected_units]
         ).sort_values("geographic_unit_fips")[
-            ["postal_code", "geographic_unit_fips", f"pred_{estimand}", "reporting"]
+            ["postal_code", "geographic_unit_fips", f"pred_{estimand}", "reporting", "unit_category"]
             + interval_cols
             + [f"results_{estimand}"]
             + (["pred_turnout"] if estimand == "margin" else [])
@@ -93,7 +94,6 @@ class ModelResultsHandler:
         """
         Create final data frames of results
         """
-        self.final_results = {}
         for agg in self.aggregates:
             merge_on = ["postal_code", "reporting", agg]
             # joins together dfs of the same level of aggregation (different estimands)
@@ -106,7 +106,14 @@ class ModelResultsHandler:
                 lambda x, y: pd.merge(x, y, how="inner", on=merge_on), self.unit_data.values()
             )
 
-    def write_data(self, election_id, office, geographic_unit_type):
+    def add_national_summary_estimates(self, national_summary_dict):
+        df = pd.DataFrame.from_dict(
+            national_summary_dict, orient="index", columns=["agg_pred", "agg_lower", "agg_upper"]
+        )
+        df.index.name = "estimand"
+        self.final_results["nat_sum_data"] = df.reset_index()
+
+    def write_data(self, election_id, office, geographic_unit_type, keys=None):
         """
         Saves dataframe of estimates for all estimands to S3
         Different file by aggregate level
@@ -115,6 +122,8 @@ class ModelResultsHandler:
             self.process_final_results()
         s3_client = s3.S3CsvUtil(TARGET_BUCKET)
         for key, value in self.final_results.items():
+            if keys is not None and key not in keys:
+                continue
             path = f"{S3_FILE_PATH}/{election_id}/predictions/{office}/{geographic_unit_type}/{key}/current.csv"
             # convert df to csv
             csv_data = convert_df_to_csv(value)

@@ -459,7 +459,7 @@ def test_get_estimates_fully_reporting(model_client, va_governor_county_data, va
     )
 
     assert result["state_data"].shape == (1, 6)
-    assert result["unit_data"].shape == (133, 7)
+    assert result["unit_data"].shape == (133, 8)
 
     assert list(result["state_data"].columns.values) == [
         "postal_code",
@@ -474,6 +474,7 @@ def test_get_estimates_fully_reporting(model_client, va_governor_county_data, va
         "geographic_unit_fips",
         "pred_turnout",
         "reporting",
+        "unit_category",
         "lower_0.9_turnout",
         "upper_0.9_turnout",
         "results_turnout",
@@ -632,7 +633,7 @@ def test_get_estimates_some_reporting(model_client, va_governor_county_data, va_
         save_output=[],
     )
     assert result["state_data"].shape == (1, 6)
-    assert result["unit_data"].shape == (133, 7)
+    assert result["unit_data"].shape == (133, 8)
 
     assert list(result["state_data"].columns.values) == [
         "postal_code",
@@ -647,6 +648,7 @@ def test_get_estimates_some_reporting(model_client, va_governor_county_data, va_
         "geographic_unit_fips",
         "pred_turnout",
         "reporting",
+        "unit_category",
         "lower_0.9_turnout",
         "upper_0.9_turnout",
         "results_turnout",
@@ -832,3 +834,47 @@ def test_estimandizer_input(model_client, va_governor_county_data, va_config):
         )
     except KeyError:
         pytest.raises("Error with client input for estimandizer")
+
+
+def test_get_national_summary_votes_estimates(model_client, va_governor_county_data, va_config):
+    expected = {"margin": [1.0, 1.0, 1.0]}
+    expected_df = pd.DataFrame.from_dict(expected, orient="index", columns=["agg_pred", "agg_lower", "agg_upper"])
+    expected_df.index.name = "estimand"
+    expected_df = expected_df.reset_index()
+
+    election_id = "2017-11-07_VA_G"
+    office_id = "G"
+    geographic_unit_type = "county"
+    estimands = ["margin"]
+    prediction_intervals = [0.9]
+    percent_reporting_threshold = 100
+    kwargs = {"pi_method": "bootstrap", "features": ["baseline_normalized_margin"], "national_summary": True}
+
+    data_handler = MockLiveDataHandler(
+        election_id, office_id, geographic_unit_type, estimands, data=va_governor_county_data
+    )
+
+    data_handler.shuffle()
+    data = data_handler.get_percent_fully_reported(100)
+
+    preprocessed_data = va_governor_county_data.copy()
+    preprocessed_data["last_election_results_turnout"] = preprocessed_data["baseline_turnout"].copy() + 1
+
+    model_client.get_estimates(
+        data,
+        election_id,
+        office_id,
+        estimands,
+        prediction_intervals,
+        percent_reporting_threshold,
+        geographic_unit_type,
+        raw_config=va_config,
+        preprocessed_data=preprocessed_data,
+        save_output=[],
+        **kwargs,
+    )
+
+    current = model_client.get_national_summary_votes_estimates(None, 0, 0.99)
+
+    assert expected == current
+    pd.testing.assert_frame_equal(expected_df, model_client.results_handler.final_results["nat_sum_data"])

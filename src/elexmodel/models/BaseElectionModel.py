@@ -98,7 +98,7 @@ class BaseElectionModel(ABC):
         unexpected_units: pd.DataFrame,
         aggregate: list,
         estimand: str,
-        *kwargs,
+        **kwargs,
     ) -> pd.DataFrame:
         """
         Aggregate predictions and results by aggregate (ie. postal_code, county_fips etc.). Add results from reporting
@@ -158,7 +158,7 @@ class BaseElectionModel(ABC):
         unexpected_units: pd.DataFrame,
         aggregate: list,
         alpha: float,
-        *kwargs,
+        **kwargs,
     ) -> PredictionIntervals:
         """
         Generates and returns aggregate prediction intervals for arbitrary aggregates
@@ -172,5 +172,5 @@ class BaseElectionModel(ABC):
         """
         return self.features_to_coefficients
 
-    def get_national_summary_estimates(self, nat_sum_data_dict, called_states, base_to_add):
+    def get_national_summary_estimates(self, nat_sum_data_dict, called_states, base_to_add, alpha):
         raise NotImplementedError()

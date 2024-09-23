@@ -114,7 +114,7 @@ def test_compute_mape():
     # if multiple true values are zero
     y_true = pd.Series(np.asarray([0, 1, 4, 0, 5, 3]))
     y_pred = pd.Series(np.asarray([10, 4, 8, 20, 5, 8]))
-    mape = round((abs(1 - 4) / 1 + abs(4 - 8) / 4 + abs(5 - 5) / 5 + abs(3 - 8) / 3) / 4, 2)
+    mape = (abs(1 - 4) / 1 + abs(4 - 8) / 4 + abs(5 - 5) / 5 + abs(3 - 8) / 3) / 4
     assert math_utils.compute_error(y_true, y_pred, type_="mape") == pytest.approx(mape)
 
     # if all true values are zero
@@ -127,7 +127,7 @@ def test_compute_frac_within_pi():
     lower = np.asarray([0, 1, 4, 10, 5, 3])
     upper = np.asarray([10, 4, 8, 20, 5, 8])
     pred = np.asarray([5, 8, 5, 10, 5, 9])
-    assert math_utils.compute_frac_within_pi(lower, upper, pred) == round(4 / 6, 2)
+    assert math_utils.compute_frac_within_pi(lower, upper, pred) == pytest.approx(4 / 6)
 
 
 def test_compute_mean_pi_length():
@@ -135,4 +135,4 @@ def test_compute_mean_pi_length():
     lower = random_number_generator.normal(loc=5, scale=1, size=100)
     length = random_number_generator.lognormal(mean=1, sigma=5, size=100)
     upper = lower + length
-    assert math_utils.compute_mean_pi_length(lower, upper, 0) == np.mean(length).round(decimals=2)
+    assert math_utils.compute_mean_pi_length(lower, upper, 1) == np.mean(length)

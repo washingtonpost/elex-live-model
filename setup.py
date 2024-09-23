@@ -4,12 +4,12 @@ from codecs import open
 from setuptools import find_packages, setup
 
 INSTALL_REQUIRES = (
-    "click~=8.1",
-    "elex-solver>=2.0.1",
-    "pandas~=2.1",
-    "boto3~=1.28",
-    "python-dotenv~=1.0",
-    "scipy~=1.11",
+    "click>=8.1",
+    "elex-solver>=2.1.1",
+    "pandas>=2.2",
+    "boto3>=1.34",
+    "python-dotenv>=1.0",
+    "scipy>=1.14",
 )
 
 THIS_FILE_DIR = os.path.dirname(__file__)
@@ -20,13 +20,13 @@ with open(os.path.join(THIS_FILE_DIR, "README.md"), encoding="utf-8") as f:
     LONG_DESCRIPTION = f.read()
 
 # The full version, including alpha/beta/rc tags
-RELEASE = "2.0.3"
+RELEASE = "2.1.0"
 # The short X.Y version
 VERSION = ".".join(RELEASE.split(".")[:2])
 
 PROJECT = "elex-model"
 AUTHOR = "The Wapo Newsroom Engineering Team"
-COPYRIGHT = "2023, {}".format(AUTHOR)
+COPYRIGHT = "2024, {}".format(AUTHOR)
 
 
 setup(

@@ -206,10 +206,10 @@ def test_aggregation_simple():
     df3 = model._get_reporting_aggregate_votes(df1, df2, aggregate=["c1", "c2"], estimand=estimand)
     assert pd.DataFrame(
         {
-            "c1": ["a", "a", "b", "b", "a", "d"],
-            "c2": ["x", "y", "y", "z", "w", "t"],
-            f"results_{estimand}": [5.0, 9.0, 1.0, 15.0, 5.0, 1.0],
-            "reporting": [2.0, 1.0, 1.0, 3.0, 1.0, 1.0],
+            "c1": ["a", "a", "a", "b", "b", "d"],
+            "c2": ["w", "x", "y", "y", "z", "t"],
+            f"results_{estimand}": [5.0, 5.0, 9.0, 1.0, 15.0, 1.0],
+            "reporting": [1.0, 2.0, 1.0, 1.0, 3.0, 1.0],
         }
     ).equals(df3)
 

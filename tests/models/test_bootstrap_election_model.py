@@ -73,11 +73,12 @@ def test_estimate_model_error(bootstrap_election_model, rng):
 
 def test_get_strata(bootstrap_election_model):
     reporting_units = pd.DataFrame(
-        [["a", True, True], ["b", True, True], ["c", True, True]],
-        columns=["county_classification", "reporting", "expected"],
+        [["a", 1, "expected"], ["b", 1, "expected"], ["c", 1, "expected"]],
+        columns=["county_classification", "reporting", "unit_category"],
     )
     nonreporting_units = pd.DataFrame(
-        [["c", False, True], ["d", False, True]], columns=["county_classification", "reporting", "expected"]
+        [["c", 0, "expected"], ["d", 0, "expected"]],
+        columns=["county_classification", "reporting", "unit_category"],
     )
     x_train_strata, x_test_strata = bootstrap_election_model._get_strata(reporting_units, nonreporting_units)
 
@@ -492,21 +493,11 @@ def test_compute_bootstrap_errors(bootstrap_election_model, va_governor_county_d
 
     turnout_factor_lower = 0.5
     turnout_factor_upper = 2.0
-    reporting_units = combined_data_handler.get_reporting_units(
+    (reporting_units, nonreporting_units, unexpected_units) = combined_data_handler.get_units(
         percent_reporting_threshold,
         turnout_factor_lower=turnout_factor_lower,
         turnout_factor_upper=turnout_factor_upper,
-    )
-    nonreporting_units = combined_data_handler.get_nonreporting_units(
-        percent_reporting_threshold,
-        turnout_factor_lower=turnout_factor_lower,
-        turnout_factor_upper=turnout_factor_upper,
-    )
-    unexpected_units = combined_data_handler.get_unexpected_units(
-        percent_reporting_threshold,
-        ["postal_code"],
-        turnout_factor_lower=turnout_factor_lower,
-        turnout_factor_upper=turnout_factor_upper,
+        aggregates=["postal_code"],
     )
 
     assert not bootstrap_election_model.ran_bootstrap
@@ -545,18 +536,11 @@ def test_get_unit_predictions(bootstrap_election_model, va_governor_county_data)
 
     turnout_factor_lower = 0.5
     turnout_factor_upper = 2.0
-    reporting_units = combined_data_handler.get_reporting_units(
+    (reporting_units, nonreporting_units, unexpected_units) = combined_data_handler.get_units(
         percent_reporting_threshold,
         turnout_factor_lower=turnout_factor_lower,
         turnout_factor_upper=turnout_factor_upper,
-    )
-    nonreporting_units = combined_data_handler.get_nonreporting_units(
-        percent_reporting_threshold,
-        turnout_factor_lower=turnout_factor_lower,
-        turnout_factor_upper=turnout_factor_upper,
-    )
-    unexpected_units = combined_data_handler.get_unexpected_units(
-        percent_reporting_threshold, ["postal_code"], turnout_factor_lower, turnout_factor_upper
+        aggregates=["postal_code"],
     )
 
     bootstrap_election_model.B = 10
@@ -579,7 +563,68 @@ def test_is_top_level_aggregate(bootstrap_election_model):
     assert not bootstrap_election_model._is_top_level_aggregate([])
 
 
-def test_aggregate_predictions(bootstrap_election_model):
+def test_format_called_contests(bootstrap_election_model):
+    lhs = [1, 2, 3]
+    rhs = [4, 5, 6]
+    contests = [1, 2, 3, 4, 5, 6, 7, 8]
+
+    called_contests = bootstrap_election_model._format_called_contests(lhs, rhs, contests, 1, 0, -1)
+    assert all(called_contests == [1, 1, 1, 0, 0, 0, -1, -1])
+
+    called_contests = bootstrap_election_model._format_called_contests(lhs, [], contests, 1, None, -1)
+    assert all(called_contests == [1, 1, 1, -1, -1, -1, -1, -1])
+
+    called_contests = bootstrap_election_model._format_called_contests([], rhs, contests, None, 0, -1)
+    assert all(called_contests == [-1, -1, -1, 0, 0, 0, -1, -1])
+
+    called_contests = bootstrap_election_model._format_called_contests(rhs, lhs, contests, 1, 0, -1)
+    assert all(called_contests == [0, 0, 0, 1, 1, 1, -1, -1])
+
+    # more complicated
+    lhs = ["a", "f", "c"]
+    rhs = ["k", "b"]
+    contests = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"]
+    called_contests = bootstrap_election_model._format_called_contests(lhs, rhs, contests, 1, 0, -1)
+    assert all(called_contests == [1, 0, 1, -1, -1, 1, -1, -1, -1, -1, 0])
+
+    # test that intersection fails
+    lhs = [1, 2, 3]
+    rhs = [2, 4, 5]
+    with pytest.raises(BootstrapElectionModelException):
+        bootstrap_election_model._format_called_contests(lhs, rhs, contests, 1, 0, -1)
+
+    # test that non-contest values fails
+    lhs = [1, 9, 3]
+    rhs = [4, 5, 6]
+    with pytest.raises(BootstrapElectionModelException):
+        bootstrap_election_model._format_called_contests(lhs, rhs, contests, 1, 0, -1)
+
+    lhs = [1, 2, 3]
+    rhs = [4, 9, 6]
+    with pytest.raises(BootstrapElectionModelException):
+        bootstrap_election_model._format_called_contests(lhs, rhs, contests, 1, 0, -1)
+
+
+def test_adjust_called_contests(bootstrap_election_model):
+    called_contests = [1 + 1e-35, 1, -1 + 1e-35, -1, -1, -1, -1, -1, -1e-35, 0]
+    to_call = np.asarray([0.3, -0.3, 0.2, -0.4, 0.15, -0.25, 0.86, -0.74, -0.3, 0.3])
+
+    called = bootstrap_election_model._adjust_called_contests(to_call, called_contests)
+    assert called.shape == to_call.shape
+    assert called[0] == to_call[0]  # since called for LHS and positive should remain the same
+    assert (
+        called[1] == bootstrap_election_model.lhs_called_threshold
+    )  # since called for LHS but negative should be replaced
+    assert called[2] == to_call[2]  # since uncalled should remain the same
+    assert called[3] == to_call[3]  # since uncalled should remain the same
+
+    assert called[-2] == to_call[-2]  # since called for RHS and negative this should not change
+    assert (
+        called[-1] == bootstrap_election_model.rhs_called_threshold
+    )  # since called for RHS but positive should be repalced
+
+
+def get_data_used_for_testing_aggregate_predictions():
     reporting_units = pd.DataFrame(
         [
             ["a", -3, 0.2, 1, 1, 1, 1, 3, 5, 8, "c"],
@@ -647,6 +692,12 @@ def test_aggregate_predictions(bootstrap_election_model):
         ],
     )
 
+    return (reporting_units, nonreporting_units, unexpected_units)
+
+
+def test_aggregate_predictions_no_race_calls(bootstrap_election_model):
+    (reporting_units, nonreporting_units, unexpected_units) = get_data_used_for_testing_aggregate_predictions()
+    bootstrap_election_model.n_contests = 6  # a through f
     bootstrap_election_model.weighted_z_test_pred = np.asarray([1, 1, 1, 1, 1, 1]).reshape(-1, 1)
 
     # test that is top level aggregate is working
@@ -659,39 +710,75 @@ def test_aggregate_predictions(bootstrap_election_model):
     aggregate_predictions = bootstrap_election_model.get_aggregate_predictions(
         reporting_units, nonreporting_units, unexpected_units, ["postal_code"], "margin"
     )
+    aggregate_predictions = aggregate_predictions.set_index("postal_code")
 
     assert bootstrap_election_model.aggregate_baseline_margin is not None
 
-    assert aggregate_predictions[aggregate_predictions.postal_code == "a"].pred_margin[0] == pytest.approx(
-        -2.6 / 4
-    )  # (-3 (pred) + 0.2 + 0 (reporting margin) + 0.2 (unexpected margin))/ 4
-    assert aggregate_predictions[aggregate_predictions.postal_code == "b"].pred_margin[1] == pytest.approx(
-        0.9 / 2
-    )  # (-0.1 + 1) / 2
-    assert aggregate_predictions[aggregate_predictions.postal_code == "c"].pred_margin[2] == pytest.approx(
-        0.3
-    )  # (0.3 + 0.3) / 2
-    assert aggregate_predictions[aggregate_predictions.postal_code == "d"].pred_margin[3] == pytest.approx(
-        8 / 3
-    )  # 0.8 / 3
-    assert aggregate_predictions[aggregate_predictions.postal_code == "e"].pred_margin[4] == pytest.approx(
-        4
-    )  # (4 + 4) / 2
-    assert aggregate_predictions[aggregate_predictions.postal_code == "f"].pred_margin[5] == pytest.approx(0.7 / 2)
+    # (-3 (pred) + 0.2 + 0 (reporting margin) + 0.2 (unexpected margin))/ 4
+    assert aggregate_predictions.loc["a", "pred_margin"] == pytest.approx(-2.6 / 4)
+    assert aggregate_predictions.loc["b", "pred_margin"] == pytest.approx(0.9 / 2)  # (-0.1 + 1) / 2
+    assert aggregate_predictions.loc["c", "pred_margin"] == pytest.approx(0.3)  # (0.3 + 0.3) / 2
+    assert aggregate_predictions.loc["d", "pred_margin"] == pytest.approx(8 / 3)  # 0.8 / 3
+    assert aggregate_predictions.loc["e", "pred_margin"] == pytest.approx(4)  # (4 + 4) / 2
+    assert aggregate_predictions.loc["f", "pred_margin"] == pytest.approx(0.7 / 2)
 
-    assert aggregate_predictions[aggregate_predictions.postal_code == "a"].results_margin[0] == pytest.approx(0.6 / 4)
-    assert aggregate_predictions[aggregate_predictions.postal_code == "b"].results_margin[1] == pytest.approx(-0.1 / 2)
-    assert aggregate_predictions[aggregate_predictions.postal_code == "c"].results_margin[2] == pytest.approx(0.3)
-    assert aggregate_predictions[aggregate_predictions.postal_code == "d"].results_margin[3] == pytest.approx(0.7 / 3)
-    assert aggregate_predictions[aggregate_predictions.postal_code == "e"].results_margin[4] == pytest.approx(0.1)
-    assert aggregate_predictions[aggregate_predictions.postal_code == "f"].results_margin[5] == pytest.approx(0.7 / 2)
+    assert aggregate_predictions.loc["a", "results_margin"] == pytest.approx(0.6 / 4)
+    assert aggregate_predictions.loc["b", "results_margin"] == pytest.approx(-0.1 / 2)
+    assert aggregate_predictions.loc["c", "results_margin"] == pytest.approx(0.3)
+    assert aggregate_predictions.loc["d", "results_margin"] == pytest.approx(0.7 / 3)
+    assert aggregate_predictions.loc["e", "results_margin"] == pytest.approx(0.1)
+    assert aggregate_predictions.loc["f", "results_margin"] == pytest.approx(0.7 / 2)
 
-    assert aggregate_predictions[aggregate_predictions.postal_code == "a"].reporting[0] == pytest.approx(2)
-    assert aggregate_predictions[aggregate_predictions.postal_code == "b"].reporting[1] == pytest.approx(1)
-    assert aggregate_predictions[aggregate_predictions.postal_code == "c"].reporting[2] == pytest.approx(2)
-    assert aggregate_predictions[aggregate_predictions.postal_code == "d"].reporting[3] == pytest.approx(0)
-    assert aggregate_predictions[aggregate_predictions.postal_code == "e"].reporting[4] == pytest.approx(0)
-    assert aggregate_predictions[aggregate_predictions.postal_code == "f"].reporting[5] == pytest.approx(0)
+    assert aggregate_predictions.loc["a", "reporting"] == pytest.approx(2)
+    assert aggregate_predictions.loc["b", "reporting"] == pytest.approx(1)
+    assert aggregate_predictions.loc["c", "reporting"] == pytest.approx(2)
+    assert aggregate_predictions.loc["d", "reporting"] == pytest.approx(0)
+    assert aggregate_predictions.loc["e", "reporting"] == pytest.approx(0)
+    assert aggregate_predictions.loc["f", "reporting"] == pytest.approx(0)
+
+    assert aggregate_predictions.loc["a", "pred_turnout"] == pytest.approx(4)
+    assert aggregate_predictions.loc["b", "pred_turnout"] == pytest.approx(2)
+    assert aggregate_predictions.loc["c", "pred_turnout"] == pytest.approx(2)
+    assert aggregate_predictions.loc["d", "pred_turnout"] == pytest.approx(3)
+    assert aggregate_predictions.loc["e", "pred_turnout"] == pytest.approx(2)
+    assert aggregate_predictions.loc["f", "pred_turnout"] == pytest.approx(2)
+
+
+def test_aggregate_predictions_with_race_call(bootstrap_election_model):
+    (reporting_units, nonreporting_units, unexpected_units) = get_data_used_for_testing_aggregate_predictions()
+    bootstrap_election_model.n_contests = 6  # a through f
+    bootstrap_election_model.weighted_z_test_pred = np.asarray([1, 1, 1, 1, 1, 1]).reshape(-1, 1)
+
+    # test with a race call
+    lhs_called_contests = ["a", "b", "c", "d", "e", "f"]
+    aggregate_predictions = bootstrap_election_model.get_aggregate_predictions(
+        reporting_units,
+        nonreporting_units,
+        unexpected_units,
+        ["postal_code"],
+        "margin",
+        lhs_called_contests=lhs_called_contests,
+    )
+    assert (aggregate_predictions.pred_margin >= bootstrap_election_model.lhs_called_threshold).all()
+    assert (
+        aggregate_predictions.pred_margin.iloc[0] == bootstrap_election_model.lhs_called_threshold
+    )  # since otherwise would be negative
+    assert aggregate_predictions.pred_margin.iloc[1] == pytest.approx(0.9 / 2)  # should not have changed
+
+    rhs_called_contests = ["a", "b", "c", "d", "e", "f"]
+    aggregate_predictions = bootstrap_election_model.get_aggregate_predictions(
+        reporting_units,
+        nonreporting_units,
+        unexpected_units,
+        ["postal_code"],
+        "margin",
+        rhs_called_contests=rhs_called_contests,
+    )
+    assert (aggregate_predictions.pred_margin <= bootstrap_election_model.rhs_called_threshold).all()
+    assert aggregate_predictions.pred_margin.iloc[0] == pytest.approx(-2.6 / 4)  # should not have changed
+    assert (
+        aggregate_predictions.pred_margin.iloc[1] == bootstrap_election_model.rhs_called_threshold
+    )  # since otherwise positive
 
     # test more complicated z predictions
     bootstrap_election_model.weighted_z_test_pred = np.asarray([2, 3, 1, 1, 1, 1]).reshape(-1, 1)
@@ -705,8 +792,14 @@ def test_aggregate_predictions(bootstrap_election_model):
     )  # now divided by 5 since the a in non reporting has weight 2
     assert aggregate_predictions[aggregate_predictions.postal_code == "b"].pred_margin[1] == pytest.approx(0.9 / 4)
 
+
+def test_more_complicated_aggregate_predictions_with_race_call(bootstrap_election_model):
+    (reporting_units, nonreporting_units, unexpected_units) = get_data_used_for_testing_aggregate_predictions()
+
     # test more complicated aggregate (postal code-district)
     bootstrap_election_model.weighted_z_test_pred = np.asarray([1, 1, 1, 1, 1, 1]).reshape(-1, 1)
+    bootstrap_election_model.n_contests = 8  # (a, c), (a, a), (b, a), (c, c), (d, c), (e, e), (e, a), (f, f)
+
     aggregate_predictions = bootstrap_election_model.get_aggregate_predictions(
         reporting_units, nonreporting_units, unexpected_units, ["postal_code", "district"], "margin"
     )
@@ -762,6 +855,43 @@ def test_aggregate_predictions(bootstrap_election_model):
         (aggregate_predictions.postal_code == "f") & (aggregate_predictions.district == "f")
     ].reporting[7] == pytest.approx(0)
 
+    # test with a race call
+    lhs_called_contests = ["a_a", "a_c", "b_a", "c_c", "d_c", "e_a", "e_e", "f_f"]
+    aggregate_predictions = bootstrap_election_model.get_aggregate_predictions(
+        reporting_units,
+        nonreporting_units,
+        unexpected_units,
+        ["postal_code", "district"],
+        "margin",
+        lhs_called_contests=lhs_called_contests,
+    )
+    assert (aggregate_predictions.pred_margin >= bootstrap_election_model.lhs_called_threshold).all()
+    assert (
+        aggregate_predictions.pred_margin.iloc[0] == bootstrap_election_model.lhs_called_threshold
+    )  # since otherwise would be zero
+    assert (
+        aggregate_predictions.pred_margin.iloc[1] == bootstrap_election_model.lhs_called_threshold
+    )  # since otherwise would be negative
+    assert aggregate_predictions.pred_margin.iloc[2] == pytest.approx(0.9 / 2)  # should not have changed
+
+    rhs_called_contests = ["a_a", "a_c", "b_a", "c_c", "d_c", "e_a", "e_e", "f_f"]
+    aggregate_predictions = bootstrap_election_model.get_aggregate_predictions(
+        reporting_units,
+        nonreporting_units,
+        unexpected_units,
+        ["postal_code", "district"],
+        "margin",
+        rhs_called_contests=rhs_called_contests,
+    )
+    assert (aggregate_predictions.pred_margin <= bootstrap_election_model.rhs_called_threshold).all()
+    assert (
+        aggregate_predictions.pred_margin.iloc[0] == bootstrap_election_model.rhs_called_threshold
+    )  # since otherwise would be zero
+    assert aggregate_predictions.pred_margin.iloc[1] == pytest.approx(-2.6 / 3)  # should not have changed
+    assert (
+        aggregate_predictions.pred_margin.iloc[2] == bootstrap_election_model.rhs_called_threshold
+    )  # since otherwise would be greater than zero
+
 
 def test_get_quantile(bootstrap_election_model):
     bootstrap_election_model.B = 1000
@@ -806,75 +936,10 @@ def test_get_unit_prediction_intervals(bootstrap_election_model, rng):
 
 
 def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
-    reporting_units = pd.DataFrame(
-        [
-            ["a", -3, 0.2, 1, 1, 1, 1, 3, 5, 8, "c"],
-            ["a", 1, 0, 1, 1, 1, 1, 2, 1, 3, "a"],
-            ["b", 5, -0.1, 1, 1, 1, 1, 8, 3, 11, "a"],
-            ["c", 3, -0.2, 1, 1, 1, 1, 9, 1, 9, "c"],
-            ["c", 3, 0.8, 1, 1, 1, 1, 2, 4, 6, "c"],
-        ],
-        columns=[
-            "postal_code",
-            "pred_margin",
-            "results_margin",
-            "results_weights",
-            "baseline_weights",
-            "turnout_factor",
-            "reporting",
-            "baseline_dem",
-            "baseline_gop",
-            "baseline_turnout",
-            "district",
-        ],
-    )
+    (reporting_units, nonreporting_units, unexpected_units) = get_data_used_for_testing_aggregate_predictions()
     reporting_units["results_normalized_margin"] = reporting_units.results_margin / reporting_units.results_weights
-    nonreporting_units = pd.DataFrame(
-        [
-            ["a", -3, 0.2, 1, 1, 1, 0, 3, 5, 8, "c"],
-            ["b", 1, 0, 1, 1, 1, 0, 2, 1, 3, "a"],
-            ["d", 5, -0.1, 1, 1, 1, 0, 8, 3, 11, "c"],
-            ["d", 3, 0.8, 1, 1, 1, 0, 2, 4, 6, "c"],
-            ["e", 4, 0.1, 1, 1, 1, 0, 5, 1, 9, "e"],
-            ["e", 4, 0.1, 1, 1, 1, 0, 5, 1, 9, "a"],
-        ],
-        columns=[
-            "postal_code",
-            "pred_margin",
-            "results_margin",
-            "results_weights",
-            "baseline_weights",
-            "turnout_factor",
-            "reporting",
-            "baseline_dem",
-            "baseline_gop",
-            "baseline_turnout",
-            "district",
-        ],
-    )
     nonreporting_units["results_normalized_margin"] = (
         nonreporting_units.results_margin / nonreporting_units.results_weights
-    )
-    unexpected_units = pd.DataFrame(
-        [
-            ["a", -3, 0.2, 1, 1, 1, 0, np.nan, np.nan, np.nan, "c"],
-            ["d", 1, 0, 1, 1, 1, 0, np.nan, np.nan, np.nan, "c"],
-            ["f", 5, -0.1, 1, 1, 1, 0, np.nan, np.nan, np.nan, "f"],
-            ["f", 3, 0.8, 1, 1, 1, 0, np.nan, np.nan, np.nan, "f"],
-        ],
-        columns=[
-            "postal_code",
-            "pred_margin",
-            "results_margin",
-            "results_weights",
-            "baseline_weights",
-            "turnout_factor",
-            "reporting",
-            "baseline_dem",
-            "baseline_gop",
-            "baseline_turnout",
-            "district",
-        ],
     )
     unexpected_units["results_normalized_margin"] = unexpected_units.results_margin / unexpected_units.results_weights
 
@@ -889,6 +954,10 @@ def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
     bootstrap_election_model.weighted_z_test_pred = rng.normal(scale=s, size=(n, 1))
     bootstrap_election_model.weighted_yz_test_pred = rng.normal(scale=s, size=(n, 1))
 
+    bootstrap_election_model.n_contests = 6  # a through f
+    bootstrap_election_model.get_aggregate_predictions(
+        reporting_units, nonreporting_units, unexpected_units, ["postal_code"], "margin"
+    )
     lower, upper = bootstrap_election_model.get_aggregate_prediction_intervals(
         reporting_units, nonreporting_units, unexpected_units, ["postal_code"], 0.95, None, None
     )
@@ -900,7 +969,75 @@ def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
     assert lower[5] == pytest.approx(upper[5])  # since all f units are unexpected
     assert all(lower <= upper)
 
+    # test race calls
+    lhs_called_contests = ["a", "b", "c", "d", "e", "f"]
+    bootstrap_election_model.get_aggregate_predictions(
+        reporting_units,
+        nonreporting_units,
+        unexpected_units,
+        ["postal_code"],
+        "margin",
+        lhs_called_contests=lhs_called_contests,
+    )  # race calling for aggregate prediction interval assumes that the point prediction has been set accordingly
+    lower, upper = bootstrap_election_model.get_aggregate_prediction_intervals(
+        reporting_units,
+        nonreporting_units,
+        unexpected_units,
+        ["postal_code"],
+        0.95,
+        None,
+        None,
+        lhs_called_contests=lhs_called_contests,
+    )
+    assert (lower >= bootstrap_election_model.lhs_called_threshold).all()
+    assert (upper >= bootstrap_election_model.lhs_called_threshold).all()
+    assert (bootstrap_election_model.divided_error_B_1 == bootstrap_election_model.lhs_called_threshold).all()
+    assert (bootstrap_election_model.divided_error_B_2 == bootstrap_election_model.lhs_called_threshold).all()
+
+    rhs_called_contests = ["a", "b", "c", "d", "e", "f"]
+    bootstrap_election_model.get_aggregate_predictions(
+        reporting_units,
+        nonreporting_units,
+        unexpected_units,
+        ["postal_code"],
+        "margin",
+        rhs_called_contests=rhs_called_contests,
+    )  # race calling for aggregate prediction interval assumes that the point prediction has been set accordingly
+    lower, upper = bootstrap_election_model.get_aggregate_prediction_intervals(
+        reporting_units,
+        nonreporting_units,
+        unexpected_units,
+        ["postal_code"],
+        0.95,
+        None,
+        None,
+        rhs_called_contests=rhs_called_contests,
+    )
+    assert (lower <= bootstrap_election_model.rhs_called_threshold).all()
+    assert (upper <= bootstrap_election_model.rhs_called_threshold).all()
+    assert (bootstrap_election_model.divided_error_B_1 == bootstrap_election_model.rhs_called_threshold).all()
+    assert (bootstrap_election_model.divided_error_B_2 == bootstrap_election_model.rhs_called_threshold).all()
+
+    # test with stopping all model calls
+    stop_model_call = ["a", "b", "c", "d", "e", "f"]
+    lower, upper = bootstrap_election_model.get_aggregate_prediction_intervals(
+        reporting_units,
+        nonreporting_units,
+        unexpected_units,
+        ["postal_code"],
+        0.95,
+        None,
+        None,
+        stop_model_call=stop_model_call,
+    )
+    # note that (c) is totally reporting, so there is zero uncertainty left, so we expect that
+    assert (lower[3] < 0) & (upper[3] > 0)  # prior to this, (d) has an upper interval below zero also
+
     # test with more complicated aggregate
+    bootstrap_election_model.n_contests = 8  # (a, c), (a, a), (b, a), (c, c), (d, c), (e, e), (e, a), (f, f)
+    bootstrap_election_model.get_aggregate_predictions(
+        reporting_units, nonreporting_units, unexpected_units, ["postal_code", "district"], "margin"
+    )
     lower, upper = bootstrap_election_model.get_aggregate_prediction_intervals(
         reporting_units, nonreporting_units, unexpected_units, ["postal_code", "district"], 0.95, None, None
     )
@@ -916,69 +1053,116 @@ def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
 
 
 def test_get_national_summary_estimates(bootstrap_election_model, rng):
-    n = 10
+    (reporting_units, nonreporting_units, unexpected_units) = get_data_used_for_testing_aggregate_predictions()
+    reporting_units["results_normalized_margin"] = reporting_units.results_margin / reporting_units.results_weights
+    nonreporting_units["results_normalized_margin"] = (
+        nonreporting_units.results_margin / nonreporting_units.results_weights
+    )
+    unexpected_units["results_normalized_margin"] = unexpected_units.results_margin / unexpected_units.results_weights
+
+    n = nonreporting_units.shape[0]
     s = 2.0
     B = 20
     bootstrap_election_model.B = B
-    bootstrap_election_model.aggregate_error_B_1 = rng.normal(scale=s, size=(n, B))
-    bootstrap_election_model.aggregate_error_B_2 = rng.normal(scale=s, size=(n, B))
-    bootstrap_election_model.aggregate_error_B_3 = rng.normal(scale=s, size=(n, B))
-    bootstrap_election_model.aggregate_error_B_4 = rng.normal(scale=s, size=(n, B))
-    bootstrap_election_model.aggregate_perc_margin_total = rng.normal(scale=s, size=(n, 1))
+    bootstrap_election_model.errors_B_1 = rng.normal(scale=s, size=(n, B))
+    bootstrap_election_model.errors_B_2 = rng.normal(scale=s, size=(n, B))
+    bootstrap_election_model.errors_B_3 = rng.normal(scale=s, size=(n, B))
+    bootstrap_election_model.errors_B_4 = rng.normal(scale=s, size=(n, B))
 
-    nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(None, None, 0, 0.95)
+    bootstrap_election_model.weighted_z_test_pred = rng.normal(scale=s, size=(n, 1))
+    bootstrap_election_model.weighted_yz_test_pred = rng.normal(scale=s, size=(n, 1))
+
+    bootstrap_election_model.n_contests = 6
+
+    bootstrap_election_model.get_aggregate_predictions(
+        reporting_units, nonreporting_units, unexpected_units, ["postal_code"], "margin"
+    )  # race calling for aggregate prediction interval assumes that the point prediction has been set accordingly
+    lower, upper = bootstrap_election_model.get_aggregate_prediction_intervals(
+        reporting_units, nonreporting_units, unexpected_units, ["postal_code"], 0.95, None, None
+    )
+
+    nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(None, 0, 0.95)
     assert "margin" in nat_sum_estimates
     assert len(nat_sum_estimates["margin"]) == 3
     assert nat_sum_estimates["margin"][0] >= nat_sum_estimates["margin"][1]
     assert nat_sum_estimates["margin"][0] <= nat_sum_estimates["margin"][2]
 
+    # adding race call
+    lhs_called_contests = ["d", "e", "f"]
+    stop_model_call = ["c"]
+    bootstrap_election_model.get_aggregate_predictions(
+        reporting_units,
+        nonreporting_units,
+        unexpected_units,
+        ["postal_code"],
+        "margin",
+        lhs_called_contests=lhs_called_contests,
+    )  # race calling for aggregate prediction interval assumes that the point prediction has been set accordingly
+    lower, upper = bootstrap_election_model.get_aggregate_prediction_intervals(
+        reporting_units,
+        nonreporting_units,
+        unexpected_units,
+        ["postal_code"],
+        0.95,
+        None,
+        None,
+        lhs_called_contests=lhs_called_contests,
+        stop_model_call=stop_model_call,
+    )
+    nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(None, 0, 0.95)
+    assert (
+        nat_sum_estimates["margin"][0] == 4
+    )  # the 3 called ones plus the third one where we stop a call from happening
+    assert nat_sum_estimates["margin"][1] == 3  # the 3 called ones
+    assert nat_sum_estimates["margin"][2] == 5  # all of them except the first one
+
+    rhs_called_contests = ["c", "d", "e", "f"]
+    lhs_called_contests = ["a"]
+    bootstrap_election_model.get_aggregate_predictions(
+        reporting_units,
+        nonreporting_units,
+        unexpected_units,
+        ["postal_code"],
+        "margin",
+        lhs_called_contests=lhs_called_contests,
+        rhs_called_contests=rhs_called_contests,
+    )  # race calling for aggregate prediction interval assumes that the point prediction has been set accordingly
+    lower, upper = bootstrap_election_model.get_aggregate_prediction_intervals(
+        reporting_units,
+        nonreporting_units,
+        unexpected_units,
+        ["postal_code"],
+        0.95,
+        None,
+        None,
+        lhs_called_contests=lhs_called_contests,
+        rhs_called_contests=rhs_called_contests,
+    )
+    nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(None, 0, 0.95)
+    assert nat_sum_estimates["margin"][0] == 1  # the first one which is called for lhs
+    assert nat_sum_estimates["margin"][1] == 1  # the first one which is called for lhs
+    assert nat_sum_estimates["margin"][2] == 2  # 2nd and first
+
     # testing adding to base
     base_to_add = rng.random()
-    nat_sum_estimates_w_base = bootstrap_election_model.get_national_summary_estimates(None, None, base_to_add, 0.95)
-    assert nat_sum_estimates_w_base["margin"][0] == pytest.approx(nat_sum_estimates["margin"][0] + base_to_add)
-    assert nat_sum_estimates_w_base["margin"][1] == pytest.approx(nat_sum_estimates["margin"][1] + base_to_add)
-    assert nat_sum_estimates_w_base["margin"][2] == pytest.approx(nat_sum_estimates["margin"][2] + base_to_add)
+    nat_sum_estimates_w_base = bootstrap_election_model.get_national_summary_estimates(None, base_to_add, 0.95)
+    assert nat_sum_estimates_w_base["margin"][0] == pytest.approx(
+        round(nat_sum_estimates["margin"][0] + base_to_add, 2)
+    )
+    assert nat_sum_estimates_w_base["margin"][1] == pytest.approx(
+        round(nat_sum_estimates["margin"][1] + base_to_add, 2)
+    )
+    assert nat_sum_estimates_w_base["margin"][2] == pytest.approx(
+        round(nat_sum_estimates["margin"][2] + base_to_add, 2)
+    )
 
-    # test calling races
-    states_called = {i: 1 for i in range(n)}
     nat_sum_data_dict = {i: 3 for i in range(n)}
     nat_sum_data_dict[1] = 7
-    nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(
-        nat_sum_data_dict, states_called, 0, 0.95
-    )
-    assert nat_sum_estimates["margin"][0] == pytest.approx(34)
-    assert nat_sum_estimates["margin"][1] == pytest.approx(34)
-    assert nat_sum_estimates["margin"][2] == pytest.approx(34)
 
-    states_called = {i: 0 for i in range(n)}
-    nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(
-        nat_sum_data_dict, states_called, 0, 0.95
-    )
-    assert nat_sum_estimates["margin"][0] == pytest.approx(0)
-    assert nat_sum_estimates["margin"][1] == pytest.approx(0)
-    assert nat_sum_estimates["margin"][2] == pytest.approx(0)
-
-    states_called = {i: 0 for i in range(n)}
-    states_called[1] = 1
-    nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(
-        nat_sum_data_dict, states_called, 0, 0.95
-    )
-    assert nat_sum_estimates["margin"][0] == pytest.approx(7)
-    assert nat_sum_estimates["margin"][1] == pytest.approx(7)
-    assert nat_sum_estimates["margin"][2] == pytest.approx(7)
-
-    # test exceptions
-    states_called = {i: 0 for i in range(n - 1)}
-    with pytest.raises(BootstrapElectionModelException):
-        nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(
-            nat_sum_data_dict, states_called, 0, 0.95
-        )
-
+    # test exception
     nat_sum_data_dict = {i: 3 for i in range(n - 1)}
     with pytest.raises(BootstrapElectionModelException):
-        nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(
-            nat_sum_data_dict, states_called, 0, 0.95
-        )
+        nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(nat_sum_data_dict, 0, 0.95)
 
 
 # TODO: write unit test for combined aggregation (e.g. prediction, intervals, aggregate etc.)
@@ -1003,7 +1187,7 @@ def test_total_aggregation(bootstrap_election_model, va_assembly_precinct_data):
     )
 
     live_data_handler.shuffle()
-    current_data = live_data_handler.get_percent_fully_reported(400)
+    current_data = live_data_handler.get_percent_fully_reported(95)
 
     preprocessed_data_handler = PreprocessedDataHandler(
         election_id, office_id, geographic_unit_type, estimands, estimands_baseline, data=va_assembly_precinct_data
@@ -1013,13 +1197,8 @@ def test_total_aggregation(bootstrap_election_model, va_assembly_precinct_data):
         preprocessed_data_handler.data, current_data, estimands, geographic_unit_type
     )
 
-    reporting_units = combined_data_handler.get_reporting_units(percent_reporting_threshold, 0.5, 1.5)
-    nonreporting_units = combined_data_handler.get_nonreporting_units(percent_reporting_threshold, 0.5, 1.5)
-    unexpected_units = combined_data_handler.get_unexpected_units(
-        percent_reporting_threshold,
-        aggregates=["postal_code", "district"],
-        turnout_factor_lower=0.5,
-        turnout_factor_upper=1.5,
+    (reporting_units, nonreporting_units, unexpected_units) = combined_data_handler.get_units(
+        percent_reporting_threshold, 0.5, 1.5, ["postal_code", "district"]
     )
 
     bootstrap_election_model.B = 300

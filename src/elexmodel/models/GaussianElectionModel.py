@@ -114,6 +114,7 @@ class GaussianElectionModel(ConformalElectionModel):
         alpha: float,
         unit_prediction_intervals: PredictionIntervals,
         estimand: str,
+        **kwargs,
     ) -> PredictionIntervals:
         """
         Get aggregate prediction intervals. Adjust aggregate prediction intervals based on Gaussian models
@@ -174,7 +175,8 @@ class GaussianElectionModel(ConformalElectionModel):
                         "nonreporting_weight_sum": np.sum(x[f"last_election_results_{estimand}"]),
                         "nonreporting_weight_ssum": np.sum(np.power(x[f"last_election_results_{estimand}"], 2)),
                     }
-                )
+                ),
+                include_groups=False,
             )
             .reset_index(drop=False)
         )

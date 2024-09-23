@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.1.0 (09/23/2024)
+- fix: model evaluation functions and margin estimand rounding [#94](https://github.com/washingtonpost/elex-live-model/pull/94)
+- chore: updated requirements to their latest versions [#95](https://github.com/washingtonpost/elex-live-model/pull/95), [#103](https://github.com/washingtonpost/elex-live-model/pull/103)
+- chore: remove duplicate code from the `Estimandizer` class [#96](https://github.com/washingtonpost/elex-live-model/pull/96)
+- feat: verbose logging of duplicate units [#97](https://github.com/washingtonpost/elex-live-model/pull/97) and non-modeled units [#105](https://github.com/washingtonpost/elex-live-model/pull/105)
+- fix: rare division by zero when creating `normalized_margin` [#98](https://github.com/washingtonpost/elex-live-model/pull/98)
+- fix: aggregate model bug [#99](https://github.com/washingtonpost/elex-live-model/pull/99)
+- feat: save aggregate model (national summary) predictions to s3 [#100](https://github.com/washingtonpost/elex-live-model/pull/100)
+- feat: apply race calls to contest-level predictions in addition to national-level ones [#101](https://github.com/washingtonpost/elex-live-model/pull/101)
+- feat: output the mean of the bootstrap as the point prediction [#102](https://github.com/washingtonpost/elex-live-model/pull/102)
+- feat: save unit-level turnout predictions from the bootstrap model to s3 [#104](https://github.com/washingtonpost/elex-live-model/pull/104)
+- feat: distinguish between genuinely unexpected and non-modeled (non-predictive) units [#105](https://github.com/washingtonpost/elex-live-model/pull/105)
+- feat: options to override/control whether or not to allow the model to produce a race call for specified contests [#106](https://github.com/washingtonpost/elex-live-model/pull/106)
+
 ## 2.0.3 (11/06/2023)
 - fix: fix print bug for aggregate model called states error [#90](https://github.com/washingtonpost/elex-live-model/pull/90)
 - chore: add predicted turnout to predictions dataframe [#91](https://github.com/washingtonpost/elex-live-model/pull/91)

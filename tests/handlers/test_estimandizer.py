@@ -69,3 +69,18 @@ def test_add_turnout_factor(va_governor_county_data):
 
     assert "turnout_factor" in output_df.columns
     assert 0 == pytest.approx(output_df.loc[0, "turnout_factor"])
+
+
+def test_add_margin_estimand_zero_normalized_margin(va_governor_county_data):
+    estimand_baselines = {"margin": None}
+    estimandizer = Estimandizer()
+
+    # test that we're handling zeros ok
+    test_df = va_governor_county_data.copy()
+    test_df.loc[1, "baseline_dem"] = 0
+    test_df.loc[1, "baseline_gop"] = 0
+
+    output_df = estimandizer.add_estimand_baselines(test_df, estimand_baselines, False, include_results_estimand=False)
+
+    assert "baseline_normalized_margin" in output_df.columns
+    assert test_df.loc[1, "baseline_normalized_margin"] == 0

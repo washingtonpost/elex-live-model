@@ -53,6 +53,27 @@ class PythonLiteralOption(click.Option):
     help="A dictionary of model parameters",
 )
 @click.option(
+    "--lhs_called_contests",
+    "lhs_called_contests",
+    help="contests called for the lhs party (ie. the party for which margin predictions > 0 are winners)",
+    default=None,
+    multiple=True,
+)
+@click.option(
+    "--rhs_called_contests",
+    "rhs_called_contests",
+    help="contests called for the rhs party (ie. the party for which margin predictions < 0 are winners)",
+    default=None,
+    multiple=True,
+)
+@click.option(
+    "--stop_model_call",
+    "stop_model_call",
+    default=None,
+    multiple=True,
+    help="contests for which we don't allow model calls",
+)
+@click.option(
     "--percent_reporting",
     "percent_reporting",
     default=100,
@@ -76,6 +97,12 @@ class PythonLiteralOption(click.Option):
     help="options: results, data, config",
 )
 @click.option("--handle_unreporting", "handle_unreporting", default="drop", type=click.Choice(["drop", "zero"]))
+@click.option(
+    "--national_summary",
+    "national_summary",
+    is_flag=True,
+    help="When not running a historical election, output results aggregated to the national level.",
+)
 def cli(
     election_id, estimands, office_id, prediction_intervals, percent_reporting_threshold, geographic_unit_type, **kwargs
 ):
@@ -156,5 +183,10 @@ def cli(
             geographic_unit_type,
             **kwargs
         )
+
+        if kwargs.get("national_summary", False):
+            # TODO: get_national_summary_votes_estimates() arguments via CLI
+            model_client.get_national_summary_votes_estimates(None, 0, 0.99)
+
         for aggregate_level, estimates in result.items():
             print(aggregate_level, "\n", estimates, "\n")
