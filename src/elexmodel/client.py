@@ -218,7 +218,9 @@ class ModelClient:
         aggregates = kwargs.get("aggregates", DEFAULT_AGGREGATES[office])
         fixed_effects = kwargs.get("fixed_effects", {})
         pi_method = kwargs.get("pi_method", "nonparametric")
-        called_contests = kwargs.get("called_contests", None)
+        lhs_called_contests = kwargs.get("lhs_called_contests", [])
+        rhs_called_contests = kwargs.get("rhs_called_contests", [])
+        stop_model_call = kwargs.get("stop_model_call", [])
         save_output = kwargs.get("save_output", ["results"])
         self.save_results = "results" in save_output
         save_data = "data" in save_output
@@ -381,7 +383,8 @@ class ModelClient:
                     self.results_handler.unexpected_units,
                     aggregate_list,
                     estimand,
-                    called_contests=called_contests,
+                    lhs_called_contests=lhs_called_contests,
+                    rhs_called_contests=rhs_called_contests,
                 )
                 alpha_to_agg_prediction_intervals = {}
                 for alpha in prediction_intervals:
@@ -393,7 +396,9 @@ class ModelClient:
                         alpha,
                         alpha_to_unit_prediction_intervals[alpha],
                         estimand,
-                        called_contests=called_contests,
+                        lhs_called_contests=lhs_called_contests,
+                        rhs_called_contests=rhs_called_contests,
+                        stop_model_call=stop_model_call,
                     )
                     if isinstance(self.model, ConformalElectionModel):
                         self.all_conformalization_data_agg_dict[alpha][
