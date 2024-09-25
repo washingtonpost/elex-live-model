@@ -20,13 +20,13 @@ with open(os.path.join(THIS_FILE_DIR, "README.md"), encoding="utf-8") as f:
     LONG_DESCRIPTION = f.read()
 
 # The full version, including alpha/beta/rc tags
-RELEASE = "2.0.3"
+RELEASE = "2.1.0"
 # The short X.Y version
 VERSION = ".".join(RELEASE.split(".")[:2])
 
 PROJECT = "elex-model"
 AUTHOR = "The Wapo Newsroom Engineering Team"
-COPYRIGHT = "2023, {}".format(AUTHOR)
+COPYRIGHT = "2024, {}".format(AUTHOR)
 
 
 setup(
