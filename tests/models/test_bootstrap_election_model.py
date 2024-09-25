@@ -62,12 +62,13 @@ def test_estimate_model_error(bootstrap_election_model, rng):
     x[:, 0] = 1
     beta = rng.integers(low=-100, high=100, size=(5, 1))
     y = x @ beta
+    weights = np.ones((y.shape[0], y.shape[1]))
     ols_regression = OLSRegressionSolver()
     ols_regression.fit(x, y)
     aggregate_indicator = rng.multivariate_hypergeometric([1] * 5, 1, size=100)
-    residuals, _, _ = bootstrap_election_model._estimate_model_errors(ols_regression, x, y, aggregate_indicator)
+    residuals, _, _ = bootstrap_election_model._estimate_model_errors(ols_regression, x, y, weights, aggregate_indicator)
     y_hat = ols_regression.predict(x)
-    np.testing.assert_array_almost_equal(ols_regression.residuals(y, y_hat, loo=True, center=True), residuals)
+    np.testing.assert_array_almost_equal(ols_regression.residuals(x, y, K=5, center=True), residuals)
     # epsilon_hat and delta_hat are tested above
 
 
