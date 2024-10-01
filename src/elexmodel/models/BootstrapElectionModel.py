@@ -11,6 +11,8 @@ from scipy.special import expit
 from elexmodel.handlers.data.Featurizer import Featurizer
 from elexmodel.models.BaseElectionModel import BaseElectionModel, PredictionIntervals
 
+# from elexmodel.utils import em
+
 LOG = logging.getLogger(__name__)
 
 
@@ -141,7 +143,7 @@ class BootstrapElectionModel(BaseElectionModel):
                 # error is the weighted sum of squares of the residual between
                 # the actual heldout y and the predicted y on the heldout set
                 errors[i] += np.sum(
-                    w_test * ols_lambda.residuals(y_test, y_hat_lambda, loo=False, center=False) ** 2
+                    w_test * ols_lambda.residuals(y_test, y_hat_lambda, np.ones_like(w_test), loo=False, center=False) ** 2
                 ) / np.sum(w_test)
         # return lambda that minimizes the k-fold error
         # np.argmin returns the first occurence if multiple minimum values
@@ -174,7 +176,7 @@ class BootstrapElectionModel(BaseElectionModel):
         return (residuals - (aggregate_indicator @ epsilon_hat)).flatten()
 
     def _estimate_model_errors(
-        self, model: OLSRegressionSolver, x: np.ndarray, y: np.ndarray, aggregate_indicator: np.ndarray
+        self, model: OLSRegressionSolver, x: np.ndarray, y: np.ndarray, weights: np.ndarray, aggregate_indicator: np.ndarray
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         This function estimates all components of the error in our bootstrap model:
@@ -192,7 +194,7 @@ class BootstrapElectionModel(BaseElectionModel):
         # get unit level predictions from OLS
         y_pred = model.predict(x)
         # compute residuals
-        residuals_y = model.residuals(y, y_pred, loo=True, center=True)
+        residuals_y = model.residuals(y, y_pred, np.ones_like(weights), loo=True, center=True)
         # estimate contest level effect (the average residual in units of a contest)
         epsilon_y_hat = self._estimate_epsilon(residuals_y, aggregate_indicator)
         # compute delta, which is the left over residual after removing the contest level effect
@@ -845,12 +847,12 @@ class BootstrapElectionModel(BaseElectionModel):
         #   (it is estiamted as the average error in OLS over all the units in a contest)
         #   delta is the unit level error that is unaccounted for by the contest level effect
         residuals_y, epsilon_y_hat, delta_y_hat = self._estimate_model_errors(
-            ols_y, x_train, y_train, aggregate_indicator_train
+            ols_y, x_train, y_train, weights_train, aggregate_indicator_train
         )
         residuals_z, epsilon_z_hat, delta_z_hat = self._estimate_model_errors(
-            ols_z, x_train, z_train, aggregate_indicator_train
+            ols_z, x_train, z_train, weights_train, aggregate_indicator_train
         )
-
+        
         # As part of the residual bootstrap we now need to generate B synthetic versions of residuals_y and residuals_z
         # residuals are broken into an epsilon (contest level error) and delta (unit level error component). This means
         # in order to generate bootstrapped residuals we need to bootstrap samples for epsilon and for delta.
@@ -926,6 +928,7 @@ class BootstrapElectionModel(BaseElectionModel):
             regularize_intercept=False,
             n_feat_ignore_reg=1,
         )
+        
         ols_z_B = OLSRegressionSolver()
         ols_z_B.fit(
             x_train,
@@ -936,9 +939,11 @@ class BootstrapElectionModel(BaseElectionModel):
             regularize_intercept=False,
             n_feat_ignore_reg=1,
         )
-
         LOG.info("orig. ols coefficients, normalized margin: \n %s", ols_y.coefficients.flatten())
         LOG.info("boot. ols coefficients, normalized margin: \n %s", ols_y_B.coefficients.mean(axis=-1))
+
+        # ols_y_B.coefficients += (ols_y.coefficients - ols_y_B.coefficients.mean(axis=-1).reshape(-1, 1))
+        # ols_z_B.coefficients += (ols_z.coefficients - ols_z_B.coefficients.mean(axis=-1).reshape(-1, 1))
 
         # we cannot just apply ols_y_B/old_z_B to the test units because that would be missing
         # our contest level random effect
@@ -947,8 +952,8 @@ class BootstrapElectionModel(BaseElectionModel):
         # estimate bootstrapped epsilons
         y_train_pred_B = ols_y_B.predict(x_train)
         z_train_pred_B = ols_z_B.predict(x_train)
-        residuals_y_B = ols_y_B.residuals(y_train_B, y_train_pred_B, loo=True, center=True)
-        residuals_z_B = ols_z_B.residuals(z_train_B, z_train_pred_B, loo=True, center=True)
+        residuals_y_B = ols_y_B.residuals(y_train_B, y_train_pred_B, np.ones_like(weights_train), loo=True, center=True)
+        residuals_z_B = ols_z_B.residuals(z_train_B, z_train_pred_B, np.ones_like(weights_train), loo=True, center=True)
         epsilon_y_hat_B = self._estimate_epsilon(residuals_y_B, aggregate_indicator_train)
         epsilon_z_hat_B = self._estimate_epsilon(residuals_z_B, aggregate_indicator_train)
 
@@ -962,13 +967,23 @@ class BootstrapElectionModel(BaseElectionModel):
             min=z_partial_reporting_lower, max=z_partial_reporting_upper
         )
 
+        # In order to generate our point prediction, we (maybe) take the bootstrap mean.
+        # this is \hat{y_i} and \hat{z_i}
+        y_test_pred = (ols_y.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat)).clip(
+            min=y_partial_reporting_lower, max=y_partial_reporting_upper
+        )
+        z_test_pred = (ols_z.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat)).clip(
+            min=z_partial_reporting_lower, max=z_partial_reporting_upper
+        )
+        # y_test_pred = y_test_pred_B.mean(axis=1).reshape(-1, 1)
+        # z_test_pred = z_test_pred_B.mean(axis=1).reshape(-1, 1)
+
         # \tilde{y_i}^{b} * \tilde{z_i}^{b}
+        y_test_pred_B += y_test_pred - y_test_pred_B.mean(axis=-1).reshape(-1,1)
+        z_test_pred_B += z_test_pred - z_test_pred_B.mean(axis=-1).reshape(-1,1)
         yz_test_pred_B = y_test_pred_B * z_test_pred_B
 
-        # In order to generate our point prediction, we take the bootstrap mean.
-        # this is \hat{y_i} and \hat{z_i}
-        y_test_pred = y_test_pred_B.mean(axis=1).reshape(-1, 1)
-        z_test_pred = z_test_pred_B.mean(axis=1).reshape(-1, 1)
+        # \hat{y_i} * \hat{z_i}
         yz_test_pred = y_test_pred * z_test_pred
 
         # we now need to generate our bootstrapped "true" quantities (in order to subtract the
