@@ -979,8 +979,6 @@ class BootstrapElectionModel(BaseElectionModel):
         # z_test_pred = z_test_pred_B.mean(axis=1).reshape(-1, 1)
 
         # \tilde{y_i}^{b} * \tilde{z_i}^{b}
-        y_test_pred_B += y_test_pred - y_test_pred_B.mean(axis=-1).reshape(-1,1)
-        z_test_pred_B += z_test_pred - z_test_pred_B.mean(axis=-1).reshape(-1,1)
         yz_test_pred_B = y_test_pred_B * z_test_pred_B
 
         # \hat{y_i} * \hat{z_i}
@@ -1039,7 +1037,7 @@ class BootstrapElectionModel(BaseElectionModel):
         self.weighted_z_test_pred = z_test_pred * weights_test
         self.ran_bootstrap = True
         self.n_contests = aggregate_indicator.shape[1]
-
+        
     def get_unit_predictions(
         self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, estimand: str, **kwargs
     ) -> np.ndarray:
@@ -1370,6 +1368,8 @@ class BootstrapElectionModel(BaseElectionModel):
         lower_q, upper_q = self._get_quantiles(alpha)
 
         error_diff = divided_error_B_1 - divided_error_B_2
+
+        error_diff -= error_diff.mean(axis=-1).reshape(-1, 1)
 
         # saves the aggregate errors in case we want to generate somem form of national predictions (like ecv)
         if self._is_top_level_aggregate(aggregate):
