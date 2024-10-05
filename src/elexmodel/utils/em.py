@@ -1,7 +1,6 @@
 import numpy as np
 from scipy.stats import multivariate_normal
 
-
 class GMM:
     def __init__(self, n_components, max_iter=100, tol=1e-6):
         """
@@ -98,17 +97,10 @@ class GMM:
             self._maximization_step(X, responsibilities)
 
             # Calculate the log-likelihood for this iteration
-            log_likelihood = np.sum(
-                np.log(
-                    np.sum(
-                        [
-                            w * multivariate_normal(m, c).pdf(X)
-                            for w, m, c in zip(self.weights, self.means, self.covariances)
-                        ],
-                        axis=0,
-                    )
-                )
-            )
+            log_likelihood = np.sum(np.log(np.sum([
+                w * multivariate_normal(m, c).pdf(X)
+                for w, m, c in zip(self.weights, self.means, self.covariances)
+            ], axis=0)))
             self.log_likelihoods.append(log_likelihood)
 
             # Check for convergence
@@ -151,19 +143,11 @@ class GMM:
         Returns:
         log_likelihood : Log-likelihood of the data.
         """
-        log_likelihood = np.sum(
-            np.log(
-                np.sum(
-                    [
-                        w * multivariate_normal(m, c).pdf(X)
-                        for w, m, c in zip(self.weights, self.means, self.covariances)
-                    ],
-                    axis=0,
-                )
-            )
-        )
+        log_likelihood = np.sum(np.log(np.sum([
+            w * multivariate_normal(m, c).pdf(X)
+            for w, m, c in zip(self.weights, self.means, self.covariances)
+        ], axis=0)))
         return log_likelihood
-
 
 # Example usage:
 X = np.random.randn(300, 2)  # Random 2D data
