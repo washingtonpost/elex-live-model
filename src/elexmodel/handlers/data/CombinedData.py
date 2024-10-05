@@ -48,7 +48,14 @@ class CombinedDataHandler:
 
         self.data = data
 
-    def get_units(self, percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper, margin_change_threshold, aggregates):
+    def get_units(
+        self,
+        percent_reporting_threshold,
+        turnout_factor_lower,
+        turnout_factor_upper,
+        margin_change_threshold,
+        aggregates,
+    ):
         """
         Returns a tuple of:
         1. reporting data. These are units where the expected vote is greater than the percent reporting threshold.
@@ -163,19 +170,29 @@ class CombinedDataHandler:
 
         return unexpected_units
 
-    def _get_non_modeled_units(self, percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper, margin_change_threshold):
+    def _get_non_modeled_units(
+        self, percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper, margin_change_threshold
+    ):
         expected_geographic_units = self._get_expected_geographic_unit_fips().tolist()
         zero_baseline_units = self._get_units_with_baseline_of_zero()
-        self.data['normalized_margin_change'] = (self.data.baseline_normalized_margin - self.data.results_normalized_margin).abs()
+        self.data["normalized_margin_change"] = (
+            self.data.baseline_normalized_margin - self.data.results_normalized_margin
+        ).abs()
         units_with_strange_turnout_factor = (
             self.data[
-                (self.data.percent_expected_vote >= percent_reporting_threshold) # reporting units (otherwise nonreporting unit)
-                & (self.data["geographic_unit_fips"].isin(expected_geographic_units)) # and expected unit (otherwise unexpected unit)
+                (
+                    self.data.percent_expected_vote >= percent_reporting_threshold
+                )  # reporting units (otherwise nonreporting unit)
                 & (
-                    (self.data["geographic_unit_fips"].isin(zero_baseline_units)) # zero baseline
-                    | (self.data.turnout_factor <= turnout_factor_lower) # or low turnout factor
-                    | (self.data.turnout_factor >= turnout_factor_upper) # or high turnout factor
-                    | (('margin' in self.estimands) & (self.data.normalized_margin_change > margin_change_threshold)) # or large margin change if margin is an estimand
+                    self.data["geographic_unit_fips"].isin(expected_geographic_units)
+                )  # and expected unit (otherwise unexpected unit)
+                & (
+                    (self.data["geographic_unit_fips"].isin(zero_baseline_units))  # zero baseline
+                    | (self.data.turnout_factor <= turnout_factor_lower)  # or low turnout factor
+                    | (self.data.turnout_factor >= turnout_factor_upper)  # or high turnout factor
+                    | (
+                        ("margin" in self.estimands) & (self.data.normalized_margin_change > margin_change_threshold)
+                    )  # or large margin change if margin is an estimand
                 )
             ]
             .drop_duplicates(subset="geographic_unit_fips")
