@@ -175,7 +175,7 @@ class CombinedDataHandler:
             ]
             .groupby(["postal_code"])
             .agg({"turnout_factor": ["mean", "std"]})
-        )
+        ).fillna(0)
         tf_by_state.columns = tf_by_state.columns.map(lambda x: "_".join(x))
         tf_by_state = tf_by_state.reset_index()
         tf_by_state["tf_lower"] = tf_by_state["turnout_factor_mean"] - (
