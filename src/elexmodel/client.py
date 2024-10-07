@@ -228,6 +228,7 @@ class ModelClient:
         # saving conformalization data only makes sense if a ConformalElectionModel is used
         save_conformalization = "conformalization" in save_output
         handle_unreporting = kwargs.get("handle_unreporting", "drop")
+        turnout_factor_z_threshold = kwargs.get("turnout_factor_z", 4.75)
 
         district_election = False
         if office in {"H", "Y", "Z"}:
@@ -294,11 +295,8 @@ class ModelClient:
             handle_unreporting=handle_unreporting,
         )
 
-        turnout_factor_lower = model_parameters.get("turnout_factor_lower", 0.2)
-        turnout_factor_upper = model_parameters.get("turnout_factor_upper", 2.5)
-
         (reporting_units, nonreporting_units, unexpected_units) = data.get_units(
-            percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper, aggregates
+            percent_reporting_threshold, aggregates, turnout_factor_z_threshold
         )
 
         LOG.info(
