@@ -75,6 +75,7 @@ Parameters for the CLI tool:
 | save_output          | list    | `results`, `data`, `config` |
 | unexpected_units     | int     | number of unexpected units to simulate; only used for testing and does not work with historical run |
 | national_summary     | flag    | When not running a historical election, specify this flag to output national summary (aggregate model) estimates. |
+| turnout_factor_z     | float   | z-score threshold to use for turnout factor outlier detection (default = 4.75).
 
 Note: When running the model with multiple fixed effects, make sure they are not linearly dependent. For example, `county_fips` and `county_classification` are linearly dependent when run together. That's because every county is in one county class, so all the fixed effect columns of the counties in the county class sum up to the fixed effect column of that county class.
 

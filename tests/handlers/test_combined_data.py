@@ -174,7 +174,7 @@ def test_get_reporting_data(va_governor_county_data):
 
     # no fixed effects
     combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
-    (observed_data, _, _) = combined_data_handler.get_units(100, [])
+    (observed_data, _, _) = combined_data_handler.get_units(100, [], 4.75)
 
     assert observed_data.shape[0] == 20
     assert observed_data.reporting.iloc[0] == 1
@@ -196,7 +196,7 @@ def test_get_reporting_data_dropping_with_turnout_factor(va_governor_county_data
     va_governor_county_data["last_election_results_turnout"] = va_governor_county_data.baseline_turnout + 1
 
     combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
-    (observed_data, _, _) = combined_data_handler.get_units(100, [])
+    (observed_data, _, _) = combined_data_handler.get_units(100, [], 4.75)
 
     # 20 units should be reporting, all are expected and non are non-modeled
     assert observed_data.shape[0] == 20
@@ -224,7 +224,7 @@ def test_get_unexpected_units_county_district(va_assembly_county_data):
 
     combined_data_handler = CombinedDataHandler(va_assembly_county_data, current_data, estimands, geographic_unit_type)
 
-    (_, _, unexpected_data) = combined_data_handler.get_units(100, ["county_fips", "district"])
+    (_, _, unexpected_data) = combined_data_handler.get_units(100, ["county_fips", "district"], 4.75)
 
     assert unexpected_data.shape[0] == unexpected_units
     assert unexpected_data[unexpected_data.county_fips == ""].shape[0] == 0
@@ -262,7 +262,7 @@ def test_get_unexpected_units_county(va_governor_county_data):
 
     combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
 
-    (_, _, unexpected_data) = combined_data_handler.get_units(100, ["county_fips"])
+    (_, _, unexpected_data) = combined_data_handler.get_units(100, ["county_fips"], 4.75)
 
     assert unexpected_data.shape[0] == reporting_unexpected_units + 1
     assert unexpected_data[unexpected_data.county_fips == ""].shape[0] == 0
@@ -289,7 +289,7 @@ def test_zero_baseline_turnout_as_unexpected(va_governor_county_data):
     va_governor_county_data["last_election_results_turnout"] = va_governor_county_data.baseline_turnout + 1
     combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
 
-    (reporting_units, nonreporting_units, unexpected_data) = combined_data_handler.get_units(100, ["county_fips"])
+    (reporting_units, nonreporting_units, unexpected_data) = combined_data_handler.get_units(100, ["county_fips"], 4.75)
 
     assert va_governor_county_data.loc[0].geographic_unit_fips in unexpected_data.geographic_unit_fips.tolist()
     assert len(unexpected_data) == 1
@@ -314,6 +314,6 @@ def test_turnout_factor_as_non_modeled(va_governor_county_data):
     va_governor_county_data["baseline_weights"] = va_governor_county_data.baseline_turnout
     va_governor_county_data["last_election_results_turnout"] = va_governor_county_data.baseline_turnout + 1
     combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
-    (_, _, unexpected_data) = combined_data_handler.get_units(100, ["county_fips"])
+    (_, _, unexpected_data) = combined_data_handler.get_units(100, ["county_fips"], 4.75)
 
     assert len(unexpected_data[unexpected_data["unit_category"] == "non-modeled"]) == 1

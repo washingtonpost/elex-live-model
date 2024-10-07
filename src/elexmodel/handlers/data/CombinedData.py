@@ -48,7 +48,7 @@ class CombinedDataHandler:
 
         self.data = data
 
-    def get_units(self, percent_reporting_threshold, aggregates):
+    def get_units(self, percent_reporting_threshold, aggregates, turnout_factor_z_threshold):
         """
         Returns a tuple of:
         1. reporting data. These are units where the expected vote is greater than the percent reporting threshold.
@@ -66,7 +66,7 @@ class CombinedDataHandler:
 
         # identify unexpected and non-predictive units
         unexpected_units = self._get_unexpected_units(aggregates)
-        non_modeled_units = self._get_non_modeled_units(percent_reporting_threshold)
+        non_modeled_units = self._get_non_modeled_units(percent_reporting_threshold, turnout_factor_z_threshold)
 
         # remove these units from the reporting units
         reporting_units = reporting_units[
@@ -160,7 +160,7 @@ class CombinedDataHandler:
 
         return unexpected_units
 
-    def _get_non_modeled_units(self, percent_reporting_threshold):
+    def _get_non_modeled_units(self, percent_reporting_threshold, turnout_factor_z_threshold):
         expected_geographic_units = self._get_expected_geographic_unit_fips().tolist()
         zero_baseline_units = self._get_units_with_baseline_of_zero()
 
@@ -178,8 +178,12 @@ class CombinedDataHandler:
         )
         tf_by_state.columns = tf_by_state.columns.map(lambda x: "_".join(x))
         tf_by_state = tf_by_state.reset_index()
-        tf_by_state["tf_lower"] = tf_by_state["turnout_factor_mean"] - (tf_by_state["turnout_factor_std"] * 4.75)
-        tf_by_state["tf_upper"] = tf_by_state["turnout_factor_mean"] + (tf_by_state["turnout_factor_std"] * 4.75)
+        tf_by_state["tf_lower"] = tf_by_state["turnout_factor_mean"] - (
+            tf_by_state["turnout_factor_std"] * turnout_factor_z_threshold
+        )
+        tf_by_state["tf_upper"] = tf_by_state["turnout_factor_mean"] + (
+            tf_by_state["turnout_factor_std"] * turnout_factor_z_threshold
+        )
 
         units_with_strange_turnout_factor = units_with_strange_turnout_factor.merge(
             tf_by_state, on="postal_code", how="left"
