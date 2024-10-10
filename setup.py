@@ -5,7 +5,7 @@ from setuptools import find_packages, setup
 
 INSTALL_REQUIRES = (
     "click>=8.1",
-    "elex-solver>=2.1.1",
+    "elex-solver @ git+https://github.com/washingtonpost/elex-solver.git@updating-residuals",
     "pandas>=2.2",
     "boto3>=1.34",
     "python-dotenv>=1.0",
