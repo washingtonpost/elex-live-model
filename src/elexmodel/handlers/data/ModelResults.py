@@ -109,10 +109,10 @@ class ModelResultsHandler:
     def add_national_summary_estimates(self, nat_sum_estimates_dict):
         df = pd.DataFrame(index=["margin"])
         for alpha, data in nat_sum_estimates_dict.items():
-            if 'agg_pred' not in df.columns:
-                df['agg_pred'] = [data['margin'][0]]
-            df[f'lower_{alpha}'] = [data['margin'][1]]
-            df[f'upper_{alpha}'] = [data['margin'][2]]
+            if "agg_pred" not in df.columns:
+                df["agg_pred"] = [data["margin"][0]]
+            df[f"lower_{alpha}"] = [data["margin"][1]]
+            df[f"upper_{alpha}"] = [data["margin"][2]]
 
         df.index.name = "estimand"
         self.final_results["nat_sum_data"] = df.reset_index()

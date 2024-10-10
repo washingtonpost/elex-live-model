@@ -190,7 +190,7 @@ class ModelClient:
             self.results_handler.write_data(
                 self.election_id, self.office, self.geographic_unit_type, keys=["nat_sum_data"]
             )
-        return self.results_handler.final_results['nat_sum_data']
+        return self.results_handler.final_results["nat_sum_data"]
 
     def get_estimates(
         self,
