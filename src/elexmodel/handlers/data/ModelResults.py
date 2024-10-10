@@ -106,10 +106,14 @@ class ModelResultsHandler:
                 lambda x, y: pd.merge(x, y, how="inner", on=merge_on), self.unit_data.values()
             )
 
-    def add_national_summary_estimates(self, national_summary_dict):
-        df = pd.DataFrame.from_dict(
-            national_summary_dict, orient="index", columns=["agg_pred", "agg_lower", "agg_upper"]
-        )
+    def add_national_summary_estimates(self, nat_sum_estimates_dict):
+        df = pd.DataFrame(index=["margin"])
+        for alpha, data in nat_sum_estimates_dict.items():
+            if "agg_pred" not in df.columns:
+                df["agg_pred"] = [data["margin"][0]]
+            df[f"lower_{alpha}"] = [data["margin"][1]]
+            df[f"upper_{alpha}"] = [data["margin"][2]]
+
         df.index.name = "estimand"
         self.final_results["nat_sum_data"] = df.reset_index()
 
