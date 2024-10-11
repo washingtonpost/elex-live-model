@@ -838,7 +838,7 @@ def test_estimandizer_input(model_client, va_governor_county_data, va_config):
 
 def test_get_national_summary_votes_estimates(model_client, va_governor_county_data, va_config):
     expected = {"margin": [1.0, 1.0, 1.0]}
-    expected_df = pd.DataFrame.from_dict(expected, orient="index", columns=["agg_pred", "agg_lower", "agg_upper"])
+    expected_df = pd.DataFrame.from_dict(expected, orient="index", columns=["agg_pred", "lower_0.99", "upper_0.99"])
     expected_df.index.name = "estimand"
     expected_df = expected_df.reset_index()
 
@@ -874,7 +874,7 @@ def test_get_national_summary_votes_estimates(model_client, va_governor_county_d
         **kwargs,
     )
 
-    current = model_client.get_national_summary_votes_estimates(None, 0, 0.99)
+    current = model_client.get_national_summary_votes_estimates(None, 0, [0.99])
 
-    assert expected == current
+    pd.testing.assert_frame_equal(current, model_client.results_handler.final_results["nat_sum_data"])
     pd.testing.assert_frame_equal(expected_df, model_client.results_handler.final_results["nat_sum_data"])
