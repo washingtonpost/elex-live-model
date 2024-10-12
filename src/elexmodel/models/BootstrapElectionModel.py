@@ -4,6 +4,7 @@ import logging
 
 import numpy as np
 import pandas as pd
+from elexsolver.LinearSolver import LinearSolver
 from elexsolver.OLSRegressionSolver import OLSRegressionSolver
 from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
 from scipy.special import expit
@@ -90,6 +91,8 @@ class BootstrapElectionModel(BaseElectionModel):
         self.lhs_called_threshold = 0.005
         self.rhs_called_threshold = -0.005
 
+        self.model_type = model_settings.get("model_type", "OLS")
+        print(self.model_type)
         # Assume that we have a baseline normalized margin
         # (D^{Y'} - R^{Y'}) / (D^{Y'} + R^{Y'}) is one of the covariates
         if "baseline_normalized_margin" not in self.features:
@@ -128,20 +131,18 @@ class BootstrapElectionModel(BaseElectionModel):
                 y_train = x_y_w_train[:, -2]
                 w_train = x_y_w_train[:, -1]
                 ols_lambda = OLSRegressionSolver()
-                ols_lambda.fit(
-                    x_train,
-                    y_train,
-                    weights=w_train,
-                    lambda_=lambda_,
-                    fit_intercept=True,
-                    regularize_intercept=False,
-                    n_feat_ignore_reg=1,
-                )
-                y_hat_lambda = ols_lambda.predict(x_test)
+                ols_kwargs = {
+                    "lambda_": lambda_,
+                    "fit_intercept": True,
+                    "regularize_intercept": False,
+                    "n_feat_ignore_reg": 1,
+                }
+                ols_lambda.fit(x_train, y_train, weights=w_train, **ols_kwargs)
+                ols_lambda.predict(x_test)
                 # error is the weighted sum of squares of the residual between
                 # the actual heldout y and the predicted y on the heldout set
                 errors[i] += np.sum(
-                    w_test * ols_lambda.residuals(y_test, y_hat_lambda, loo=False, center=False) ** 2
+                    w_test * ols_lambda.residuals(x_test, y_test, w_test, K=None, center=False, **ols_kwargs) ** 2
                 ) / np.sum(w_test)
         # return lambda that minimizes the k-fold error
         # np.argmin returns the first occurence if multiple minimum values
@@ -174,7 +175,15 @@ class BootstrapElectionModel(BaseElectionModel):
         return (residuals - (aggregate_indicator @ epsilon_hat)).flatten()
 
     def _estimate_model_errors(
-        self, model: OLSRegressionSolver, x: np.ndarray, y: np.ndarray, aggregate_indicator: np.ndarray
+        self,
+        model: OLSRegressionSolver,
+        x: np.ndarray,
+        y: np.ndarray,
+        weights: np.ndarray,
+        aggregate_indicator: np.ndarray,
+        K: int = 5,
+        center: bool = False,
+        model_kwargs: dict = {},
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         This function estimates all components of the error in our bootstrap model:
@@ -190,9 +199,9 @@ class BootstrapElectionModel(BaseElectionModel):
         (ie. the difference between the OLS residual and the contest level state effect)
         """
         # get unit level predictions from OLS
-        y_pred = model.predict(x)
+        model.predict(x)
         # compute residuals
-        residuals_y = model.residuals(y, y_pred, loo=True, center=True)
+        residuals_y = model.residuals(x, y, weights, K=K, center=center, **model_kwargs)
         # estimate contest level effect (the average residual in units of a contest)
         epsilon_y_hat = self._estimate_epsilon(residuals_y, aggregate_indicator)
         # compute delta, which is the left over residual after removing the contest level effect
@@ -253,6 +262,9 @@ class BootstrapElectionModel(BaseElectionModel):
         # lower/upper bound to the regression, one pair for each stratum.
         # This lower/upper bound is set manually, note that if we observe a value that is more extreme than
         # the lower/upper bound we are fine, since the quantile regression will use that instead
+
+        taus = np.asarray(self.taus)
+        taus_lower, taus_upper = taus[taus < 0.5], taus[taus >= 0.5]
         for x_stratum in x_strata:
             x_train_aug = np.concatenate([x_train_strata, x_stratum.reshape(1, -1)], axis=0)
 
@@ -264,15 +276,16 @@ class BootstrapElectionModel(BaseElectionModel):
             # for where dummy variable position i is equal to 1
             # since we are fitting many quantile regressions at the same time, our beta is
             # beta[tau, i] where tau stretches from 0.01 to 0.99
-            qr_lower = QuantileRegressionSolver()
-            qr_lower.fit(x_train_aug, delta_aug_lb, self.taus_lower, fit_intercept=False)
-            betas_lower = qr_lower.coefficients
+            betas = np.zeros((len(taus), x_train_aug.shape[1]))
+            if len(taus_lower) > 0:
+                qr_lower = QuantileRegressionSolver()
+                qr_lower.fit(x_train_aug, delta_aug_lb, taus_lower, fit_intercept=False)
+                betas[0 : len(taus_lower)] = qr_lower.coefficients.T  # noqa: E203
 
-            qr_upper = QuantileRegressionSolver()
-            qr_upper.fit(x_train_aug, delta_aug_ub, self.taus_upper, fit_intercept=False)
-            betas_upper = qr_upper.coefficients
-
-            betas = np.concatenate([betas_lower, betas_upper])
+            if len(taus_upper) > 0:
+                qr_upper = QuantileRegressionSolver()
+                qr_upper.fit(x_train_aug, delta_aug_ub, taus_upper, fit_intercept=False)
+                betas[len(taus_lower) :] = qr_upper.coefficients.T  # noqa: E203
 
             # for each strata, we take the betas that belong to that stratum
             # ie. for stratum [0, 1, 0] we take the betas (there is one for each tau between 0.01, 0.99])
@@ -647,6 +660,22 @@ class BootstrapElectionModel(BaseElectionModel):
         test_error_z = test_epsilon_z + test_delta_z
         return test_error_y, test_error_z
 
+    def fit_model(self, x: np.ndarray, y: np.ndarray, weights: np.ndarray, **model_kwargs) -> LinearSolver:
+        """
+        Fit the actual models. This is abstracted away for us to more easily test other kinds of models
+        """
+        if self.model_type == "OLS":
+            model = OLSRegressionSolver()
+            model.fit(x, y, weights=weights, **model_kwargs)
+        elif self.model_type == "QR":
+            model = QuantileRegressionSolver()
+            model.fit(x, y, weights=weights, taus=0.5, **model_kwargs)
+        else:
+            raise BootstrapElectionModelException(
+                f"Please use defined model type 'QR' or 'OLS', input is: {self.model_type}"
+            )
+        return model
+
     # TODO: potentially generalize binning features for strata
     def _get_strata(
         self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame
@@ -806,36 +835,27 @@ class BootstrapElectionModel(BaseElectionModel):
             nonreporting_units, "turnout_factor"
         )
 
-        # we use k-fold cross validation to find the optimal lambda for our OLS regression
-        optimal_lambda_y = self.cv_lambda(x_train, y_train, np.logspace(-3, 2, 20), weights=weights_train)
-        optimal_lambda_z = self.cv_lambda(x_train, z_train, np.logspace(-3, 2, 20), weights=weights_train)
-
         # step 1) fit the initial model
         # we don't want to regularize the intercept or the coefficient for baseline_normalized_margin
-        ols_y = OLSRegressionSolver()
-        ols_y.fit(
-            x_train,
-            y_train,
-            weights=weights_train,
-            lambda_=optimal_lambda_y,
-            fit_intercept=True,
-            regularize_intercept=False,
-            n_feat_ignore_reg=1,
-        )
-        ols_z = OLSRegressionSolver()
-        ols_z.fit(
-            x_train,
-            z_train,
-            weights=weights_train,
-            lambda_=optimal_lambda_z,
-            fit_intercept=True,
-            regularize_intercept=False,
-            n_feat_ignore_reg=1,
-        )
+        model_kwargs = {"fit_intercept": True, "regularize_intercept": False, "n_feat_ignore_reg": 1}
+        if self.model_type == "OLS":
+            # if we run OLS we use cross validation to find the optimal lambda
+            # TODO: why do we not do this for other models also
+            optimal_lambda_y = self.cv_lambda(x_train, y_train, np.logspace(-3, 2, 20), weights=weights_train)
+            optimal_lambda_z = self.cv_lambda(x_train, z_train, np.logspace(-3, 2, 20), weights=weights_train)
+
+            model_kwargs_y = {"lambda_": optimal_lambda_y, **model_kwargs}
+            model_kwargs_z = {"lambda_": optimal_lambda_z, **model_kwargs}
+        else:
+            model_kwargs_y = model_kwargs
+            model_kwargs_z = model_kwargs
+
+        model_y = self.fit_model(x_train, y_train, weights_train, **model_kwargs_y)
+        model_z = self.fit_model(x_train, z_train, weights_train, **model_kwargs_z)
 
         # step 2) calculate the fitted values
-        y_train_pred = ols_y.predict(x_train)
-        z_train_pred = ols_z.predict(x_train)
+        y_train_pred = model_y.predict(x_train)
+        z_train_pred = model_z.predict(x_train)
 
         # step 3) calculate residuals
         #   residuals are the residuals from OLS (ie. the amount of error that our regression does not explain)
@@ -845,10 +865,24 @@ class BootstrapElectionModel(BaseElectionModel):
         #   (it is estiamted as the average error in OLS over all the units in a contest)
         #   delta is the unit level error that is unaccounted for by the contest level effect
         residuals_y, epsilon_y_hat, delta_y_hat = self._estimate_model_errors(
-            ols_y, x_train, y_train, aggregate_indicator_train
+            model_y,
+            x_train,
+            y_train,
+            weights_train,
+            aggregate_indicator_train,
+            K=5,
+            center=False,
+            model_kwargs=model_kwargs_y,
         )
         residuals_z, epsilon_z_hat, delta_z_hat = self._estimate_model_errors(
-            ols_z, x_train, z_train, aggregate_indicator_train
+            model_z,
+            x_train,
+            z_train,
+            weights_train,
+            aggregate_indicator_train,
+            K=5,
+            center=False,
+            model_kwargs=model_kwargs_z,
         )
 
         # As part of the residual bootstrap we now need to generate B synthetic versions of residuals_y and residuals_z
@@ -916,49 +950,42 @@ class BootstrapElectionModel(BaseElectionModel):
         #   we need to generate bootstrapped test predictions and to do that we need to fit a bootstrap model
         #   we are using the normal equations from the original model since x_train has stayed the same and the normal
         #       equations are only dependent on x_train. This saves compute.
-        ols_y_B = OLSRegressionSolver()
-        ols_y_B.fit(
-            x_train,
-            y_train_B,
-            weights_train,
-            normal_eqs=ols_y.normal_eqs,
-            fit_intercept=True,
-            regularize_intercept=False,
-            n_feat_ignore_reg=1,
-        )
-        ols_z_B = OLSRegressionSolver()
-        ols_z_B.fit(
-            x_train,
-            z_train_B,
-            weights_train,
-            normal_eqs=ols_z.normal_eqs,
-            fit_intercept=True,
-            regularize_intercept=False,
-            n_feat_ignore_reg=1,
-        )
 
-        LOG.info("orig. ols coefficients, normalized margin: \n %s", ols_y.coefficients.flatten())
-        LOG.info("boot. ols coefficients, normalized margin: \n %s", ols_y_B.coefficients.mean(axis=-1))
+        # TODO: should there be regularization here also?
+        if self.model_type == "OLS":
+            model_kwargs_y_B = {"normal_eqs": model_y.normal_eqs, **model_kwargs}
+            model_kwargs_z_B = {"normal_eqs": model_z.normal_eqs, **model_kwargs}
+        else:
+            model_kwargs_y_B = model_kwargs
+            model_kwargs_z_B = model_kwargs
+
+        model_y_B = self.fit_model(x_train, y_train_B, weights_train, **model_kwargs_y_B)
+        model_z_B = self.fit_model(x_train, z_train_B, weights_train, **model_kwargs_z_B)
+
+        LOG.info("orig. ols coefficients, normalized margin: \n %s", model_y.coefficients.flatten())
+        LOG.info("boot. ols coefficients, normalized margin: \n %s", model_y_B.coefficients.mean(axis=-1))
 
         # we cannot just apply ols_y_B/old_z_B to the test units because that would be missing
         # our contest level random effect
+        # TODO: DO WE NEVER DO ANYTHING WITH THE OUTPUT
+        model_y_B.predict(x_train)
+        model_z_B.predict(x_train)
+
         # so we need to compute an bootstrapped estimate of the contest level random effect (epsilon)
         # to do that we first compute the bootstrapped leave-one-out training residuals and then use that to
         # estimate bootstrapped epsilons
-        y_train_pred_B = ols_y_B.predict(x_train)
-        z_train_pred_B = ols_z_B.predict(x_train)
-        residuals_y_B = ols_y_B.residuals(y_train_B, y_train_pred_B, loo=True, center=True)
-        residuals_z_B = ols_z_B.residuals(z_train_B, z_train_pred_B, loo=True, center=True)
+        residuals_y_B = model_y_B.residuals(x_train, y_train_B, weights_train, K=5, center=False, **model_kwargs_y)
+        residuals_z_B = model_z_B.residuals(x_train, z_train_B, weights_train, K=5, center=False, **model_kwargs_z)
         epsilon_y_hat_B = self._estimate_epsilon(residuals_y_B, aggregate_indicator_train)
         epsilon_z_hat_B = self._estimate_epsilon(residuals_z_B, aggregate_indicator_train)
 
         # We can then use our bootstrapped ols_y_B/ols_z_B and our bootstrapped contest level effect
         # (epsilon) to make bootstrapped predictions on our non-reporting units
         # This is \tilde{y_i}^{b} and \tilde{z_i}^{b}
-        y_test_pred_B = (ols_y_B.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat_B)).clip(
+        y_test_pred_B = (model_y_B.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat_B)).clip(
             min=y_partial_reporting_lower, max=y_partial_reporting_upper
         )
-        z_test_pred_B = (ols_z_B.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat_B)).clip(
+        z_test_pred_B = (model_z_B.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat_B)).clip(
             min=z_partial_reporting_lower, max=z_partial_reporting_upper
         )
 
