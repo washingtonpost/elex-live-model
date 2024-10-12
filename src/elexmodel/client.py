@@ -303,7 +303,13 @@ class ModelClient:
         postal_code_blacklist = model_parameters.get("postal_code_blacklist", [])
 
         (reporting_units, nonreporting_units, unexpected_units) = data.get_units(
-            percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper, margin_change_threshold, unit_blacklist, postal_code_blacklist, aggregates
+            percent_reporting_threshold,
+            turnout_factor_lower,
+            turnout_factor_upper,
+            margin_change_threshold,
+            unit_blacklist,
+            postal_code_blacklist,
+            aggregates,
         )
 
         LOG.info(
