@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.1.1 (10/10/2024)
+- fix: allow multiple `alpha` values passed in to `ModelClient.get_national_summary_votes_estimates()` and change that method to return a `pandas.DataFrame` [#111](https://github.com/washingtonpost/elex-live-model/pull/111)
+
 ## 2.1.0 (09/23/2024)
 - fix: model evaluation functions and margin estimand rounding [#94](https://github.com/washingtonpost/elex-live-model/pull/94)
 - chore: updated requirements to their latest versions [#95](https://github.com/washingtonpost/elex-live-model/pull/95), [#103](https://github.com/washingtonpost/elex-live-model/pull/103)

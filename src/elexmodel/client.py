@@ -174,21 +174,23 @@ class ModelClient:
         raw_aggregate_list = base_aggregate + [aggregate]
         return sorted(list(set(raw_aggregate_list)), key=lambda x: AGGREGATE_ORDER.index(x))
 
-    def get_national_summary_votes_estimates(self, nat_sum_data_dict=None, base_to_add=0, alpha=0.99):
+    def get_national_summary_votes_estimates(self, nat_sum_data_dict=None, base_to_add=0, alphas=[0.99]):
         if self.model is None:
             raise ModelClientException(
                 "Must call the get_estimands() method before get_national_summary_votes_estimates()."
             )
 
-        nat_sum_estimates = self.model.get_national_summary_estimates(nat_sum_data_dict, base_to_add, alpha)
-        self.results_handler.add_national_summary_estimates(nat_sum_estimates)
+        nat_sum_estimates_dict = {}
+        for alpha in alphas:
+            nat_sum_estimates = self.model.get_national_summary_estimates(nat_sum_data_dict, base_to_add, alpha)
+            nat_sum_estimates_dict[alpha] = nat_sum_estimates
+        self.results_handler.add_national_summary_estimates(nat_sum_estimates_dict)
 
         if APP_ENV != "local" and self.save_results:
             self.results_handler.write_data(
                 self.election_id, self.office, self.geographic_unit_type, keys=["nat_sum_data"]
             )
-
-        return nat_sum_estimates
+        return self.results_handler.final_results["nat_sum_data"]
 
     def get_estimates(
         self,
