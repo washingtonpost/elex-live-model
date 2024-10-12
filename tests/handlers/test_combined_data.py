@@ -176,7 +176,9 @@ def test_get_reporting_data(va_governor_county_data):
     combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
     turnout_factor_lower = 0.5
     turnout_factor_upper = 1.5
-    (observed_data, _, _) = combined_data_handler.get_units(100, turnout_factor_lower, turnout_factor_upper, 0.4, [], [], [])
+    (observed_data, _, _) = combined_data_handler.get_units(
+        100, turnout_factor_lower, turnout_factor_upper, 0.4, [], [], []
+    )
     assert observed_data.shape[0] == 20
     assert observed_data.reporting.iloc[0] == 1
     assert observed_data.reporting.sum() == 20
@@ -208,7 +210,9 @@ def test_get_reporting_data_dropping_with_turnout_factor(va_governor_county_data
         & (combined_data_handler.data.turnout_factor < turnout_factor_lower)
     ].shape[0]
 
-    (observed_data, _, _) = combined_data_handler.get_units(100, turnout_factor_lower, turnout_factor_upper, 0.4, [], [], [])
+    (observed_data, _, _) = combined_data_handler.get_units(
+        100, turnout_factor_lower, turnout_factor_upper, 0.4, [], [], []
+    )
 
     # 20 units should be reporting,
     # but the additional ones are dropped to unexpected because they are above/below threshold
