@@ -54,6 +54,8 @@ class CombinedDataHandler:
         turnout_factor_lower,
         turnout_factor_upper,
         margin_change_threshold,
+        unit_blacklist,
+        postal_code_blacklist,
         aggregates,
     ):
         """
@@ -64,6 +66,7 @@ class CombinedDataHandler:
             - unexpected units (ie. units for which we have no covariates prepared)
             - units for which the baseline results is zero (ie. units that are tiny)
             - units with strange turnout factors (ie. units that are likely precinct mismatches)
+            - units that have been blacklisted
         """
 
         # units where the expected vote is greater than the percent reporting threshold
@@ -74,7 +77,7 @@ class CombinedDataHandler:
         # identify unexpected and non-predictive units
         unexpected_units = self._get_unexpected_units(aggregates)
         non_modeled_units = self._get_non_modeled_units(
-            percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper, margin_change_threshold
+            percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper, margin_change_threshold, unit_blacklist, postal_code_blacklist
         )
 
         # remove these units from the reporting units
@@ -171,7 +174,7 @@ class CombinedDataHandler:
         return unexpected_units
 
     def _get_non_modeled_units(
-        self, percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper, margin_change_threshold
+        self, percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper, margin_change_threshold, unit_blacklist, postal_code_blacklist
     ):
         expected_geographic_units = self._get_expected_geographic_unit_fips().tolist()
         zero_baseline_units = self._get_units_with_baseline_of_zero()
@@ -194,6 +197,8 @@ class CombinedDataHandler:
                         ("margin" in self.estimands) & (self.data.normalized_margin_change > margin_change_threshold)
                     )  # or large margin change if margin is an estimand
                 )
+                | (self.data["geographic_unit_fips"].isin(unit_blacklist))  # or blacklisted (doesn't need to be reporting/expected)
+                | (self.data['postal_code'].isin(postal_code_blacklist))  # or entire state is blacklisted (doesn't need to be reporting/expected)
             ]
             .drop_duplicates(subset="geographic_unit_fips")
             .copy()

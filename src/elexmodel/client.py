@@ -299,9 +299,11 @@ class ModelClient:
         turnout_factor_lower = model_parameters.get("turnout_factor_lower", 0.5)
         turnout_factor_upper = model_parameters.get("turnout_factor_upper", 2.0)
         margin_change_threshold = model_parameters.get("margin_change_threshold", 0.3)
+        unit_blacklist = model_parameters.get("unit_blacklist", [])
+        postal_code_blacklist = model_parameters.get("postal_code_blacklist", [])
 
         (reporting_units, nonreporting_units, unexpected_units) = data.get_units(
-            percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper, margin_change_threshold, aggregates
+            percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper, margin_change_threshold, unit_blacklist, postal_code_blacklist, aggregates
         )
 
         LOG.info(
