@@ -356,6 +356,7 @@ def test_turnout_factor_as_non_predictive(va_governor_county_data):
     assert unexpected_data.shape[0] == over + under
     assert len(unexpected_data[unexpected_data["unit_category"] == "non-modeled"]) == over + under
 
+
 def test_margin_change_threshold_as_non_predictive(va_governor_county_data):
     election_id = "2017-11-07_VA_G"
     office = "G"
@@ -366,21 +367,30 @@ def test_margin_change_threshold_as_non_predictive(va_governor_county_data):
         election_id, office, geographic_unit_type, estimands, data=va_governor_county_data
     )
     current_data = live_data_handler.get_n_fully_reported(n=133)
-    va_governor_county_data["baseline_weights"] = va_governor_county_data.baseline_dem + va_governor_county_data.baseline_gop
-    va_governor_county_data['baseline_margin'] = va_governor_county_data.baseline_dem - va_governor_county_data.baseline_gop
-    va_governor_county_data['baseline_normalized_margin'] = va_governor_county_data.baseline_margin / va_governor_county_data.baseline_weights
+    va_governor_county_data["baseline_weights"] = (
+        va_governor_county_data.baseline_dem + va_governor_county_data.baseline_gop
+    )
+    va_governor_county_data["baseline_margin"] = (
+        va_governor_county_data.baseline_dem - va_governor_county_data.baseline_gop
+    )
+    va_governor_county_data["baseline_normalized_margin"] = (
+        va_governor_county_data.baseline_margin / va_governor_county_data.baseline_weights
+    )
     va_governor_county_data["last_election_results_margin"] = va_governor_county_data.baseline_margin
-    
+
     combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
 
     margin_change_threshold = 0.1
     (reporting_data, _, unexpected_data) = combined_data_handler.get_units(
         100, 0.2, 2.5, margin_change_threshold, [], [], ["county_fips"]
     )
-    over = combined_data_handler.data[combined_data_handler.data.normalized_margin_change > margin_change_threshold].shape[0]
+    over = combined_data_handler.data[
+        combined_data_handler.data.normalized_margin_change > margin_change_threshold
+    ].shape[0]
     assert unexpected_data.shape[0] == over
     assert len(unexpected_data[unexpected_data["unit_category"] == "non-modeled"]) == over
     assert reporting_data.shape[0] == 133 - over
+
 
 def test_unit_blacklist(va_governor_county_data, rng):
     election_id = "2017-11-07_VA_G"
@@ -398,17 +408,24 @@ def test_unit_blacklist(va_governor_county_data, rng):
     combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
 
     number_to_blacklist = 10
-    unit_blacklist = rng.choice(va_governor_county_data.geographic_unit_fips, number_to_blacklist, replace=False).tolist()
+    unit_blacklist = rng.choice(
+        va_governor_county_data.geographic_unit_fips, number_to_blacklist, replace=False
+    ).tolist()
     (reporting_data, nonreporting_data, unexpected_data) = combined_data_handler.get_units(
         100, 0.5, 1.5, 0.4, unit_blacklist, [], ["county_fips"]
     )
-    number_blacklist_reporting = current_data[current_data.percent_expected_vote == 100].geographic_unit_fips.isin(unit_blacklist).sum()
-    number_blacklist_nonreporting = current_data[current_data.percent_expected_vote < 100].geographic_unit_fips.isin(unit_blacklist).sum()
+    number_blacklist_reporting = (
+        current_data[current_data.percent_expected_vote == 100].geographic_unit_fips.isin(unit_blacklist).sum()
+    )
+    number_blacklist_nonreporting = (
+        current_data[current_data.percent_expected_vote < 100].geographic_unit_fips.isin(unit_blacklist).sum()
+    )
 
     assert unexpected_data.shape[0] == number_to_blacklist
     assert unexpected_data.geographic_unit_fips.isin(unit_blacklist).all()
     assert reporting_data.shape[0] == 100 - number_blacklist_reporting
     assert nonreporting_data.shape[0] == 33 - number_blacklist_nonreporting
+
 
 def test_postal_code_blacklist(va_governor_county_data):
     election_id = "2017-11-07_VA_G"
@@ -425,7 +442,7 @@ def test_postal_code_blacklist(va_governor_county_data):
     va_governor_county_data["last_election_results_turnout"] = va_governor_county_data.baseline_turnout + 1
     combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
 
-    postal_code_blacklist = ['VA']
+    postal_code_blacklist = ["VA"]
     (reporting_data, nonreporting_data, unexpected_data) = combined_data_handler.get_units(
         100, 0.5, 1.5, 0.4, [], postal_code_blacklist, ["county_fips"]
     )
