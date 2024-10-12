@@ -497,6 +497,9 @@ def test_compute_bootstrap_errors(bootstrap_election_model, va_governor_county_d
         percent_reporting_threshold,
         turnout_factor_lower=turnout_factor_lower,
         turnout_factor_upper=turnout_factor_upper,
+        margin_change_threshold=0.4,
+        unit_blacklist=[],
+        postal_code_blacklist=[],
         aggregates=["postal_code"],
     )
 
@@ -540,6 +543,9 @@ def test_get_unit_predictions(bootstrap_election_model, va_governor_county_data)
         percent_reporting_threshold,
         turnout_factor_lower=turnout_factor_lower,
         turnout_factor_upper=turnout_factor_upper,
+        margin_change_threshold=0.4,
+        unit_blacklist=[],
+        postal_code_blacklist=[],
         aggregates=["postal_code"],
     )
 
@@ -1198,7 +1204,7 @@ def test_total_aggregation(bootstrap_election_model, va_assembly_precinct_data):
     )
 
     (reporting_units, nonreporting_units, unexpected_units) = combined_data_handler.get_units(
-        percent_reporting_threshold, 0.5, 1.5, ["postal_code", "district"]
+        percent_reporting_threshold, 0.5, 1.5, 0.4, [], [], ["postal_code", "district"]
     )
 
     bootstrap_election_model.B = 300

@@ -189,9 +189,10 @@ class CombinedDataHandler:
     ):
         expected_geographic_units = self._get_expected_geographic_unit_fips().tolist()
         zero_baseline_units = self._get_units_with_baseline_of_zero()
-        self.data["normalized_margin_change"] = (
-            self.data.baseline_normalized_margin - self.data.results_normalized_margin
-        ).abs()
+        if "margin" in self.estimands:
+            self.data["normalized_margin_change"] = (
+                self.data.baseline_normalized_margin - self.data.results_normalized_margin
+            ).abs()
         units_with_strange_turnout_factor = (
             self.data[
                 (
@@ -205,8 +206,8 @@ class CombinedDataHandler:
                     | (self.data.turnout_factor <= turnout_factor_lower)  # or low turnout factor
                     | (self.data.turnout_factor >= turnout_factor_upper)  # or high turnout factor
                     | (
-                        ("margin" in self.estimands) & (self.data.normalized_margin_change > margin_change_threshold)
-                    )  # or large margin change if margin is an estimand
+                        ("margin" in self.estimands) and (self.data.normalized_margin_change > margin_change_threshold)
+                    )  # or large margin change if margin is an estimand (using and rather than & here is fine since first clause is a boolean and not a series)
                 )
                 | (
                     self.data["geographic_unit_fips"].isin(unit_blacklist)
