@@ -1,5 +1,6 @@
 import logging
 from collections import defaultdict
+import pprint
 
 import numpy as np
 import pandas as pd
@@ -299,16 +300,16 @@ class ModelClient:
         turnout_factor_lower = model_parameters.get("turnout_factor_lower", 0.5)
         turnout_factor_upper = model_parameters.get("turnout_factor_upper", 2.0)
         margin_change_threshold = model_parameters.get("margin_change_threshold", 0.3)
-        unit_blacklist = model_parameters.get("unit_blacklist", [])
-        postal_code_blacklist = model_parameters.get("postal_code_blacklist", [])
+        unit_blocklist = model_parameters.get("unit_blocklist", [])
+        postal_code_blocklist = model_parameters.get("postal_code_blocklist", [])
 
         (reporting_units, nonreporting_units, unexpected_units) = data.get_units(
             percent_reporting_threshold,
             turnout_factor_lower,
             turnout_factor_upper,
             margin_change_threshold,
-            unit_blacklist,
-            postal_code_blacklist,
+            unit_blocklist,
+            postal_code_blocklist,
             aggregates,
         )
 
@@ -338,7 +339,7 @@ class ModelClient:
         if APP_ENV != "local" and self.save_results:
             data.write_data(self.election_id, self.office)
 
-        non_modeled_units = unexpected_units[unexpected_units["unit_category"] == "non-modeled"]
+        non_modeled_units = unexpected_units[unexpected_units["unit_category"].str.startswith("non-modeled")]
         n_reporting_expected_units = reporting_units.shape[0]
         n_unexpected_units = len(unexpected_units[unexpected_units["unit_category"] == "unexpected"])
         n_nonreporting_units = nonreporting_units.shape[0]
@@ -351,8 +352,9 @@ class ModelClient:
             There are {n_nonreporting_units} nonreporting units."""
         )
         if len(non_modeled_units) > 0:
-            non_modeled_units = non_modeled_units.groupby("postal_code")["geographic_unit_fips"].apply(list).to_dict()
-            LOG.info(f"non-modeled units:\n{non_modeled_units}")
+            non_modeled_units = non_modeled_units.groupby("unit_category")[["postal_code", "geographic_unit_fips"]].apply(lambda x: list(x.itertuples(index=False, name=None))).to_dict()
+            non_modeled_units_pprint = pprint.pformat(non_modeled_units)
+            LOG.info(f"non-modeled units:\n{non_modeled_units_pprint}")
 
         if n_reporting_expected_units < minimum_reporting_units_max:
             raise ModelNotEnoughSubunitsException(

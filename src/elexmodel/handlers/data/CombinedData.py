@@ -54,8 +54,8 @@ class CombinedDataHandler:
         turnout_factor_lower,
         turnout_factor_upper,
         margin_change_threshold,
-        unit_blacklist,
-        postal_code_blacklist,
+        unit_blocklist,
+        postal_code_blocklist,
         aggregates,
     ):
         """
@@ -66,7 +66,7 @@ class CombinedDataHandler:
             - unexpected units (ie. units for which we have no covariates prepared)
             - units for which the baseline results is zero (ie. units that are tiny)
             - units with strange turnout factors (ie. units that are likely precinct mismatches)
-            - units that have been blacklisted
+            - units that have been blocklisted
         """
 
         # units where the expected vote is greater than the percent reporting threshold
@@ -81,8 +81,8 @@ class CombinedDataHandler:
             turnout_factor_lower,
             turnout_factor_upper,
             margin_change_threshold,
-            unit_blacklist,
-            postal_code_blacklist,
+            unit_blocklist,
+            postal_code_blocklist,
         )
 
         # remove these units from the reporting units
@@ -119,8 +119,6 @@ class CombinedDataHandler:
         nonreporting_units["unit_category"] = "expected"
 
         # finalize all unexpected/non-modeled units
-        unexpected_units["unit_category"] = "unexpected"
-        non_modeled_units["unit_category"] = "non-modeled"
         all_unexpected_units = pd.concat([unexpected_units, non_modeled_units]).reset_index(drop=True)
         all_unexpected_units["reporting"] = int(0)
 
@@ -164,6 +162,7 @@ class CombinedDataHandler:
             .drop_duplicates(subset="geographic_unit_fips")
             .copy()
         )
+        unexpected_units["unit_category"] = "unexpected"
 
         # since we were not expecting them, we have don't have their county or district
         # from preprocessed data. so we have to add that back in.
@@ -184,43 +183,53 @@ class CombinedDataHandler:
         turnout_factor_lower,
         turnout_factor_upper,
         margin_change_threshold,
-        unit_blacklist,
-        postal_code_blacklist,
+        unit_blocklist,
+        postal_code_blocklist,
     ):
         expected_geographic_units = self._get_expected_geographic_unit_fips().tolist()
         zero_baseline_units = self._get_units_with_baseline_of_zero()
+
+        units_blocklisted = self.data[
+            (self.data["geographic_unit_fips"].isin(unit_blocklist))
+            | (self.data["postal_code"].isin(postal_code_blocklist))
+        ].copy()
+        units_blocklisted["unit_category"] = "non-modeled: blocklisted"
+
+        units_with_zero_baseline = self.data[self.data["geographic_unit_fips"].isin(zero_baseline_units)].copy()
+        units_with_zero_baseline["unit_category"] = "non-modeled: zero baseline"
+
+        units_with_strange_turnout_factor = (
+            self.data[
+                (self.data.percent_expected_vote >= percent_reporting_threshold)
+                & (self.data["geographic_unit_fips"].isin(expected_geographic_units))
+                & (
+                    (self.data.turnout_factor <= turnout_factor_lower)
+                    | (self.data.turnout_factor >= turnout_factor_upper)
+                )
+            ]
+        ).copy()
+        units_with_strange_turnout_factor["unit_category"] = "non-modeled: strange turnout factor"
+
+        non_modeled_units_list = [units_blocklisted, units_with_zero_baseline, units_with_strange_turnout_factor]
+
         if "margin" in self.estimands:
+            # instead fit stupid model based on all reporting units (whether modeled or not)
+            # units that are far from that model should also be non-modeled
+
             self.data["normalized_margin_change"] = (
                 self.data.baseline_normalized_margin - self.data.results_normalized_margin
             ).abs()
-        units_with_strange_turnout_factor = (
-            self.data[
-                (
-                    self.data.percent_expected_vote >= percent_reporting_threshold
-                )  # reporting units (otherwise nonreporting unit)
-                & (
-                    self.data["geographic_unit_fips"].isin(expected_geographic_units)
-                )  # and expected unit (otherwise unexpected unit)
-                & (
-                    (self.data["geographic_unit_fips"].isin(zero_baseline_units))  # zero baseline
-                    | (self.data.turnout_factor <= turnout_factor_lower)  # or low turnout factor
-                    | (self.data.turnout_factor >= turnout_factor_upper)  # or high turnout factor
-                    | (
-                        ("margin" in self.estimands) and (self.data.normalized_margin_change > margin_change_threshold)
-                    )  # or large margin change if margin is an estimand (using and rather than & here is fine since first clause is a boolean and not a series)
-                )
-                | (
-                    self.data["geographic_unit_fips"].isin(unit_blacklist)
-                )  # or blacklisted (doesn't need to be reporting/expected)
-                | (
-                    self.data["postal_code"].isin(postal_code_blacklist)
-                )  # or entire state is blacklisted (doesn't need to be reporting/expected)
-            ]
-            .drop_duplicates(subset="geographic_unit_fips")
-            .copy()
-        )
 
-        return units_with_strange_turnout_factor
+            units_with_strange_margin_change = self.data[
+                (self.data.percent_expected_vote >= percent_reporting_threshold)
+                & (self.data["geographic_unit_fips"].isin(expected_geographic_units))
+                & (self.data.normalized_margin_change > margin_change_threshold)
+            ].copy()
+            units_with_strange_margin_change["unit_category"] = "non-modeled: strange margin change"
+            non_modeled_units_list.append(units_with_strange_margin_change)
+        
+        non_modeled_units = pd.concat(non_modeled_units_list).reset_index(drop=True).drop_duplicates(subset='geographic_unit_fips')
+        return non_modeled_units
 
     def write_data(self, election_id, office):
         s3_client = s3.S3CsvUtil(TARGET_BUCKET)

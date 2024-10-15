@@ -498,8 +498,8 @@ def test_compute_bootstrap_errors(bootstrap_election_model, va_governor_county_d
         turnout_factor_lower=turnout_factor_lower,
         turnout_factor_upper=turnout_factor_upper,
         margin_change_threshold=0.4,
-        unit_blacklist=[],
-        postal_code_blacklist=[],
+        unit_blocklist=[],
+        postal_code_blocklist=[],
         aggregates=["postal_code"],
     )
 
@@ -544,8 +544,8 @@ def test_get_unit_predictions(bootstrap_election_model, va_governor_county_data)
         turnout_factor_lower=turnout_factor_lower,
         turnout_factor_upper=turnout_factor_upper,
         margin_change_threshold=0.4,
-        unit_blacklist=[],
-        postal_code_blacklist=[],
+        unit_blocklist=[],
+        postal_code_blocklist=[],
         aggregates=["postal_code"],
     )
 
