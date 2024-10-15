@@ -227,8 +227,10 @@ class CombinedDataHandler:
             ].copy()
             units_with_strange_margin_change["unit_category"] = "non-modeled: strange margin change"
             non_modeled_units_list.append(units_with_strange_margin_change)
-        
-        non_modeled_units = pd.concat(non_modeled_units_list).reset_index(drop=True).drop_duplicates(subset='geographic_unit_fips')
+
+        non_modeled_units = (
+            pd.concat(non_modeled_units_list).reset_index(drop=True).drop_duplicates(subset="geographic_unit_fips")
+        )
         return non_modeled_units
 
     def write_data(self, election_id, office):

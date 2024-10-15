@@ -1,6 +1,6 @@
 import logging
-from collections import defaultdict
 import pprint
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
@@ -352,7 +352,11 @@ class ModelClient:
             There are {n_nonreporting_units} nonreporting units."""
         )
         if len(non_modeled_units) > 0:
-            non_modeled_units = non_modeled_units.groupby("unit_category")[["postal_code", "geographic_unit_fips"]].apply(lambda x: list(x.itertuples(index=False, name=None))).to_dict()
+            non_modeled_units = (
+                non_modeled_units.groupby("unit_category")[["postal_code", "geographic_unit_fips"]]
+                .apply(lambda x: list(x.itertuples(index=False, name=None)))
+                .to_dict()
+            )
             non_modeled_units_pprint = pprint.pformat(non_modeled_units)
             LOG.info(f"non-modeled units:\n{non_modeled_units_pprint}")
 
