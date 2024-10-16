@@ -176,7 +176,10 @@ def test_get_reporting_data(va_governor_county_data):
     combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
     turnout_factor_lower = 0.5
     turnout_factor_upper = 1.5
-    (observed_data, _, _) = combined_data_handler.get_units(100, turnout_factor_lower, turnout_factor_upper, [])
+    margin_change_threshold = 0.4
+    (observed_data, _, _) = combined_data_handler.get_units(
+        100, turnout_factor_lower, turnout_factor_upper, margin_change_threshold, [], [], []
+    )
     assert observed_data.shape[0] == 20
     assert observed_data.reporting.iloc[0] == 1
     assert observed_data.reporting.sum() == 20
@@ -208,7 +211,9 @@ def test_get_reporting_data_dropping_with_turnout_factor(va_governor_county_data
         & (combined_data_handler.data.turnout_factor < turnout_factor_lower)
     ].shape[0]
 
-    (observed_data, _, _) = combined_data_handler.get_units(100, turnout_factor_lower, turnout_factor_upper, [])
+    (observed_data, _, _) = combined_data_handler.get_units(
+        100, turnout_factor_lower, turnout_factor_upper, 0.4, [], [], []
+    )
 
     # 20 units should be reporting,
     # but the additional ones are dropped to unexpected because they are above/below threshold
@@ -242,7 +247,7 @@ def test_get_unexpected_units_county_district(va_assembly_county_data):
     turnout_factor_lower = 0  # set to extreme values so as not to add any more "unexpected"
     turnout_factor_upper = 100
     (_, _, unexpected_data) = combined_data_handler.get_units(
-        100, turnout_factor_lower, turnout_factor_upper, ["county_fips", "district"]
+        100, turnout_factor_lower, turnout_factor_upper, 0.4, [], [], ["county_fips", "district"]
     )
 
     assert unexpected_data.shape[0] == unexpected_units
@@ -283,7 +288,7 @@ def test_get_unexpected_units_county(va_governor_county_data):
     turnout_factor_lower = 0.5
     turnout_factor_upper = 1.5
     (_, _, unexpected_data) = combined_data_handler.get_units(
-        100, turnout_factor_lower, turnout_factor_upper, ["county_fips"]
+        100, turnout_factor_lower, turnout_factor_upper, 0.4, [], [], ["county_fips"]
     )
     assert unexpected_data.shape[0] == reporting_unexpected_units + 1
     assert unexpected_data[unexpected_data.county_fips == ""].shape[0] == 0
@@ -313,7 +318,7 @@ def test_zero_baseline_turnout_as_unexpected(va_governor_county_data):
     turnout_factor_upper = 1.5
 
     (reporting_units, nonreporting_units, unexpected_data) = combined_data_handler.get_units(
-        100, turnout_factor_lower, turnout_factor_upper, ["county_fips"]
+        100, turnout_factor_lower, turnout_factor_upper, 0.4, [], [], ["county_fips"]
     )
 
     assert va_governor_county_data.loc[0].geographic_unit_fips in unexpected_data.geographic_unit_fips.tolist()
@@ -344,9 +349,104 @@ def test_turnout_factor_as_non_predictive(va_governor_county_data):
     turnout_factor_lower = 0.95
     turnout_factor_upper = 1.2
     (_, _, unexpected_data) = combined_data_handler.get_units(
-        100, turnout_factor_lower, turnout_factor_upper, ["county_fips"]
+        100, turnout_factor_lower, turnout_factor_upper, 0.4, [], [], ["county_fips"]
     )
     over = combined_data_handler.data[combined_data_handler.data.turnout_factor >= turnout_factor_upper].shape[0]
     under = combined_data_handler.data[combined_data_handler.data.turnout_factor < turnout_factor_lower].shape[0]
     assert unexpected_data.shape[0] == over + under
     assert len(unexpected_data[unexpected_data["unit_category"] == "non-modeled"]) == over + under
+
+
+def test_margin_change_threshold_as_non_predictive(va_governor_county_data):
+    election_id = "2017-11-07_VA_G"
+    office = "G"
+    geographic_unit_type = "county"
+    estimands = ["margin"]
+
+    live_data_handler = MockLiveDataHandler(
+        election_id, office, geographic_unit_type, estimands, data=va_governor_county_data
+    )
+    current_data = live_data_handler.get_n_fully_reported(n=133)
+    va_governor_county_data["baseline_weights"] = (
+        va_governor_county_data.baseline_dem + va_governor_county_data.baseline_gop
+    )
+    va_governor_county_data["baseline_margin"] = (
+        va_governor_county_data.baseline_dem - va_governor_county_data.baseline_gop
+    )
+    va_governor_county_data["baseline_normalized_margin"] = (
+        va_governor_county_data.baseline_margin / va_governor_county_data.baseline_weights
+    )
+    va_governor_county_data["last_election_results_margin"] = va_governor_county_data.baseline_margin
+
+    combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
+
+    margin_change_threshold = 0.1
+    (reporting_data, _, unexpected_data) = combined_data_handler.get_units(
+        100, 0.2, 2.5, margin_change_threshold, [], [], ["county_fips"]
+    )
+    over = combined_data_handler.data[
+        combined_data_handler.data.normalized_margin_change > margin_change_threshold
+    ].shape[0]
+    assert unexpected_data.shape[0] == over
+    assert len(unexpected_data[unexpected_data["unit_category"] == "non-modeled"]) == over
+    assert reporting_data.shape[0] == 133 - over
+
+
+def test_unit_blacklist(va_governor_county_data, rng):
+    election_id = "2017-11-07_VA_G"
+    office = "G"
+    geographic_unit_type = "county"
+    estimands = ["turnout"]
+
+    live_data_handler = MockLiveDataHandler(
+        election_id, office, geographic_unit_type, estimands, data=va_governor_county_data
+    )
+    current_data = live_data_handler.get_n_fully_reported(n=100)
+    # Add an additional row of a nonreporting unexpected unit that we test below
+    va_governor_county_data["baseline_weights"] = va_governor_county_data.baseline_turnout
+    va_governor_county_data["last_election_results_turnout"] = va_governor_county_data.baseline_turnout + 1
+    combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
+
+    number_to_blacklist = 10
+    unit_blacklist = rng.choice(
+        va_governor_county_data.geographic_unit_fips, number_to_blacklist, replace=False
+    ).tolist()
+    (reporting_data, nonreporting_data, unexpected_data) = combined_data_handler.get_units(
+        100, 0.5, 1.5, 0.4, unit_blacklist, [], ["county_fips"]
+    )
+    number_blacklist_reporting = (
+        current_data[current_data.percent_expected_vote == 100].geographic_unit_fips.isin(unit_blacklist).sum()
+    )
+    number_blacklist_nonreporting = (
+        current_data[current_data.percent_expected_vote < 100].geographic_unit_fips.isin(unit_blacklist).sum()
+    )
+
+    assert unexpected_data.shape[0] == number_to_blacklist
+    assert unexpected_data.geographic_unit_fips.isin(unit_blacklist).all()
+    assert reporting_data.shape[0] == 100 - number_blacklist_reporting
+    assert nonreporting_data.shape[0] == 33 - number_blacklist_nonreporting
+
+
+def test_postal_code_blacklist(va_governor_county_data):
+    election_id = "2017-11-07_VA_G"
+    office = "G"
+    geographic_unit_type = "county"
+    estimands = ["turnout"]
+
+    live_data_handler = MockLiveDataHandler(
+        election_id, office, geographic_unit_type, estimands, data=va_governor_county_data
+    )
+    current_data = live_data_handler.get_n_fully_reported(n=100)
+    # Add an additional row of a nonreporting unexpected unit that we test below
+    va_governor_county_data["baseline_weights"] = va_governor_county_data.baseline_turnout
+    va_governor_county_data["last_election_results_turnout"] = va_governor_county_data.baseline_turnout + 1
+    combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
+
+    postal_code_blacklist = ["VA"]
+    (reporting_data, nonreporting_data, unexpected_data) = combined_data_handler.get_units(
+        100, 0.5, 1.5, 0.4, [], postal_code_blacklist, ["county_fips"]
+    )
+
+    assert unexpected_data.shape[0] == 133
+    assert reporting_data.shape[0] == 0
+    assert nonreporting_data.shape[0] == 0

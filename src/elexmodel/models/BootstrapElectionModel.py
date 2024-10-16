@@ -1024,6 +1024,7 @@ class BootstrapElectionModel(BaseElectionModel):
         self.weighted_z_test_pred = z_test_pred * weights_test
         self.ran_bootstrap = True
         self.n_contests = aggregate_indicator.shape[1]
+        # import IPython; IPython.embed()
 
     def get_unit_predictions(
         self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, estimand: str, **kwargs

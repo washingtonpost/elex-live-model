@@ -347,7 +347,7 @@ def test_generate_fixed_effects(va_governor_county_data):
         handle_unreporting="drop",
     )
 
-    (reporting_data, nonreporting_data, _) = combined_data_handler.get_units(99, 0.5, 1.5, [])
+    (reporting_data, nonreporting_data, _) = combined_data_handler.get_units(99, 0.5, 1.5, 0.4, [], [], [])
 
     featurizer = Featurizer([], {"county_classification": "all"})
 
@@ -381,7 +381,7 @@ def test_generate_fixed_effects(va_governor_county_data):
 
     featurizer = Featurizer([], {"county_classification": ["all"], "county_fips": ["all"]})
 
-    (reporting_data, nonreporting_data, _) = combined_data_handler.get_units(99, 0.5, 1.5, [])
+    (reporting_data, nonreporting_data, _) = combined_data_handler.get_units(99, 0.5, 1.5, 0.4, [], [], [])
 
     n_train = reporting_data.shape[0]
     all_units = pd.concat([reporting_data, nonreporting_data], axis=0)
@@ -436,7 +436,7 @@ def test_generate_fixed_effects_not_all_reporting(va_governor_county_data):
         handle_unreporting="drop",
     )
 
-    (reporting_data, nonreporting_data, _) = combined_data_handler.get_units(99, 0.5, 1.5, [])
+    (reporting_data, nonreporting_data, _) = combined_data_handler.get_units(99, 0.5, 1.5, 0.4, [], [], [])
 
     featurizer = Featurizer([], {"county_fips": ["all"]})
     n_train = reporting_data.shape[0]
@@ -501,7 +501,7 @@ def test_generate_fixed_effects_mixed_reporting(va_governor_precinct_data):
         handle_unreporting="drop",
     )
 
-    (reporting_data, nonreporting_data, _) = combined_data_handler.get_units(99, 0.5, 1.5, [])
+    (reporting_data, nonreporting_data, _) = combined_data_handler.get_units(99, 0.5, 1.5, 0.4, [], [], [])
 
     featurizer = Featurizer([], ["county_fips"])
 
