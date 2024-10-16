@@ -302,6 +302,9 @@ class ModelClient:
         margin_change_threshold = model_parameters.get("margin_change_threshold", 0.3)
         unit_blocklist = model_parameters.get("unit_blocklist", [])
         postal_code_blocklist = model_parameters.get("postal_code_blocklist", [])
+        fit_margin_outlier_model = model_parameters.get("fit_margin_outlier_model", True)
+        fit_turnout_outlier_model = model_parameters.get("fit_turnout_outlier_model", True)
+        outlier_z_threshold = model_parameters.get("outlier_z_threshold", 2.0)
 
         (reporting_units, nonreporting_units, unexpected_units) = data.get_units(
             percent_reporting_threshold,
@@ -310,6 +313,9 @@ class ModelClient:
             margin_change_threshold,
             unit_blocklist,
             postal_code_blocklist,
+            fit_margin_outlier_model,
+            fit_turnout_outlier_model,
+            outlier_z_threshold,
             aggregates,
         )
 

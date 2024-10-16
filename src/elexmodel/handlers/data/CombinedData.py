@@ -5,6 +5,10 @@ from elexmodel.handlers import s3
 from elexmodel.handlers.data.Estimandizer import Estimandizer
 from elexmodel.utils.file_utils import S3_FILE_PATH, TARGET_BUCKET, convert_df_to_csv
 
+from elexsolver.OLSRegressionSolver import OLSRegressionSolver
+from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
+
+from elexmodel.handlers.data.Featurizer import Featurizer
 
 class CombinedDataHandler:
     """
@@ -56,6 +60,9 @@ class CombinedDataHandler:
         margin_change_threshold,
         unit_blocklist,
         postal_code_blocklist,
+        fit_margin_outlier_model,
+        fit_turnout_outlier_model,
+        outlier_z_threshold,
         aggregates,
     ):
         """
@@ -67,6 +74,9 @@ class CombinedDataHandler:
             - units for which the baseline results is zero (ie. units that are tiny)
             - units with strange turnout factors (ie. units that are likely precinct mismatches)
             - units that have been blocklisted
+            - if margin is an estimand, units with strange margin changes
+            - if fit_margin_outlier_model is True, units whose margins are outliers
+            - if fit_turnout_outlier_model is True, units whose turnout factors are outliers
         """
 
         # units where the expected vote is greater than the percent reporting threshold
@@ -76,19 +86,30 @@ class CombinedDataHandler:
 
         # identify unexpected and non-predictive units
         unexpected_units = self._get_unexpected_units(aggregates)
+
+        # remove unexpected units from reporting units
+        reporting_units = reporting_units[
+            ~reporting_units.geographic_unit_fips.isin(unexpected_units.geographic_unit_fips)
+        ].reset_index(drop=True)
+
+        # this will be overwritten if we have any non-modeled units
+        reporting_units["reporting"] = int(1)
+        reporting_units["unit_category"] = "expected"
+
         non_modeled_units = self._get_non_modeled_units(
+            reporting_units,
             percent_reporting_threshold,
             turnout_factor_lower,
             turnout_factor_upper,
             margin_change_threshold,
             unit_blocklist,
             postal_code_blocklist,
+            fit_margin_outlier_model,
+            fit_turnout_outlier_model,
+            outlier_z_threshold
         )
 
-        # remove these units from the reporting units
-        reporting_units = reporting_units[
-            ~reporting_units.geographic_unit_fips.isin(unexpected_units.geographic_unit_fips)
-        ].reset_index(drop=True)
+        # remove non-modeled units from reporting units
         reporting_units = reporting_units[
             ~reporting_units.geographic_unit_fips.isin(non_modeled_units.geographic_unit_fips)
         ].reset_index(drop=True)
@@ -99,8 +120,6 @@ class CombinedDataHandler:
                 reporting_units[f"results_{estimand}"] - reporting_units[f"last_election_results_{estimand}"]
             ) / reporting_units[f"last_election_results_{estimand}"]
 
-        reporting_units["reporting"] = int(1)
-        reporting_units["unit_category"] = "expected"
 
         # units where expected vote is less than the percent reporting threshold
         nonreporting_units = self.data[self.data.percent_expected_vote < percent_reporting_threshold].reset_index(
@@ -177,56 +196,72 @@ class CombinedDataHandler:
 
         return unexpected_units
 
+    def _fit_outlier_detection_model(self, reporting_units, response_variable, outlier_z_threshold):
+        features = ['baseline_normalized_margin', 'age_le_30', 'ethnicity_likely_african_american', 'percent_bachelor_or_higher']
+        fixed_effects = ["postal_code"]
+        featurizer = Featurizer(features=features, fixed_effects=fixed_effects)
+        x_data = featurizer.prepare_data(reporting_units)
+        y = reporting_units[response_variable]
+        qr = QuantileRegressionSolver()
+        qr.fit(x_data.values, y.values, weights=reporting_units['baseline_weights'].values, taus=[0.5])
+        y_hat = qr.predict(x_data.values)
+        residuals =  y.values - y_hat
+        abs_residuals = np.abs(residuals)
+        threshold = abs_residuals.mean() + outlier_z_threshold * abs_residuals.std()
+        return reporting_units[(abs_residuals > threshold).flatten()].copy()
+
+
     def _get_non_modeled_units(
         self,
+        reporting_units,
         percent_reporting_threshold,
         turnout_factor_lower,
         turnout_factor_upper,
         margin_change_threshold,
         unit_blocklist,
         postal_code_blocklist,
+        fit_margin_outlier_model,
+        fit_turnout_outlier_model,
+        outlier_z_threshold
     ):
-        expected_geographic_units = self._get_expected_geographic_unit_fips().tolist()
-        zero_baseline_units = self._get_units_with_baseline_of_zero()
-
         units_blocklisted = self.data[
             (self.data["geographic_unit_fips"].isin(unit_blocklist))
             | (self.data["postal_code"].isin(postal_code_blocklist))
         ].copy()
         units_blocklisted["unit_category"] = "non-modeled: blocklisted"
 
+        zero_baseline_units = self._get_units_with_baseline_of_zero()
         units_with_zero_baseline = self.data[self.data["geographic_unit_fips"].isin(zero_baseline_units)].copy()
         units_with_zero_baseline["unit_category"] = "non-modeled: zero baseline"
 
         units_with_strange_turnout_factor = (
-            self.data[
-                (self.data.percent_expected_vote >= percent_reporting_threshold)
-                & (self.data["geographic_unit_fips"].isin(expected_geographic_units))
-                & (
-                    (self.data.turnout_factor <= turnout_factor_lower)
-                    | (self.data.turnout_factor >= turnout_factor_upper)
-                )
+            reporting_units[ # these are all already reporting and expected units
+                (reporting_units.turnout_factor <= turnout_factor_lower) | (reporting_units.turnout_factor >= turnout_factor_upper)
             ]
         ).copy()
         units_with_strange_turnout_factor["unit_category"] = "non-modeled: strange turnout factor"
 
         non_modeled_units_list = [units_blocklisted, units_with_zero_baseline, units_with_strange_turnout_factor]
 
+        if fit_turnout_outlier_model:
+            units_with_strange_turnout_factor_modeled = self._fit_outlier_detection_model(reporting_units, 'turnout_factor', outlier_z_threshold)
+            units_with_strange_turnout_factor_modeled["unit_category"] = "non-modeled: strange turnout factor modeled"
+            non_modeled_units_list.append(units_with_strange_turnout_factor_modeled)
+
+
         if "margin" in self.estimands:
-            # instead fit stupid model based on all reporting units (whether modeled or not)
-            # units that are far from that model should also be non-modeled
+            # reporting_units["normalized_margin_change"] = (
+            #     reporting_units.baseline_normalized_margin - reporting_units.results_normalized_margin
+            # ).abs()
 
-            self.data["normalized_margin_change"] = (
-                self.data.baseline_normalized_margin - self.data.results_normalized_margin
-            ).abs()
+            # units_with_strange_margin_change = reporting_units[reporting_units.normalized_margin_change > margin_change_threshold].copy()
+            # units_with_strange_margin_change["unit_category"] = "non-modeled: strange margin change"
+            # non_modeled_units_list.append(units_with_strange_margin_change)
 
-            units_with_strange_margin_change = self.data[
-                (self.data.percent_expected_vote >= percent_reporting_threshold)
-                & (self.data["geographic_unit_fips"].isin(expected_geographic_units))
-                & (self.data.normalized_margin_change > margin_change_threshold)
-            ].copy()
-            units_with_strange_margin_change["unit_category"] = "non-modeled: strange margin change"
-            non_modeled_units_list.append(units_with_strange_margin_change)
+            if fit_margin_outlier_model:
+                units_with_strange_margin_change_modeled = self._fit_outlier_detection_model(reporting_units, 'results_normalized_margin', outlier_z_threshold)
+                units_with_strange_margin_change_modeled["unit_category"] = "non-modeled: strange margin change modeled"
+                non_modeled_units_list.append(units_with_strange_margin_change_modeled)
 
         non_modeled_units = (
             pd.concat(non_modeled_units_list).reset_index(drop=True).drop_duplicates(subset="geographic_unit_fips")
