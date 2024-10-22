@@ -55,7 +55,7 @@ class BootstrapElectionModel(BaseElectionModel):
         self.strata = model_settings.get("strata", ["county_classification"])  # columns to stratify the data by
         self.T = model_settings.get("T", 5000)  # temperature for aggregate model
         self.hard_threshold = model_settings.get(
-            "agg_model_hard_threshold", False
+            "agg_model_hard_threshold", True
         )  # use sigmoid or hard thresold when calculating agg model
         self.district_election = model_settings.get("district_election", False)
 
@@ -1490,7 +1490,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         # we also need a national aggregate point prediction
         if self.hard_threshold:
-            aggregate_dem_probs_total = self.aggregate_pred_margin > 0.5
+            aggregate_dem_probs_total = self.aggregate_pred_margin > 0
         else:
             aggregate_dem_probs_total = expit(self.T * self.aggregate_pred_margin)
 
