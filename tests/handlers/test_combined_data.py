@@ -392,7 +392,7 @@ def test_margin_change_threshold_as_non_predictive(va_governor_county_data):
     assert reporting_data.shape[0] == 133 - over
 
 
-def test_unit_blacklist(va_governor_county_data, rng):
+def test_unit_blocklist(va_governor_county_data, rng):
     election_id = "2017-11-07_VA_G"
     office = "G"
     geographic_unit_type = "county"
@@ -407,27 +407,27 @@ def test_unit_blacklist(va_governor_county_data, rng):
     va_governor_county_data["last_election_results_turnout"] = va_governor_county_data.baseline_turnout + 1
     combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
 
-    number_to_blacklist = 10
-    unit_blacklist = rng.choice(
-        va_governor_county_data.geographic_unit_fips, number_to_blacklist, replace=False
+    number_to_blocklist = 10
+    unit_blocklist = rng.choice(
+        va_governor_county_data.geographic_unit_fips, number_to_blocklist, replace=False
     ).tolist()
     (reporting_data, nonreporting_data, unexpected_data) = combined_data_handler.get_units(
-        100, 0.5, 1.5, 0.4, unit_blacklist, [], ["county_fips"]
+        100, 0.5, 1.5, 0.4, unit_blocklist, [], ["county_fips"]
     )
-    number_blacklist_reporting = (
-        current_data[current_data.percent_expected_vote == 100].geographic_unit_fips.isin(unit_blacklist).sum()
+    number_blocklist_reporting = (
+        current_data[current_data.percent_expected_vote == 100].geographic_unit_fips.isin(unit_blocklist).sum()
     )
-    number_blacklist_nonreporting = (
-        current_data[current_data.percent_expected_vote < 100].geographic_unit_fips.isin(unit_blacklist).sum()
+    number_blocklist_nonreporting = (
+        current_data[current_data.percent_expected_vote < 100].geographic_unit_fips.isin(unit_blocklist).sum()
     )
 
-    assert unexpected_data.shape[0] == number_to_blacklist
-    assert unexpected_data.geographic_unit_fips.isin(unit_blacklist).all()
-    assert reporting_data.shape[0] == 100 - number_blacklist_reporting
-    assert nonreporting_data.shape[0] == 33 - number_blacklist_nonreporting
+    assert unexpected_data.shape[0] == number_to_blocklist
+    assert unexpected_data.geographic_unit_fips.isin(unit_blocklist).all()
+    assert reporting_data.shape[0] == 100 - number_blocklist_reporting
+    assert nonreporting_data.shape[0] == 33 - number_blocklist_nonreporting
 
 
-def test_postal_code_blacklist(va_governor_county_data):
+def test_postal_code_blocklist(va_governor_county_data):
     election_id = "2017-11-07_VA_G"
     office = "G"
     geographic_unit_type = "county"
@@ -442,9 +442,9 @@ def test_postal_code_blacklist(va_governor_county_data):
     va_governor_county_data["last_election_results_turnout"] = va_governor_county_data.baseline_turnout + 1
     combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
 
-    postal_code_blacklist = ["VA"]
+    postal_code_blocklist = ["VA"]
     (reporting_data, nonreporting_data, unexpected_data) = combined_data_handler.get_units(
-        100, 0.5, 1.5, 0.4, [], postal_code_blacklist, ["county_fips"]
+        100, 0.5, 1.5, 0.4, [], postal_code_blocklist, ["county_fips"]
     )
 
     assert unexpected_data.shape[0] == 133

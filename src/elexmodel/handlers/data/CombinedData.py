@@ -98,10 +98,8 @@ class CombinedDataHandler:
 
         non_modeled_units = self._get_non_modeled_units(
             reporting_units,
-            percent_reporting_threshold,
             turnout_factor_lower,
             turnout_factor_upper,
-            margin_change_threshold,
             unit_blocklist,
             postal_code_blocklist,
             fit_margin_outlier_model,
@@ -197,7 +195,7 @@ class CombinedDataHandler:
         return unexpected_units
 
     def _fit_outlier_detection_model(self, reporting_units, response_variable, outlier_z_threshold):
-        features = ['baseline_normalized_margin', 'age_le_30', 'ethnicity_likely_african_american', 'percent_bachelor_or_higher']
+        features = ['baseline_normalized_margin', 'ethnicity_likely_african_american', 'percent_bachelor_or_higher']
         fixed_effects = ["postal_code"]
         featurizer = Featurizer(features=features, fixed_effects=fixed_effects)
         x_data = featurizer.prepare_data(reporting_units)
@@ -214,10 +212,8 @@ class CombinedDataHandler:
     def _get_non_modeled_units(
         self,
         reporting_units,
-        percent_reporting_threshold,
         turnout_factor_lower,
         turnout_factor_upper,
-        margin_change_threshold,
         unit_blocklist,
         postal_code_blocklist,
         fit_margin_outlier_model,
@@ -250,14 +246,6 @@ class CombinedDataHandler:
 
 
         if "margin" in self.estimands:
-            # reporting_units["normalized_margin_change"] = (
-            #     reporting_units.baseline_normalized_margin - reporting_units.results_normalized_margin
-            # ).abs()
-
-            # units_with_strange_margin_change = reporting_units[reporting_units.normalized_margin_change > margin_change_threshold].copy()
-            # units_with_strange_margin_change["unit_category"] = "non-modeled: strange margin change"
-            # non_modeled_units_list.append(units_with_strange_margin_change)
-
             if fit_margin_outlier_model:
                 units_with_strange_margin_change_modeled = self._fit_outlier_detection_model(reporting_units, 'results_normalized_margin', outlier_z_threshold)
                 units_with_strange_margin_change_modeled["unit_category"] = "non-modeled: strange margin change modeled"
