@@ -1124,7 +1124,7 @@ def test_get_national_summary_estimates(bootstrap_election_model, rng):
         nat_sum_estimates["margin"][0] == 4
     )  # the 3 called ones plus the third one where we stop a call from happening
     assert nat_sum_estimates["margin"][1] == 3  # the 3 called ones
-    assert nat_sum_estimates["margin"][2] == 5 # all of them except the first one
+    assert nat_sum_estimates["margin"][2] == 5  # all of them except the first one
 
     rhs_called_contests = ["c", "d", "e", "f"]
     lhs_called_contests = ["a"]

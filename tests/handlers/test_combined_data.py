@@ -351,7 +351,10 @@ def test_turnout_factor_as_non_predictive(va_governor_county_data):
     over = combined_data_handler.data[combined_data_handler.data.turnout_factor >= turnout_factor_upper].shape[0]
     under = combined_data_handler.data[combined_data_handler.data.turnout_factor < turnout_factor_lower].shape[0]
     assert unexpected_data.shape[0] == over + under
-    assert len(unexpected_data[unexpected_data["unit_category"] == "non-modeled: strange turnout factor"]) == over + under
+    assert (
+        len(unexpected_data[unexpected_data["unit_category"] == "non-modeled: strange turnout factor"]) == over + under
+    )
+
 
 def test_unit_blocklist(va_governor_county_data, rng):
     election_id = "2017-11-07_VA_G"

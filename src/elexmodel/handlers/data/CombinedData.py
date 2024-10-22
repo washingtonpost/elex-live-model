@@ -194,7 +194,9 @@ class CombinedDataHandler:
         features = ["baseline_normalized_margin", "ethnicity_likely_african_american", "percent_bachelor_or_higher"]
         features_to_use = [feature for feature in features if feature in reporting_units.columns]
         fixed_effects = ["postal_code"]
-        fixed_effects_to_use = [fixed_effect for fixed_effect in fixed_effects if fixed_effect in reporting_units.columns]
+        fixed_effects_to_use = [
+            fixed_effect for fixed_effect in fixed_effects if fixed_effect in reporting_units.columns
+        ]
         featurizer = Featurizer(features=features_to_use, fixed_effects=fixed_effects_to_use)
         x_data = featurizer.prepare_data(reporting_units)
         y = reporting_units[response_variable]

@@ -456,7 +456,7 @@ def test_get_estimates_fully_reporting(model_client, va_governor_county_data, va
         raw_config=va_config,
         preprocessed_data=preprocessed_data,
         save_output=[],
-        model_parameters={'fit_margin_outlier_model': False, 'fit_turnout_outlier_model': False}
+        model_parameters={"fit_margin_outlier_model": False, "fit_turnout_outlier_model": False},
     )
 
     assert result["state_data"].shape == (1, 6)
@@ -632,7 +632,7 @@ def test_get_estimates_some_reporting(model_client, va_governor_county_data, va_
         raw_config=va_config,
         preprocessed_data=preprocessed_data,
         save_output=[],
-        model_parameters={'fit_margin_outlier_model': False, 'fit_turnout_outlier_model': False}
+        model_parameters={"fit_margin_outlier_model": False, "fit_turnout_outlier_model": False},
     )
     assert result["state_data"].shape == (1, 6)
     assert result["unit_data"].shape == (133, 8)
@@ -693,7 +693,7 @@ def test_get_estimates_no_subunits_reporting(model_client, va_governor_county_da
             raw_config=va_config,
             preprocessed_data=preprocessed_data,
             save_output=[],
-            model_parameters={'fit_margin_outlier_model': False, 'fit_turnout_outlier_model': False}
+            model_parameters={"fit_margin_outlier_model": False, "fit_turnout_outlier_model": False},
         )
 
 
@@ -727,7 +727,7 @@ def test_get_estimates_not_enough_subunits_reporting(model_client, va_governor_c
             raw_config=va_config,
             preprocessed_data=preprocessed_data,
             save_output=[],
-            model_parameters={'fit_margin_outlier_model': False, 'fit_turnout_outlier_model': False}
+            model_parameters={"fit_margin_outlier_model": False, "fit_turnout_outlier_model": False},
         )
 
 
