@@ -497,9 +497,11 @@ def test_compute_bootstrap_errors(bootstrap_election_model, va_governor_county_d
         percent_reporting_threshold,
         turnout_factor_lower=turnout_factor_lower,
         turnout_factor_upper=turnout_factor_upper,
-        margin_change_threshold=0.4,
         unit_blocklist=[],
         postal_code_blocklist=[],
+        fit_margin_outlier_model=False,
+        fit_turnout_outlier_model=False,
+        outlier_z_threshold=2,
         aggregates=["postal_code"],
     )
 
@@ -543,9 +545,11 @@ def test_get_unit_predictions(bootstrap_election_model, va_governor_county_data)
         percent_reporting_threshold,
         turnout_factor_lower=turnout_factor_lower,
         turnout_factor_upper=turnout_factor_upper,
-        margin_change_threshold=0.4,
         unit_blocklist=[],
         postal_code_blocklist=[],
+        fit_margin_outlier_model=False,
+        fit_turnout_outlier_model=False,
+        outlier_z_threshold=2,
         aggregates=["postal_code"],
     )
 
@@ -1117,10 +1121,10 @@ def test_get_national_summary_estimates(bootstrap_election_model, rng):
     )
     nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(None, 0, 0.95)
     assert (
-        nat_sum_estimates["margin"][0] == 5
+        nat_sum_estimates["margin"][0] == 4
     )  # the 3 called ones plus the third one where we stop a call from happening
     assert nat_sum_estimates["margin"][1] == 3  # the 3 called ones
-    assert nat_sum_estimates["margin"][2] == 6  # all of them except the first one
+    assert nat_sum_estimates["margin"][2] == 5 # all of them except the first one
 
     rhs_called_contests = ["c", "d", "e", "f"]
     lhs_called_contests = ["a"]
@@ -1145,7 +1149,7 @@ def test_get_national_summary_estimates(bootstrap_election_model, rng):
         rhs_called_contests=rhs_called_contests,
     )
     nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(None, 0, 0.95)
-    assert nat_sum_estimates["margin"][0] == 2  # the first one which is called for lhs
+    assert nat_sum_estimates["margin"][0] == 1  # the first one which is called for lhs
     assert nat_sum_estimates["margin"][1] == 1  # the first one which is called for lhs
     assert nat_sum_estimates["margin"][2] == 2  # 2nd and first
 
@@ -1204,7 +1208,7 @@ def test_total_aggregation(bootstrap_election_model, va_assembly_precinct_data):
     )
 
     (reporting_units, nonreporting_units, unexpected_units) = combined_data_handler.get_units(
-        percent_reporting_threshold, 0.5, 1.5, 0.4, [], [], ["postal_code", "district"]
+        percent_reporting_threshold, 0.5, 1.5, [], [], False, False, 2, ["postal_code", "district"]
     )
 
     bootstrap_election_model.B = 300
