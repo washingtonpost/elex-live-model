@@ -88,7 +88,7 @@ class Featurizer:
         # and we zero out the original feature column for those states
         additional_state_features = []
         # if 'BB' in self.states_for_separate_model and 'CC' in self.states_for_separate_model:
-            # import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         for state in self.states_for_separate_model:
             mask = df.postal_code == state
             for feature in self.features:
@@ -96,7 +96,7 @@ class Featurizer:
                 df[state_feature] = df[feature].where(mask, 0)
                 df.loc[mask, feature] = 0
                 additional_state_features.append(state_feature)
-    
+
         df = df.copy()  # create copy so we can do things to the values
         if center_features:
             df[self.features] -= df[self.features].mean()
@@ -115,11 +115,11 @@ class Featurizer:
                 # if we have a postal code fixed effect then we do not want a separate intercept column for that state
                 # because the fixed effect takes the role of that column (ie. those would be linearly dependent)
                 # but we still want to zero out the original intercept for those states.
-                if 'postal_code' not in self.fixed_effect_cols:
-                    state_intercept = f'intercept_{state}'
-                    df[state_intercept] = df['intercept'].where(mask, 0)
+                if "postal_code" not in self.fixed_effect_cols:
+                    state_intercept = f"intercept_{state}"
+                    df[state_intercept] = df["intercept"].where(mask, 0)
                     self.complete_features.append(state_intercept)
-                df.loc[mask, 'intercept'] = 0
+                df.loc[mask, "intercept"] = 0
 
             # if fixed effects are on then we have redundant with the state specific intercepts
 
