@@ -80,7 +80,8 @@ class BootstrapElectionModel(BaseElectionModel):
         self.z_unobserved_upper_bound = model_settings.get("z_unobserved_upper_bound", 1.5)
         self.z_unobserved_lower_bound = model_settings.get("z_unobserved_lower_bound", 0.5)
 
-        self.featurizer = Featurizer(self.features, self.fixed_effects)
+        self.states_for_separate_model = model_settings.get("states_for_separate_model", [])
+        self.featurizer = Featurizer(self.features, self.fixed_effects, self.states_for_separate_model)
         self.seed = model_settings.get("seed", 0)
         self.rng = np.random.default_rng(seed=self.seed)  # used for sampling
         self.ran_bootstrap = False
