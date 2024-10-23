@@ -415,6 +415,7 @@ def test_postal_code_blocklist(va_governor_county_data):
     assert reporting_data.shape[0] == 0
     assert nonreporting_data.shape[0] == 0
 
+
 def test_turnout_factor_outlier_model(va_governor_county_data):
     election_id = "2017-11-07_VA_G"
     office = "G"
@@ -425,16 +426,22 @@ def test_turnout_factor_outlier_model(va_governor_county_data):
         election_id, office, geographic_unit_type, estimands, data=va_governor_county_data
     )
     current_data = live_data_handler.get_n_fully_reported(n=133)
-    
+
     current_data.loc[0, "results_turnout"] = 100000
     current_data.loc[0, "results_weights"] = 100000
     current_data.loc[1, "results_turnout"] = 5
     current_data.loc[1, "results_weights"] = 5
 
     va_governor_county_data["baseline_weights"] = va_governor_county_data.baseline_turnout
-    va_governor_county_data["last_election_results_margin"] = va_governor_county_data.baseline_dem - va_governor_county_data.baseline_gop
-    va_governor_county_data["baseline_margin"] = va_governor_county_data.baseline_dem - va_governor_county_data.baseline_gop
-    va_governor_county_data["baseline_normalized_margin"] = va_governor_county_data.baseline_margin / va_governor_county_data.baseline_weights
+    va_governor_county_data["last_election_results_margin"] = (
+        va_governor_county_data.baseline_dem - va_governor_county_data.baseline_gop
+    )
+    va_governor_county_data["baseline_margin"] = (
+        va_governor_county_data.baseline_dem - va_governor_county_data.baseline_gop
+    )
+    va_governor_county_data["baseline_normalized_margin"] = (
+        va_governor_county_data.baseline_margin / va_governor_county_data.baseline_weights
+    )
 
     combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
     turnout_factor_lower = -np.inf
@@ -443,9 +450,8 @@ def test_turnout_factor_outlier_model(va_governor_county_data):
         100, turnout_factor_lower, turnout_factor_upper, [], [], False, True, 1.2, ["county_fips"]
     )
     assert unexpected_data.shape[0] == 2
-    assert (
-        len(unexpected_data[unexpected_data["unit_category"] == "non-modeled: strange turnout factor modeled"]) == 2
-    )
+    assert len(unexpected_data[unexpected_data["unit_category"] == "non-modeled: strange turnout factor modeled"]) == 2
+
 
 def test_margin_outlier_model(va_governor_county_data):
     election_id = "2017-11-07_VA_G"
@@ -457,14 +463,20 @@ def test_margin_outlier_model(va_governor_county_data):
         election_id, office, geographic_unit_type, estimands, data=va_governor_county_data
     )
     current_data = live_data_handler.get_n_fully_reported(n=133)
-    
+
     current_data.loc[0, "results_normalized_margin"] = 1.0
     current_data.loc[1, "results_normalized_margin"] = -1.0
 
     va_governor_county_data["baseline_weights"] = va_governor_county_data.baseline_turnout
-    va_governor_county_data["last_election_results_margin"] = va_governor_county_data.baseline_dem - va_governor_county_data.baseline_gop
-    va_governor_county_data["baseline_margin"] = va_governor_county_data.baseline_dem - va_governor_county_data.baseline_gop
-    va_governor_county_data["baseline_normalized_margin"] = va_governor_county_data.baseline_margin / va_governor_county_data.baseline_weights
+    va_governor_county_data["last_election_results_margin"] = (
+        va_governor_county_data.baseline_dem - va_governor_county_data.baseline_gop
+    )
+    va_governor_county_data["baseline_margin"] = (
+        va_governor_county_data.baseline_dem - va_governor_county_data.baseline_gop
+    )
+    va_governor_county_data["baseline_normalized_margin"] = (
+        va_governor_county_data.baseline_margin / va_governor_county_data.baseline_weights
+    )
 
     combined_data_handler = CombinedDataHandler(va_governor_county_data, current_data, estimands, geographic_unit_type)
     turnout_factor_lower = -np.inf
@@ -473,6 +485,4 @@ def test_margin_outlier_model(va_governor_county_data):
         100, turnout_factor_lower, turnout_factor_upper, [], [], True, False, 2, ["county_fips"]
     )
     assert unexpected_data.shape[0] == 2
-    assert (
-        len(unexpected_data[unexpected_data["unit_category"] == "non-modeled: strange margin change modeled"]) == 2
-    )
+    assert len(unexpected_data[unexpected_data["unit_category"] == "non-modeled: strange margin change modeled"]) == 2
