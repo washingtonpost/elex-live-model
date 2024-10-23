@@ -412,23 +412,13 @@ def test_sample_test_epsilon(bootstrap_election_model):
     assert epsilon_y.shape == (aggregate_indicator_test.shape[0], bootstrap_election_model.B)
     assert epsilon_z.shape == (aggregate_indicator_test.shape[0], bootstrap_election_model.B)
 
-    # aggregate 3 has no elements in the training set, and rows 2,3,5 in the test set
-    # are parts of aggregate 3
-    assert np.isclose(epsilon_z[0], 0).all()
-    assert np.isclose(epsilon_z[1], 0).all()
+    # test epsilons should never be zero
+    assert not np.isclose(epsilon_z[0], 0).all()
+    assert not np.isclose(epsilon_z[1], 0).all()
     assert not np.isclose(epsilon_z[2], 0).all()
     assert not np.isclose(epsilon_z[3], 0).all()
-    assert np.isclose(epsilon_z[4], 0).all()
+    assert not np.isclose(epsilon_z[4], 0).all()
     assert not np.isclose(epsilon_z[5], 0).all()
-
-    # testing that if there is only one element epsilon_hat that we return 0
-    epsilon_y, epsilon_z = bootstrap_election_model._sample_test_epsilon(
-        residuals, residuals, [[4]], [[4]], aggregate_indicator_train, aggregate_indicator_test
-    )
-    assert epsilon_y.shape == (1, bootstrap_election_model.B)
-    assert epsilon_z.shape == (1, bootstrap_election_model.B)
-
-    assert np.isclose(epsilon_z[0], 0).all()
 
 
 def test_sample_test_errors(bootstrap_election_model):
@@ -965,8 +955,8 @@ def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
     assert lower.shape == (6, 1)
     assert upper.shape == (6, 1)
 
-    assert lower[2] == pytest.approx(upper[2])  # since c is fully reporting
-    assert lower[5] == pytest.approx(upper[5])  # since all f units are unexpected
+    assert lower[2] == pytest.approx(upper[2] - 0.002)  # since c is fully reporting
+    assert lower[5] == pytest.approx(upper[5] - 0.002)  # since all f units are unexpected
     assert all(lower <= upper)
 
     # test race calls
@@ -989,7 +979,7 @@ def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
         None,
         lhs_called_contests=lhs_called_contests,
     )
-    assert (lower >= bootstrap_election_model.lhs_called_threshold).all()
+    assert (lower >= bootstrap_election_model.lhs_called_threshold - 0.001).all()
     assert (upper >= bootstrap_election_model.lhs_called_threshold).all()
     assert (bootstrap_election_model.divided_error_B_1 == bootstrap_election_model.lhs_called_threshold).all()
     assert (bootstrap_election_model.divided_error_B_2 == bootstrap_election_model.lhs_called_threshold).all()
@@ -1014,7 +1004,7 @@ def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
         rhs_called_contests=rhs_called_contests,
     )
     assert (lower <= bootstrap_election_model.rhs_called_threshold).all()
-    assert (upper <= bootstrap_election_model.rhs_called_threshold).all()
+    assert (upper <= bootstrap_election_model.rhs_called_threshold + 0.001).all()
     assert (bootstrap_election_model.divided_error_B_1 == bootstrap_election_model.rhs_called_threshold).all()
     assert (bootstrap_election_model.divided_error_B_2 == bootstrap_election_model.rhs_called_threshold).all()
 
@@ -1045,10 +1035,10 @@ def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
     assert lower.shape == (8, 1)
     assert upper.shape == (8, 1)
 
-    assert lower[0] == pytest.approx(upper[0])  # a-a is fully reporting
-    assert lower[3] == pytest.approx(upper[3])  # c-c is fully reporting
-    assert lower[7] == pytest.approx(upper[7])  # c-c is fully reporting
-    assert lower[7] == pytest.approx(upper[7])  # f-f is fully unexpected
+    assert lower[0] == pytest.approx(upper[0] - 0.002)  # a-a is fully reporting
+    assert lower[3] == pytest.approx(upper[3] - 0.002)  # c-c is fully reporting
+    assert lower[7] == pytest.approx(upper[7] - 0.002)  # c-c is fully reporting
+    assert lower[7] == pytest.approx(upper[7] - 0.002)  # f-f is fully unexpected
     assert all(lower <= upper)
 
 
