@@ -58,7 +58,7 @@ class BootstrapElectionModel(BaseElectionModel):
             "agg_model_hard_threshold", True
         )  # use sigmoid or hard thresold when calculating agg model
         self.district_election = model_settings.get("district_election", False)
-        self.lambda_ = model_settings.get("lambda", None)  # regularization parameter for OLS
+        self.lambda_ = model_settings.get("lambda_", None)  # regularization parameter for OLS
 
         # upper and lower bounds for the quantile regression which define the strata distributions
         # these make sure that we can control the worst cases for the distributions in case we
