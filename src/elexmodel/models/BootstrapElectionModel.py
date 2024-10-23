@@ -600,15 +600,16 @@ class BootstrapElectionModel(BaseElectionModel):
         # where n is the number of observed units and N is the number of units in the contest
         # pop variance is the variance of the residuals in the contest
         def _get_epsilon_hat_std(residuals, epsilon):
-            var = np.var(aggregate_indicator_train * residuals, axis=0) # incorrect denominator for variance
-            var *= aggregate_indicator_train.shape[0] / (aggregate_indicator_train.sum(axis=0) - 1) # Bessel's correction
-            var *= (1 - aggregate_indicator_train.sum(axis=0) / aggregate_indicator.sum(axis=0)) / aggregate_indicator_train.sum(axis=0)
+            var = np.var(aggregate_indicator_train * residuals, axis=0)  # incorrect denominator for variance
+            var *= aggregate_indicator_train.shape[0] / (
+                aggregate_indicator_train.sum(axis=0) - 1
+            )  # Bessel's correction
+            var *= (
+                1 - aggregate_indicator_train.sum(axis=0) / aggregate_indicator.sum(axis=0)
+            ) / aggregate_indicator_train.sum(axis=0)
 
             # where we have < 2 units in a contest, we set the variance to the variance of the observed epsilon_hat values
-            var[np.isnan(var) | np.isinf(var)] = np.var(
-                epsilon[np.nonzero(epsilon)[0]].T, 
-                ddof=1
-            )
+            var[np.isnan(var) | np.isinf(var)] = np.var(epsilon[np.nonzero(epsilon)[0]].T, ddof=1)
             return np.sqrt(var)
 
         std_y = _get_epsilon_hat_std(residuals_y, epsilon_y_hat)
@@ -619,9 +620,7 @@ class BootstrapElectionModel(BaseElectionModel):
         std[1::2] = std_z
 
         # high observed correlation between epsilon_y_hat and epsilon_z_hat in 2020, so this is important
-        corr = np.corrcoef(
-            np.concatenate([epsilon_y_hat, epsilon_z_hat], axis=1)[np.nonzero(epsilon_y_hat)[0]].T
-        )
+        corr = np.corrcoef(np.concatenate([epsilon_y_hat, epsilon_z_hat], axis=1)[np.nonzero(epsilon_y_hat)[0]].T)
         # tile corr into a block diagonal matrix
         corr_list = [corr] * aggregate_indicator.shape[1]
         corr_hat = block_diag(*corr_list)
@@ -631,18 +630,16 @@ class BootstrapElectionModel(BaseElectionModel):
 
         # \epsilon ~ N(0, \Sigma)
         # Sigma is a block diagonal matrix with 2x2 blocks running down the diagonal and 0s elsewhere
-        # each block is the covariance matrix of epsilon_y and epsilon_z for a particular contest, 
+        # each block is the covariance matrix of epsilon_y and epsilon_z for a particular contest,
         # e.g., the first block is for the AK contest, the second block is for the AL contest, etc.
         # we can sample from this distribution to get new epsilons
         mu_hat = np.zeros(corr_hat.shape[0])
         sigma_hat = np.diag(std) @ corr_hat @ np.diag(std)
 
-        test_epsilon = self.rng.multivariate_normal(
-            mu_hat, sigma_hat, size=self.B
-        )
+        test_epsilon = self.rng.multivariate_normal(mu_hat, sigma_hat, size=self.B)
 
-        test_epsilon_y = test_epsilon[:,0::2].T
-        test_epsilon_z = test_epsilon[:,1::2].T
+        test_epsilon_y = test_epsilon[:, 0::2].T
+        test_epsilon_z = test_epsilon[:, 1::2].T
 
         test_epsilon_y = aggregate_indicator_test @ test_epsilon_y
         test_epsilon_z = aggregate_indicator_test @ test_epsilon_z
