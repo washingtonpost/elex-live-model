@@ -81,7 +81,8 @@ class BootstrapElectionModel(BaseElectionModel):
         self.z_unobserved_lower_bound = model_settings.get("z_unobserved_lower_bound", 0.5)
 
         self.states_for_separate_model = model_settings.get("states_for_separate_model", [])
-        self.featurizer = Featurizer(self.features, self.fixed_effects, self.states_for_separate_model)
+        self.featurizer = Featurizer(self.features, self.fixed_effects, states_for_separate_model=self.states_for_separate_model)
+        
         self.seed = model_settings.get("seed", 0)
         self.rng = np.random.default_rng(seed=self.seed)  # used for sampling
         self.ran_bootstrap = False
@@ -662,7 +663,7 @@ class BootstrapElectionModel(BaseElectionModel):
         # but like with fixed effects we drop one strata category and use the intercept instead so the
         # example would be
         # rural: 0, 0 urban: 1, 0 and rural: 0, 1
-        strata_featurizer = Featurizer([], self.strata)
+        strata_featurizer = Featurizer([], self.strata, states_for_separate_model=self.states_for_separate_model)
         all_units = pd.concat([reporting_units, nonreporting_units], axis=0)
 
         strata_all = strata_featurizer.prepare_data(
