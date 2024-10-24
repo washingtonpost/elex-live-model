@@ -811,9 +811,11 @@ class BootstrapElectionModel(BaseElectionModel):
         if self.lambda_ is None:
             optimal_lambda_y = self.cv_lambda(x_train, y_train, np.logspace(-3, 2, 20), weights=weights_train)
             optimal_lambda_z = self.cv_lambda(x_train, z_train, np.logspace(-3, 2, 20), weights=weights_train)
+            LOG.info(f"Optimal lambda for y: {optimal_lambda_y}, Optimal lambda for z: {optimal_lambda_z}")
         else:
             optimal_lambda_y = self.lambda_
             optimal_lambda_z = self.lambda_
+            LOG.info(f"Using user provided lambda: {self.lambda_}")
 
         # step 1) fit the initial model
         # we don't want to regularize the intercept or the coefficient for baseline_normalized_margin
