@@ -94,7 +94,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         # this is the correlation structure we impose when we sample from the contest level random effects
         self.contest_correlations = model_settings.get(
-            "contest_correlations", [(("PA", "MI", "WI", "MN"), 0.8), (("GA", "NC"), 0.8), (("AZ", "NV"), 0.8)]
+            "contest_correlations", []
         )
 
         # Assume that we have a baseline normalized margin

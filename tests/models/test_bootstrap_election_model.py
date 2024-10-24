@@ -39,9 +39,9 @@ def test_estimate_epsilon(bootstrap_election_model):
     residuals = np.asarray([0.5, 0.5, 0.3, 0.8, 0.5]).reshape(-1, 1)
     aggregate_indicator = np.asarray([[1, 1, 0, 0, 0], [0, 0, 1, 1, 0], [0, 0, 0, 0, 1]]).T
     epsilon_hat = bootstrap_election_model._estimate_epsilon(residuals, aggregate_indicator)
-    assert epsilon_hat[0] == (residuals[0] + residuals[1]) / 2
-    assert epsilon_hat[1] == (residuals[2] + residuals[3]) / 2
-    assert epsilon_hat[2] == 0  # since the aggrgate indicator for that row only has one 1 which is less than 2
+    assert np.isclose(epsilon_hat[0], (residuals[0] + residuals[1]) / 2)
+    assert np.isclose(epsilon_hat[1], (residuals[2] + residuals[3]) / 2)
+    assert np.isclose(epsilon_hat[2], 0)  # since the aggrgate indicator for that row only has one 1 which is less than 2
 
 
 def test_estimate_delta(bootstrap_election_model):
@@ -405,9 +405,9 @@ def test_sample_test_epsilon(bootstrap_election_model):
         # circumstance is here: https://arcpublishing.atlassian.net/browse/ELEX-3431
         epsilon_hat = bootstrap_election_model._estimate_epsilon(residuals, aggregate_indicator_train)
 
-    epsilon_y, epsilon_z = bootstrap_election_model._sample_test_epsilon(
-        residuals, residuals, epsilon_hat, epsilon_hat, aggregate_indicator_train, aggregate_indicator_test
-    )
+        epsilon_y, epsilon_z = bootstrap_election_model._sample_test_epsilon(
+            residuals, residuals, epsilon_hat, epsilon_hat, aggregate_indicator_train, aggregate_indicator_test
+        )
 
     assert epsilon_y.shape == (aggregate_indicator_test.shape[0], bootstrap_election_model.B)
     assert epsilon_z.shape == (aggregate_indicator_test.shape[0], bootstrap_election_model.B)
