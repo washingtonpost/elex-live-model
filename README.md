@@ -106,7 +106,7 @@ Some model types have specific model parameters that can be included.
 
 | Name                              | Type    | Acceptable values                | model           |
 |-----------------------------------|---------|----------------------------------|-----------------|
-| lambda                            | numeric | regularization constant          | all             |
+| lambda_                           | numeric | regularization constant          | all             |
 | turnout_factor_lower              | numeric | drop units with < turnout factor | all             |
 | turnout_factor_upper              | numeric | drop units with < turnout factor | all             |
 | robust                            | boolean | larger prediction intervals      | `nonparametric` |

@@ -55,9 +55,10 @@ class BootstrapElectionModel(BaseElectionModel):
         self.strata = model_settings.get("strata", ["county_classification"])  # columns to stratify the data by
         self.T = model_settings.get("T", 5000)  # temperature for aggregate model
         self.hard_threshold = model_settings.get(
-            "agg_model_hard_threshold", False
+            "agg_model_hard_threshold", True
         )  # use sigmoid or hard thresold when calculating agg model
         self.district_election = model_settings.get("district_election", False)
+        self.lambda_ = model_settings.get("lambda_", None)  # regularization parameter for OLS
 
         # upper and lower bounds for the quantile regression which define the strata distributions
         # these make sure that we can control the worst cases for the distributions in case we
@@ -807,8 +808,14 @@ class BootstrapElectionModel(BaseElectionModel):
         )
 
         # we use k-fold cross validation to find the optimal lambda for our OLS regression
-        optimal_lambda_y = self.cv_lambda(x_train, y_train, np.logspace(-3, 2, 20), weights=weights_train)
-        optimal_lambda_z = self.cv_lambda(x_train, z_train, np.logspace(-3, 2, 20), weights=weights_train)
+        if self.lambda_ is None:
+            optimal_lambda_y = self.cv_lambda(x_train, y_train, np.logspace(-3, 2, 20), weights=weights_train)
+            optimal_lambda_z = self.cv_lambda(x_train, z_train, np.logspace(-3, 2, 20), weights=weights_train)
+            LOG.info(f"Optimal lambda for y: {optimal_lambda_y}, Optimal lambda for z: {optimal_lambda_z}")
+        else:
+            optimal_lambda_y = self.lambda_
+            optimal_lambda_z = self.lambda_
+            LOG.info(f"Using user provided lambda: {self.lambda_}")
 
         # step 1) fit the initial model
         # we don't want to regularize the intercept or the coefficient for baseline_normalized_margin
@@ -1490,7 +1497,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         # we also need a national aggregate point prediction
         if self.hard_threshold:
-            aggregate_dem_probs_total = self.aggregate_pred_margin > 0.5
+            aggregate_dem_probs_total = self.aggregate_pred_margin > 0
         else:
             aggregate_dem_probs_total = expit(self.T * self.aggregate_pred_margin)
 
