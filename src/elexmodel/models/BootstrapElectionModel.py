@@ -93,9 +93,7 @@ class BootstrapElectionModel(BaseElectionModel):
         self.rhs_called_threshold = -0.005
 
         # this is the correlation structure we impose when we sample from the contest level random effects
-        self.contest_correlations = model_settings.get(
-            "contest_correlations", []
-        )
+        self.contest_correlations = model_settings.get("contest_correlations", [])
 
         # Assume that we have a baseline normalized margin
         # (D^{Y'} - R^{Y'}) / (D^{Y'} + R^{Y'}) is one of the covariates

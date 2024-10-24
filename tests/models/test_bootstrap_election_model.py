@@ -41,7 +41,9 @@ def test_estimate_epsilon(bootstrap_election_model):
     epsilon_hat = bootstrap_election_model._estimate_epsilon(residuals, aggregate_indicator)
     assert np.isclose(epsilon_hat[0], (residuals[0] + residuals[1]) / 2)
     assert np.isclose(epsilon_hat[1], (residuals[2] + residuals[3]) / 2)
-    assert np.isclose(epsilon_hat[2], 0)  # since the aggrgate indicator for that row only has one 1 which is less than 2
+    assert np.isclose(
+        epsilon_hat[2], 0
+    )  # since the aggrgate indicator for that row only has one 1 which is less than 2
 
 
 def test_estimate_delta(bootstrap_election_model):
