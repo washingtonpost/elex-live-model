@@ -1,6 +1,7 @@
 from __future__ import annotations  # pylint: disable=too-many-lines
 
 import logging
+from itertools import combinations
 
 import numpy as np
 import pandas as pd
@@ -91,6 +92,11 @@ class BootstrapElectionModel(BaseElectionModel):
         self.lhs_called_threshold = 0.005
         self.rhs_called_threshold = -0.005
 
+        # this is the correlation structure we impose when we sample from the contest level random effects
+        self.contest_correlations = model_settings.get(
+            "contest_correlations", [(("PA", "MI", "WI", "MN"), 0.8), (("GA", "NC"), 0.8), (("AZ", "NV"), 0.8)]
+        )
+
         # Assume that we have a baseline normalized margin
         # (D^{Y'} - R^{Y'}) / (D^{Y'} + R^{Y'}) is one of the covariates
         if "baseline_normalized_margin" not in self.features:
@@ -157,11 +163,11 @@ class BootstrapElectionModel(BaseElectionModel):
         This function estimates the epsilon (contest level random effects)
         """
         # the estimate for epsilon is the average of the residuals in each contest
-        epsilon_hat = (aggregate_indicator.T @ residuals) / aggregate_indicator.sum(axis=0).reshape(-1, 1)
+        epsilon_hat, _, _, _ = np.linalg.lstsq(aggregate_indicator, residuals)
+
         # we can't estimate a contest level effect if only have 1 unit in that contest (since our residual can just)
         # be made equal to zero by setting the random effect to that value
         epsilon_hat[aggregate_indicator.sum(axis=0) < 2] = 0
-
         return epsilon_hat
 
     def _estimate_delta(
@@ -625,8 +631,31 @@ class BootstrapElectionModel(BaseElectionModel):
         corr_list = [corr] * aggregate_indicator.shape[1]
         corr_hat = block_diag(*corr_list)
 
-        # TODO: may wish to add additional correlations to corr_hat
-        # e.g., correlation across the rust belt, sun belt, abortion referenda states, etc.
+        # if we have additional inter-contest correlations to impose
+        # self.contest_correlations is list of tuples
+        # e.g., [(("AK", "AL", "AR"), 0.5), (("CA", "CO", "CT"), 0.5)]
+        # this will impose a correlation of 0.5 among the sampled state-level swings
+        # for AK, AL, AR and CA, CO, CT
+        if len(self.contest_correlations) > 0:
+            for contests, correlation in self.contest_correlations:
+                for c_1, c_2 in combinations(contests, 2):
+                    i, j = 2 * self.aggregate_names[c_1], 2 * self.aggregate_names[c_2]
+                    corr_hat[i, j] = correlation  # epsilon_y_correlation
+                    corr_hat[i + 1, j + 1] = correlation  # epsilon_z_correlation
+                    corr_hat[j, i] = correlation
+                    corr_hat[j + 1, i + 1] = correlation
+                    corr_hat[i + 1, j] = min(corr_hat[i, i + 1], correlation)
+                    corr_hat[j, i + 1] = min(corr_hat[i, i + 1], correlation)
+                    corr_hat[i, j + 1] = min(corr_hat[i, i + 1], correlation)
+                    corr_hat[j + 1, i] = min(corr_hat[i, i + 1], correlation)
+
+            # project correlation matrix back to PSD cone
+            evals, evecs = np.linalg.eigh(corr_hat)
+            if (evals < -1e-5).any():
+                LOG.info("Epsilon correl. matrix is not PSD and requires projection.")
+                evals = np.clip(evals, 0, None)
+                corr_hat = evecs @ np.diag(evals) @ evecs.T
+                corr_hat /= np.sqrt(np.outer(np.diag(corr_hat), np.diag(corr_hat)))
 
         # \epsilon ~ N(0, \Sigma)
         # Sigma is a block diagonal matrix with 2x2 blocks running down the diagonal and 0s elsewhere
@@ -809,11 +838,34 @@ class BootstrapElectionModel(BaseElectionModel):
         # between unit and contest (ie. a 1 in i,j says that unit j belongs to contest i)
         # in case district election we need to create a variable that defines the state, district
         # which is what the contest is
-        if self.district_election:
+        if self.district_election:  # want to model aggregate effect at both district and state levels
             all_units["postal_code-district"] = all_units[["postal_code", "district"]].agg("_".join, axis=1)
-            aggregate_indicator = pd.get_dummies(all_units["postal_code-district"]).values
+
+            contest_indicator = pd.get_dummies(all_units["postal_code-district"])
+            postal_code_indicator = pd.get_dummies(all_units["postal_code"])
+
+            # drop districts that are at-large districts for a state
+            postal_code_filter = all_units.groupby("postal_code")["postal_code-district"].nunique() > 1
+            valid_postal_codes = postal_code_filter[postal_code_filter].index
+            valid_districts = all_units[all_units.postal_code.isin(valid_postal_codes)]["postal_code-district"].unique()
+            contest_indicator_filtered = contest_indicator.loc[:, valid_districts]
+
+            # drop contest indicators if there are fewer than 10 units in contest
+            contest_indicator_filtered = contest_indicator_filtered.loc[:, contest_indicator.sum(axis=0) > 10]
+
+            self.aggregate_names = {
+                c: i
+                for i, c in enumerate(
+                    postal_code_indicator.columns.tolist() + contest_indicator_filtered.columns.tolist()
+                )
+            }
+            aggregate_indicator = np.concatenate(
+                (postal_code_indicator.values, contest_indicator_filtered.values), axis=1
+            )
         else:
-            aggregate_indicator = pd.get_dummies(all_units["postal_code"]).values
+            contest_indicator = pd.get_dummies(all_units["postal_code"])
+            self.aggregate_names = {c: i for i, c in enumerate(contest_indicator.columns.tolist())}
+            aggregate_indicator = contest_indicator.values
 
         aggregate_indicator_expected = aggregate_indicator[: (n_train + n_test)]
         aggregate_indicator_train = aggregate_indicator_expected[:n_train]
@@ -1047,7 +1099,7 @@ class BootstrapElectionModel(BaseElectionModel):
         # and turn into turnout estimate
         self.weighted_z_test_pred = z_test_pred * weights_test
         self.ran_bootstrap = True
-        self.n_contests = aggregate_indicator.shape[1]
+        self.n_contests = contest_indicator.values.shape[1]
 
     def get_unit_predictions(
         self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, estimand: str, **kwargs
