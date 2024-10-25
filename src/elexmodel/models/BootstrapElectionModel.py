@@ -589,7 +589,13 @@ class BootstrapElectionModel(BaseElectionModel):
     ) -> tuple[np.ndarray, np.ndarray]:
         """
         This function generates new test epsilons (contest level random effects)
-        NOTE: for now we are sampling from a normal with mean zero and sample variance.
+
+        For partially observed contests, we apply a normal approximation, and sample
+        from the normal distribution implied by the remaining uncertainty of a
+        sampling without replacement process.
+
+        For unobserved contests, we sample from the normal distribution implied by the
+        sample covariance of the partially observed epsilons
         """
         non_zero_epsilon_indices = np.nonzero(epsilon_y_hat)[0]
         # if there is only one non zero contest OR if the contest is a state level election only
