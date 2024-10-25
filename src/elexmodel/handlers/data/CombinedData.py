@@ -191,7 +191,7 @@ class CombinedDataHandler:
         return unexpected_units
 
     def _fit_outlier_detection_model(self, reporting_units, response_variable, outlier_z_threshold):
-        features = ["baseline_normalized_margin", "ethnicity_likely_african_american", "percent_bachelor_or_higher"]
+        features = ["baseline_normalized_margin", "race_black_or_african_american", "ethnicity_likely_african_american", "percent_bachelor_or_higher", "education_bachelors_or_higher"]
         features_to_use = [feature for feature in features if feature in reporting_units.columns]
         fixed_effects = ["postal_code"]
         fixed_effects_to_use = [
