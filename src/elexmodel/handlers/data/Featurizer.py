@@ -87,8 +87,6 @@ class Featurizer:
         # if a state is in the states for separate model, then we add separate feature columns for that state
         # and we zero out the original feature column for those states
         additional_state_features = []
-        # if 'BB' in self.states_for_separate_model and 'CC' in self.states_for_separate_model:
-        # import pdb; pdb.set_trace()
         for state in self.states_for_separate_model:
             mask = df.postal_code == state
             for feature in self.features:
