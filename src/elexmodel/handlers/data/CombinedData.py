@@ -205,7 +205,9 @@ class CombinedDataHandler:
             fixed_effect for fixed_effect in fixed_effects if fixed_effect in reporting_units.columns
         ]
         featurizer = Featurizer(features=features_to_use, fixed_effects=fixed_effects_to_use)
-        x_data = featurizer.prepare_data(reporting_units)
+        x_data = featurizer.prepare_data(
+            reporting_units, center_features=False, scale_features=False, add_intercept=True
+        )
         y = reporting_units[response_variable]
         qr = QuantileRegressionSolver()
         qr.fit(x_data.values, y.values, weights=reporting_units["baseline_weights"].values, taus=[0.5])
