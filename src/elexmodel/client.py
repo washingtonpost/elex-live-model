@@ -233,7 +233,8 @@ class ModelClient:
         handle_unreporting = kwargs.get("handle_unreporting", "drop")
 
         district_election = False
-        if office in {"H", "Y", "Z"}:
+        # if office starts with one of these letters
+        if office.startswith("H") or office.startswith("Y") or office.startswith("Z"):
             district_election = True
 
         model_settings = {

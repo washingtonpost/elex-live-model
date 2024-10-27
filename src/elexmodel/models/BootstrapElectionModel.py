@@ -1,11 +1,13 @@
 from __future__ import annotations  # pylint: disable=too-many-lines
 
 import logging
+from itertools import combinations
 
 import numpy as np
 import pandas as pd
 from elexsolver.OLSRegressionSolver import OLSRegressionSolver
 from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
+from scipy.linalg import block_diag
 from scipy.special import expit
 
 from elexmodel.handlers.data.Featurizer import Featurizer
@@ -91,6 +93,9 @@ class BootstrapElectionModel(BaseElectionModel):
         self.lhs_called_threshold = 0.005
         self.rhs_called_threshold = -0.005
 
+        # this is the correlation structure we impose when we sample from the contest level random effects
+        self.contest_correlations = model_settings.get("contest_correlations", [])
+
         # Assume that we have a baseline normalized margin
         # (D^{Y'} - R^{Y'}) / (D^{Y'} + R^{Y'}) is one of the covariates
         if "baseline_normalized_margin" not in self.features:
@@ -157,11 +162,11 @@ class BootstrapElectionModel(BaseElectionModel):
         This function estimates the epsilon (contest level random effects)
         """
         # the estimate for epsilon is the average of the residuals in each contest
-        epsilon_hat = (aggregate_indicator.T @ residuals) / aggregate_indicator.sum(axis=0).reshape(-1, 1)
+        epsilon_hat, _, _, _ = np.linalg.lstsq(aggregate_indicator, residuals)
+
         # we can't estimate a contest level effect if only have 1 unit in that contest (since our residual can just)
         # be made equal to zero by setting the random effect to that value
         epsilon_hat[aggregate_indicator.sum(axis=0) < 2] = 0
-
         return epsilon_hat
 
     def _estimate_delta(
@@ -585,42 +590,94 @@ class BootstrapElectionModel(BaseElectionModel):
     ) -> tuple[np.ndarray, np.ndarray]:
         """
         This function generates new test epsilons (contest level random effects)
-        NOTE: for now we are sampling from a normal with mean zero and sample variance.
+
+        For partially observed contests, we apply a normal approximation, and sample
+        from the normal distribution implied by the remaining uncertainty of a
+        sampling without replacement process.
+
+        For unobserved contests, we sample from the normal distribution implied by the
+        sample covariance of the partially observed epsilons
         """
-        # the contests that need a sampled contest level random effect are those that still have outstanding
-        # units (since for the others, the contest level random effect is a known fixed quantity) but no
-        # current estimate for the epsilon in that contest (so ones with NO training examples)
-
-        # this gives us indices of contests for which we have no samples in the training set
-        contests_not_in_reporting_units = np.where(np.all(aggregate_indicator_train == 0, axis=0))[0]
-        # gives us contests for which there is at least one county not reporting
-        contests_in_nonreporting_units = np.where(np.any(aggregate_indicator_test > 0, axis=0))[0]
-        # contests that need a random effect are:
-        #   contests that we want to make predictions on (ie. there are still outstanding units)
-        #   BUT no units in that contest are reporting
-        contests_that_need_random_effect = np.intersect1d(
-            contests_not_in_reporting_units, contests_in_nonreporting_units
-        )
-
-        # \epsilon ~ N(0, \Sigma)
-        mu_hat = [0, 0]
-
-        # the variance is the sample variance of epsilons for which we have an estimate
         non_zero_epsilon_indices = np.nonzero(epsilon_y_hat)[0]
         # if there is only one non zero contest OR if the contest is a state level election only
         # then just sample from nearly zero since no variance
         if non_zero_epsilon_indices.shape[0] == 1:
             return np.zeros((1, self.B)), np.zeros((1, self.B))
 
-        sigma_hat = np.cov(np.concatenate([epsilon_y_hat, epsilon_z_hat], axis=1)[np.nonzero(epsilon_y_hat)[0]].T)
+        aggregate_indicator = np.concatenate([aggregate_indicator_train, aggregate_indicator_test], axis=0)
 
-        # sample new test epsilons, but only for states that need tem
-        test_epsilon = self.rng.multivariate_normal(
-            mu_hat, sigma_hat, size=(len(contests_that_need_random_effect), self.B)
-        )
+        # computes standard error of epsilon_hat estimate for each contest
+        # formula is given by square root of (1 - n/N) * (pop variance) / n
+        # where n is the number of observed units and N is the number of units in the contest
+        # pop variance is the variance of the residuals in the contest
+        def _get_epsilon_hat_std(residuals, epsilon):
+            var = np.var(aggregate_indicator_train * residuals, axis=0)  # incorrect denominator for variance
+            var *= aggregate_indicator_train.shape[0] / (
+                aggregate_indicator_train.sum(axis=0) - 1
+            )  # Bessel's correction
+            var *= (
+                1 - aggregate_indicator_train.sum(axis=0) / aggregate_indicator.sum(axis=0)
+            ) / aggregate_indicator_train.sum(axis=0)
 
-        test_epsilon_y = aggregate_indicator_test[:, contests_that_need_random_effect] @ test_epsilon[:, :, 0]
-        test_epsilon_z = aggregate_indicator_test[:, contests_that_need_random_effect] @ test_epsilon[:, :, 1]
+            # where we have < 2 units in a contest, we set the variance to the variance of the observed epsilon_hat values
+            var[np.isnan(var) | np.isinf(var)] = np.var(epsilon[np.nonzero(epsilon)[0]].T, ddof=1)
+            return np.sqrt(var)
+
+        std_y = _get_epsilon_hat_std(residuals_y, epsilon_y_hat)
+        std_z = _get_epsilon_hat_std(residuals_z, epsilon_z_hat)
+
+        std = np.zeros((std_y.shape[0] + std_z.shape[0],))
+        std[0::2] = std_y
+        std[1::2] = std_z
+
+        # high observed correlation between epsilon_y_hat and epsilon_z_hat in 2020, so this is important
+        corr = np.corrcoef(np.concatenate([epsilon_y_hat, epsilon_z_hat], axis=1)[np.nonzero(epsilon_y_hat)[0]].T)
+        # tile corr into a block diagonal matrix
+        corr_list = [corr] * aggregate_indicator.shape[1]
+        corr_hat = block_diag(*corr_list)
+
+        # if we have additional inter-contest correlations to impose
+        # self.contest_correlations is list of tuples
+        # e.g., [(("AK", "AL", "AR"), 0.5), (("CA", "CO", "CT"), 0.5)]
+        # this will impose a correlation of 0.5 among the sampled state-level swings
+        # for AK, AL, AR and CA, CO, CT
+        if len(self.contest_correlations) > 0:
+            for contests, correlation in self.contest_correlations:
+                for c_1, c_2 in combinations(contests, 2):
+                    i, j = 2 * self.aggregate_names[c_1], 2 * self.aggregate_names[c_2]
+                    corr_hat[i, j] = correlation  # epsilon_y_correlation
+                    corr_hat[i + 1, j + 1] = correlation  # epsilon_z_correlation
+                    corr_hat[j, i] = correlation
+                    corr_hat[j + 1, i + 1] = correlation
+                    corr_hat[i + 1, j] = min(corr_hat[i, i + 1], correlation)
+                    corr_hat[j, i + 1] = min(corr_hat[i, i + 1], correlation)
+                    corr_hat[i, j + 1] = min(corr_hat[i, i + 1], correlation)
+                    corr_hat[j + 1, i] = min(corr_hat[i, i + 1], correlation)
+
+            # project correlation matrix back to PSD cone
+            evals, evecs = np.linalg.eigh(corr_hat)
+            if (evals < -1e-5).any():
+                LOG.info("Epsilon correl. matrix is not PSD and requires projection.")
+                evals = np.clip(evals, 0, None)
+                corr_hat = evecs @ np.diag(evals) @ evecs.T
+                corr_hat /= np.sqrt(np.outer(np.diag(corr_hat), np.diag(corr_hat)))
+
+        # \epsilon ~ N(0, \Sigma)
+        # Sigma is a block diagonal matrix with 2x2 blocks running down the diagonal and 0s elsewhere
+        # each block is the covariance matrix of epsilon_y and epsilon_z for a particular contest,
+        # e.g., the first block is for the AK contest, the second block is for the AL contest, etc.
+        # we can sample from this distribution to get new epsilons
+        mu_hat = np.zeros(corr_hat.shape[0])
+        sigma_hat = np.diag(std) @ corr_hat @ np.diag(std)
+
+        test_epsilon = self.rng.multivariate_normal(mu_hat, sigma_hat, size=self.B)
+
+        test_epsilon_y = test_epsilon[:, 0::2].T
+        test_epsilon_z = test_epsilon[:, 1::2].T
+
+        test_epsilon_y = aggregate_indicator_test @ test_epsilon_y
+        test_epsilon_z = aggregate_indicator_test @ test_epsilon_z
+
         return test_epsilon_y, test_epsilon_z
 
     def _sample_test_errors(
@@ -786,11 +843,34 @@ class BootstrapElectionModel(BaseElectionModel):
         # between unit and contest (ie. a 1 in i,j says that unit j belongs to contest i)
         # in case district election we need to create a variable that defines the state, district
         # which is what the contest is
-        if self.district_election:
+        if self.district_election:  # want to model aggregate effect at both district and state levels
             all_units["postal_code-district"] = all_units[["postal_code", "district"]].agg("_".join, axis=1)
-            aggregate_indicator = pd.get_dummies(all_units["postal_code-district"]).values
+
+            contest_indicator = pd.get_dummies(all_units["postal_code-district"])
+            postal_code_indicator = pd.get_dummies(all_units["postal_code"])
+
+            # drop districts that are at-large districts for a state
+            postal_code_filter = all_units.groupby("postal_code")["postal_code-district"].nunique() > 1
+            valid_postal_codes = postal_code_filter[postal_code_filter].index
+            valid_districts = all_units[all_units.postal_code.isin(valid_postal_codes)]["postal_code-district"].unique()
+            contest_indicator_filtered = contest_indicator.loc[:, valid_districts]
+
+            # drop contest indicators if there are fewer than 10 units in contest
+            contest_indicator_filtered = contest_indicator_filtered.loc[:, contest_indicator.sum(axis=0) > 10]
+
+            self.aggregate_names = {
+                c: i
+                for i, c in enumerate(
+                    postal_code_indicator.columns.tolist() + contest_indicator_filtered.columns.tolist()
+                )
+            }
+            aggregate_indicator = np.concatenate(
+                (postal_code_indicator.values, contest_indicator_filtered.values), axis=1
+            )
         else:
-            aggregate_indicator = pd.get_dummies(all_units["postal_code"]).values
+            contest_indicator = pd.get_dummies(all_units["postal_code"])
+            self.aggregate_names = {c: i for i, c in enumerate(contest_indicator.columns.tolist())}
+            aggregate_indicator = contest_indicator.values
 
         aggregate_indicator_expected = aggregate_indicator[: (n_train + n_test)]
         aggregate_indicator_train = aggregate_indicator_expected[:n_train]
@@ -1030,7 +1110,7 @@ class BootstrapElectionModel(BaseElectionModel):
         # and turn into turnout estimate
         self.weighted_z_test_pred = z_test_pred * weights_test
         self.ran_bootstrap = True
-        self.n_contests = aggregate_indicator.shape[1]
+        self.n_contests = contest_indicator.values.shape[1]
 
     def get_unit_predictions(
         self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, estimand: str, **kwargs
@@ -1443,6 +1523,10 @@ class BootstrapElectionModel(BaseElectionModel):
 
         interval_upper = interval_upper.reshape(-1, 1)
         interval_lower = interval_lower.reshape(-1, 1)
+
+        # guarantee overlap between the prediction interval and the point prediction
+        interval_lower = np.minimum(interval_lower, aggregate_perc_margin_total - 0.001)
+        interval_upper = np.maximum(interval_upper, aggregate_perc_margin_total + 0.001)
 
         return PredictionIntervals(interval_lower, interval_upper)
 
