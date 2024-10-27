@@ -612,4 +612,3 @@ def test_separate_state_model():
     assert df_new.loc[(df.postal_code != "CC") & (df.postal_code != "BB"), "intercept"].all() == 1
     assert df_new.loc[df.postal_code == "CC", "intercept"].all() == 0
     assert df_new.loc[df.postal_code == "BB", "intercept"].all() == 0
-
