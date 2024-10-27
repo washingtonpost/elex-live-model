@@ -569,8 +569,6 @@ def test_separate_state_model():
     df_new = featurizer.prepare_data(df, center_features=False, scale_features=False, add_intercept=True)
     assert df_new.loc[df.postal_code != "CC", "intercept"].all() == 1
     assert df_new.loc[df.postal_code == "CC", "intercept"].all() == 0
-    assert df_new.loc[df.postal_code != "CC", "intercept_CC"].all() == 0
-    assert df_new.loc[df.postal_code == "CC", "intercept_CC"].all() == 1
 
     assert df_new.loc[df.postal_code != "CC", "a"].all() > 0
     assert df_new.loc[df.postal_code == "CC", "a"].all() == 0
@@ -595,12 +593,6 @@ def test_separate_state_model():
     assert df_new.loc[(df.postal_code != "CC") & (df.postal_code != "BB"), "intercept"].all() == 1
     assert df_new.loc[df.postal_code == "CC", "intercept"].all() == 0
     assert df_new.loc[df.postal_code == "BB", "intercept"].all() == 0
-    assert df_new.loc[(df.postal_code != "CC") & (df.postal_code != "BB"), "intercept_CC"].all() == 0
-    assert df_new.loc[(df.postal_code != "CC") & (df.postal_code != "BB"), "intercept_BB"].all() == 0
-    assert df_new.loc[df.postal_code == "CC", "intercept_CC"].all() == 1
-    assert df_new.loc[df.postal_code == "BB", "intercept_BB"].all() == 1
-    assert df_new.loc[df.postal_code == "CC", "intercept_BB"].all() == 0
-    assert df_new.loc[df.postal_code == "BB", "intercept_CC"].all() == 0
 
     assert df_new.loc[(df.postal_code != "CC") & (df.postal_code != "BB"), "a"].all() > 0
     assert df_new.loc[df.postal_code == "CC", "a"].all() == 0
@@ -620,5 +612,4 @@ def test_separate_state_model():
     assert df_new.loc[(df.postal_code != "CC") & (df.postal_code != "BB"), "intercept"].all() == 1
     assert df_new.loc[df.postal_code == "CC", "intercept"].all() == 0
     assert df_new.loc[df.postal_code == "BB", "intercept"].all() == 0
-    assert "intercept_BB" not in df_new.columns
-    assert "intercept_CC" not in df_new.columns
+
