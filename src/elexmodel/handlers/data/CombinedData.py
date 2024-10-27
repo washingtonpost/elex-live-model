@@ -48,6 +48,7 @@ class CombinedDataHandler:
             data.update(data[result_cols].fillna(value=0))
             data.loc[indices_with_null_val, "percent_expected_vote"] = 0
 
+        self.n_minimum_for_outlier_detection_model = 20
         self.data = data
 
     def get_units(
@@ -245,7 +246,7 @@ class CombinedDataHandler:
 
         non_modeled_units_list = [units_blocklisted, units_with_zero_baseline, units_with_strange_turnout_factor]
 
-        if fit_turnout_outlier_model:
+        if fit_turnout_outlier_model and reporting_units.shape[0] > self.n_minimum_for_outlier_detection_model:
             units_with_strange_turnout_factor_modeled = self._fit_outlier_detection_model(
                 reporting_units, "turnout_factor", outlier_z_threshold
             )
@@ -253,7 +254,7 @@ class CombinedDataHandler:
             non_modeled_units_list.append(units_with_strange_turnout_factor_modeled)
 
         if "margin" in self.estimands:
-            if fit_margin_outlier_model:
+            if fit_margin_outlier_model and reporting_units.shape[0] > self.n_minimum_for_outlier_detection_model:
                 units_with_strange_margin_change_modeled = self._fit_outlier_detection_model(
                     reporting_units, "results_normalized_margin", outlier_z_threshold
                 )
