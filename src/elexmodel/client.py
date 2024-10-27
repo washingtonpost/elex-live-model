@@ -7,6 +7,7 @@ import pandas as pd
 from elexmodel.handlers import s3
 from elexmodel.handlers.config import ConfigHandler
 from elexmodel.handlers.data.CombinedData import CombinedDataHandler
+from elexmodel.handlers.data.VersionedData import VersionedDataHandler
 from elexmodel.handlers.data.ModelResults import ModelResultsHandler
 from elexmodel.handlers.data.PreprocessedData import PreprocessedDataHandler
 from elexmodel.logging import initialize_logging
@@ -304,6 +305,22 @@ class ModelClient:
             percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper, aggregates
         )
 
+        if model_parameters.get("extrapolation", True):
+            LOG.info("Getting versioned data for extrapolation rule")
+            versioned_data_handler = VersionedDataHandler(
+                self.election_id,
+                self.office,
+                self.geographic_unit_type,
+                estimands,
+                start_date=model_parameters.get("versioned_start_date", None),
+                end_date=model_parameters.get("versioned_end_date", None)
+            )
+            versioned_results = versioned_data_handler.get_versioned_results(
+                model_settings.get("versioned_filepath", "/Users/cherianj/Desktop") # TODO: change this
+            )
+        else:
+            versioned_results = None
+
         LOG.info(
             "Model parameters: \n prediction intervals: %s, percent reporting threshold: %s, \
                 pi_method: %s, aggregates: %s, model settings: %s",
@@ -319,7 +336,7 @@ class ModelClient:
         elif pi_method == "gaussian":
             self.model = GaussianElectionModel(model_settings=model_settings)
         elif pi_method == "bootstrap":
-            self.model = BootstrapElectionModel(model_settings=model_settings)
+            self.model = BootstrapElectionModel(model_settings=model_settings, versioned_data_handler=versioned_data_handler)
 
         minimum_reporting_units_max = 0
         for alpha in prediction_intervals:
