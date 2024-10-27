@@ -1196,7 +1196,7 @@ class BootstrapElectionModel(BaseElectionModel):
             y_test_pred_B[extrap_filter] = (model_weight * y_test_pred_B + (1 - model_weight) * y_test_pred_extrap)[
                 extrap_filter
             ]
-            
+
         y_test_pred_B = y_test_pred_B.clip(min=y_partial_reporting_lower, max=y_partial_reporting_upper)
 
         # \tilde{y_i}^{b} * \tilde{z_i}^{b}
