@@ -1184,17 +1184,19 @@ class BootstrapElectionModel(BaseElectionModel):
             min=z_partial_reporting_lower, max=z_partial_reporting_upper
         )
 
-        y_test_pred_extrap, extrap_std = self._extrapolate_unit_margin(reporting_units, nonreporting_units)
-        extrap_filter = ~(np.isnan(y_test_pred_extrap) | np.isnan(extrap_std)).flatten()
-        model_std = y_test_pred_B.std(axis=1).reshape(-1, 1)
+        if self.versioned_data_handler is not None:
+            y_test_pred_extrap, extrap_std = self._extrapolate_unit_margin(reporting_units, nonreporting_units)
+            extrap_filter = ~(np.isnan(y_test_pred_extrap) | np.isnan(extrap_std)).flatten()
+            model_std = y_test_pred_B.std(axis=1).reshape(-1, 1)
 
-        model_weight = 1 / np.clip(model_std**2, 1e-5, None)
-        extrap_weight = 1 / np.clip(extrap_std**2, 1e-5, None)
-        model_weight = model_weight / (model_weight + extrap_weight)
+            model_weight = 1 / np.clip(model_std**2, 1e-5, None)
+            extrap_weight = 1 / np.clip(extrap_std**2, 1e-5, None)
+            model_weight = model_weight / (model_weight + extrap_weight)
 
-        y_test_pred_B[extrap_filter] = (model_weight * y_test_pred_B + (1 - model_weight) * y_test_pred_extrap)[
-            extrap_filter
-        ]
+            y_test_pred_B[extrap_filter] = (model_weight * y_test_pred_B + (1 - model_weight) * y_test_pred_extrap)[
+                extrap_filter
+            ]
+            
         y_test_pred_B = y_test_pred_B.clip(min=y_partial_reporting_lower, max=y_partial_reporting_upper)
 
         # \tilde{y_i}^{b} * \tilde{z_i}^{b}
