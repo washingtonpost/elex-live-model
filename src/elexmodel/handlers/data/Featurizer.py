@@ -7,7 +7,7 @@ class Featurizer:
     Featurizer. Normalizes features, add intercept, expands fixed effects
     """
 
-    def __init__(self, features: list, fixed_effects: list):
+    def __init__(self, features: list, fixed_effects: list, states_for_separate_model: list = []):
         self.features = features
         # fixed effects can be a list, in which case every value of a fixed effect gets its own column
         if isinstance(fixed_effects, list):
@@ -38,6 +38,8 @@ class Featurizer:
         self.active_fixed_effects = []
         # active features are features + active fixed effects
         self.active_features = []
+
+        self.states_for_separate_model = states_for_separate_model
 
     def _expand_fixed_effects(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -81,6 +83,19 @@ class Featurizer:
         if add_intercept is true an intercept column is added to the features and one fixed effect value is dropped
         """
         df = df.copy()  # create copy so we can do things to the values
+
+        # if a state is in the states for separate model, then we add separate feature columns for that state
+        # and we zero out the original feature column for those states
+        additional_state_features = []
+        for state in self.states_for_separate_model:
+            mask = df.postal_code == state
+            for feature in self.features:
+                state_feature = f"{feature}_{state}"
+                df[state_feature] = df[feature].where(mask, 0)
+                df.loc[mask, feature] = 0
+                additional_state_features.append(state_feature)
+
+        df = df.copy()  # create copy so we can do things to the values
         if center_features:
             df[self.features] -= df[self.features].mean()
         if scale_features:
@@ -90,6 +105,21 @@ class Featurizer:
             self.complete_features += ["intercept"]
             self.active_features += ["intercept"]
             df["intercept"] = 1
+
+            # if a state is in the states for separate model, then we add separate intercept columns for that state
+            # and we zero out the original intercept column for those stattes
+            for state in self.states_for_separate_model:
+                mask = df.postal_code == state
+                # if we have a postal code fixed effect then we do not want a separate intercept column for that state
+                # because the fixed effect takes the role of that column (ie. those would be linearly dependent)
+                # but we still want to zero out the original intercept for those states.
+                if "postal_code" not in self.fixed_effect_cols:
+                    state_intercept = f"intercept_{state}"
+                    df[state_intercept] = df["intercept"].where(mask, 0)
+                    self.complete_features.append(state_intercept)
+                df.loc[mask, "intercept"] = 0
+
+            # if fixed effects are on then we have redundant with the state specific intercepts
 
         if len(self.fixed_effect_cols) > 0:
             df = self._expand_fixed_effects(df)
@@ -140,8 +170,8 @@ class Featurizer:
         # all features that the model will be fit on
         # these are all the features + the expanded fixed effects
         # (so all fixed effect values in the complete data excluding the ones dropped for multicolinearity)
-        self.complete_features += self.features + self.expanded_fixed_effects
-        self.active_features += self.features + self.active_fixed_effects
+        self.complete_features += self.features + additional_state_features + self.expanded_fixed_effects
+        self.active_features += self.features + additional_state_features + self.active_fixed_effects
         df = df[self.complete_features]
 
         return df
