@@ -305,7 +305,7 @@ class ModelClient:
             percent_reporting_threshold, turnout_factor_lower, turnout_factor_upper, aggregates
         )
 
-        if model_parameters.get("extrapolation", True):
+        if model_parameters.get("extrapolation", False):
             LOG.info("Getting versioned data for extrapolation rule")
             versioned_data_handler = VersionedDataHandler(
                 self.election_id,
