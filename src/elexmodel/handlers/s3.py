@@ -3,12 +3,10 @@ import json
 import logging
 import queue
 
-import pandas as pd
-from dateutil import tz
-
 import boto3
-
+import pandas as pd
 from botocore.session import get_session
+from dateutil import tz
 from s3transfer.manager import TransferManager
 from s3transfer.subscribers import BaseSubscriber
 
@@ -84,7 +82,8 @@ class S3CsvUtil(S3Util):
         data = super().get(filename, **kwargs)
         csv = data.read().decode("utf-8")
         return csv
-    
+
+
 class S3VersionUtil:
     def __init__(self, bucket_name, start_date=None, end_date=None, tz="America/New_York"):
         self.bucket_name = bucket_name
@@ -100,9 +99,7 @@ class S3VersionUtil:
         path here is the full path - constucted via f"{base_path}/{path}"
         in previous implementations of this
         """
-        response = self.s3_client.list_object_versions(
-            Bucket=self.bucket_name, Prefix=path, **kwargs
-        )
+        response = self.s3_client.list_object_versions(Bucket=self.bucket_name, Prefix=path, **kwargs)
 
         versions = []
         if "Versions" in response:
@@ -119,7 +116,7 @@ class S3VersionUtil:
         if self.end_date is not None:
             versions = list(filter(lambda v: v["LastModified"] <= self.end_date, versions))
         return versions
-    
+
     def wait_for_versions(self, q):
         while not q.empty():
             version, data, future = q.get()
@@ -131,7 +128,7 @@ class S3VersionUtil:
                 LOG.error(f"Error downloading {version['VersionId']}: {e}")
 
             q.task_done()
-    
+
     def make_request(self, path, *, version=None, **kwargs):
         subscribers = []
         if version is not None:
@@ -144,7 +141,7 @@ class S3VersionUtil:
         future = self.manager.download(self.bucket_name, path, data, extra_args=kwargs, subscribers=subscribers)
 
         return version, data, future
-    
+
     def get(self, path, sample=2):
         versions = self.list_versions(path)
         if len(versions) == 0:

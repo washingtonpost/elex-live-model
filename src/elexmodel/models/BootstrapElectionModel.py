@@ -1,7 +1,6 @@
 from __future__ import annotations  # pylint: disable=too-many-lines
 
 import logging
-from functools import lru_cache
 from itertools import combinations
 
 import numpy as np
@@ -66,6 +65,7 @@ class BootstrapElectionModel(BaseElectionModel):
         self.versioned_data_handler = versioned_data_handler
         self.extrapolate_threshold = model_settings.get("extrapolate_threshold", 75)
         self.min_extrapolating_units = model_settings.get("min_extrapolating_units", 5)
+        self.extrapolate_std_method = model_settings.get("extrapolate_std_method", "std")
 
         # upper and lower bounds for the quantile regression which define the strata distributions
         # these make sure that we can control the worst cases for the distributions in case we
@@ -740,12 +740,8 @@ class BootstrapElectionModel(BaseElectionModel):
         x_train_strata = strata_all[:n_train]
         x_test_strata = strata_all[n_train:]
         return x_train_strata, x_test_strata
-    
-    def _extrapolate_unit_margin(
-            self,
-            reporting_units: pd.DataFrame,
-            nonreporting_units: pd.DataFrame
-    ):
+
+    def _extrapolate_unit_margin(self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame):
         """
         This function will produce the extrapolated predictions for the non-reporting units.
 
@@ -755,8 +751,7 @@ class BootstrapElectionModel(BaseElectionModel):
         all_units[missing_columns] = self.versioned_data_handler.data[missing_columns].max()
 
         self.versioned_data_handler.data = pd.concat(
-            [self.versioned_data_handler.data, all_units[self.versioned_data_handler.data.columns]], 
-            axis=0
+            [self.versioned_data_handler.data, all_units[self.versioned_data_handler.data.columns]], axis=0
         )
 
         versioned_estimates = self.versioned_data_handler.compute_versioned_margin_estimate()
@@ -769,23 +764,23 @@ class BootstrapElectionModel(BaseElectionModel):
         modeling_filter &= nonreporting_units.geographic_unit_type == "county"
 
         reporting_units_county = reporting_units[reporting_units.geographic_unit_type == "county"]
-        
+
         # get the versioned results for the reporting units
         reporting_versioned_estimates = versioned_estimates[
             versioned_estimates.geographic_unit_fips.isin(reporting_units_county.geographic_unit_fips)
         ].copy()
 
         reporting_versioned_estimates = reporting_versioned_estimates.merge(
-            reporting_units[["geographic_unit_fips", "postal_code"]],
-            on="geographic_unit_fips",
-            how="left"
+            reporting_units[["geographic_unit_fips", "postal_code"]], on="geographic_unit_fips", how="left"
         )
 
         from tqdm import tqdm
+
         all_corrections = []
         for postal_code in tqdm(nonreporting_units[modeling_filter].postal_code.unique()):
             # only extrapolate for the non-reporting units with percent_expected_vote > 50
-            _get_filter = lambda df: df.postal_code == postal_code
+            def _get_filter(df):
+                return df.postal_code == postal_code
 
             # if there are fewer than k reporting units, we can't extrapolate
             if _get_filter(reporting_units_county).sum() < self.min_extrapolating_units:
@@ -795,16 +790,18 @@ class BootstrapElectionModel(BaseElectionModel):
             nonreporting_filter = _get_filter(nonreporting_units) & modeling_filter
 
             state_reporting_estimates = reporting_versioned_estimates[reporting_filter]
-            
-            nonreporting_merge = nonreporting_units.loc[nonreporting_filter, ["geographic_unit_fips", "percent_expected_vote"]].copy()
+
+            nonreporting_merge = nonreporting_units.loc[
+                nonreporting_filter, ["geographic_unit_fips", "percent_expected_vote"]
+            ].copy()
             nonreporting_merge["percent_expected_vote"] = nonreporting_merge.percent_expected_vote.round()
 
             est_corrections_df = pd.merge(
-                nonreporting_merge, 
-                state_reporting_estimates, 
-                on="percent_expected_vote", 
+                nonreporting_merge,
+                state_reporting_estimates,
+                on="percent_expected_vote",
                 how="left",
-                suffixes=("", "_reporting")
+                suffixes=("", "_reporting"),
             )
 
             grouped_est_corrections = est_corrections_df.groupby("geographic_unit_fips")
@@ -814,39 +811,66 @@ class BootstrapElectionModel(BaseElectionModel):
             def compute_correction_statistics(df):
                 df_filtered = df[(df.dist_to_observed < 5) & (df.est_correction.notnull())]
                 if df_filtered.empty:
-                    return pd.DataFrame({
-                        "est_correction": np.nan,
-                        "est_correction_max": np.nan,
-                        "est_correction_min": np.nan,
-                        "est_correction_std": np.nan,
-                        "est_correction_count": 0
-                    }, index=[df.geographic_unit_fips.iloc[0]])
-                
-                return pd.DataFrame({
-                    "est_correction": np.nanmean(df_filtered.est_correction.values),
-                    "est_correction_max": np.nanmax(df_filtered.est_correction.values),
-                    "est_correction_min": np.nanmin(df_filtered.est_correction.values),
-                    "est_correction_std": np.nanstd(df_filtered.est_correction.values, ddof=1),
-                    "est_correction_count": df_filtered.est_correction.count()
-                }, index=[df.geographic_unit_fips.iloc[0]])
-            
+                    return pd.DataFrame(
+                        {
+                            "est_correction": np.nan,
+                            "est_correction_max": np.nan,
+                            "est_correction_min": np.nan,
+                            "est_correction_std": np.nan,
+                            "est_correction_count": 0,
+                        },
+                        index=[df.geographic_unit_fips.iloc[0]],
+                    )
+
+                return pd.DataFrame(
+                    {
+                        "est_correction": np.nanmean(df_filtered.est_correction.values),
+                        "est_correction_max": np.nanmax(df_filtered.est_correction.values),
+                        "est_correction_min": np.nanmin(df_filtered.est_correction.values),
+                        "est_correction_std": np.nanstd(df_filtered.est_correction.values, ddof=1),
+                        "est_correction_count": df_filtered.est_correction.count(),
+                    },
+                    index=[df.geographic_unit_fips.iloc[0]],
+                )
+
             corrections = grouped_est_corrections.apply(compute_correction_statistics).reset_index()
             all_corrections.append(corrections)
 
         if len(all_corrections) == 0:
-            return np.nan * np.ones((nonreporting_units.shape[0], 1)), np.nan * np.ones((nonreporting_units.shape[0], 1))
+            return np.nan * np.ones((nonreporting_units.shape[0], 1)), np.nan * np.ones(
+                (nonreporting_units.shape[0], 1)
+            )
         all_corrections = pd.concat(all_corrections, axis=0)
 
         nonreporting_units = nonreporting_units.merge(
-            all_corrections[["geographic_unit_fips", "est_correction", "est_correction_max", "est_correction_min",
-                                "est_correction_std", "est_correction_count"]],
-            how='left',
-            on='geographic_unit_fips'
+            all_corrections[
+                [
+                    "geographic_unit_fips",
+                    "est_correction",
+                    "est_correction_max",
+                    "est_correction_min",
+                    "est_correction_std",
+                    "est_correction_count",
+                ]
+            ],
+            how="left",
+            on="geographic_unit_fips",
         )
 
-        nonreporting_units["pred_extrapolate"] = nonreporting_units.results_normalized_margin + nonreporting_units.est_correction
+        nonreporting_units["pred_extrapolate"] = (
+            nonreporting_units.results_normalized_margin + nonreporting_units.est_correction
+        )
 
-        return nonreporting_units.pred_extrapolate.values.reshape(-1,1), nonreporting_units.est_correction_std.values.reshape(-1,1)#nonreporting_units.est_correction_max.values.reshape(-1,1) - nonreporting_units.est_correction_min.values.reshape(-1,1)
+        prediction = nonreporting_units.pred_extrapolate.values.reshape(-1, 1)
+
+        if self.extrapolate_std_method == "std":
+            prediction_std = nonreporting_units.est_correction_std.values.reshape(-1, 1)
+        elif self.extrapolate_std_method == "max_min":
+            prediction_std = (
+                nonreporting_units.est_correction_max.values - nonreporting_units.est_correction_min.values
+            ).reshape(-1, 1)
+
+        return prediction, prediction_std
 
     def compute_bootstrap_errors(
         self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, unexpected_units: pd.DataFrame
@@ -1155,7 +1179,7 @@ class BootstrapElectionModel(BaseElectionModel):
         # We can then use our bootstrapped ols_y_B/ols_z_B and our bootstrapped contest level effect
         # (epsilon) to make bootstrapped predictions on our non-reporting units
         # This is \tilde{y_i}^{b} and \tilde{z_i}^{b}
-        y_test_pred_B = (ols_y_B.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat_B))
+        y_test_pred_B = ols_y_B.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat_B)
         z_test_pred_B = (ols_z_B.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat_B)).clip(
             min=z_partial_reporting_lower, max=z_partial_reporting_upper
         )
@@ -1168,7 +1192,9 @@ class BootstrapElectionModel(BaseElectionModel):
         extrap_weight = 1 / np.clip(extrap_std**2, 1e-5, None)
         model_weight = model_weight / (model_weight + extrap_weight)
 
-        y_test_pred_B[extrap_filter] = (model_weight * y_test_pred_B + (1 - model_weight) * y_test_pred_extrap)[extrap_filter]
+        y_test_pred_B[extrap_filter] = (model_weight * y_test_pred_B + (1 - model_weight) * y_test_pred_extrap)[
+            extrap_filter
+        ]
         y_test_pred_B = y_test_pred_B.clip(min=y_partial_reporting_lower, max=y_partial_reporting_upper)
 
         # \tilde{y_i}^{b} * \tilde{z_i}^{b}
@@ -1717,9 +1743,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         if self.national_summary_correlation:
             # perfect correlation between the contests for the electoral college
-            agg_pred_margin_dist = (
-                self.aggregate_pred_margin - (self.divided_error_B_1 - self.divided_error_B_2)
-            )
+            agg_pred_margin_dist = self.aggregate_pred_margin - (self.divided_error_B_1 - self.divided_error_B_2)
             upper_outcomes = np.mean(agg_pred_margin_dist > 0, axis=1) > lower_q
             interval_upper_corr = np.sum(nat_sum_data_dict_sorted_vals * upper_outcomes.reshape(-1, 1))
 
