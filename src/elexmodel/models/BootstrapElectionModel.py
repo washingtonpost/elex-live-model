@@ -64,7 +64,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         # save versioned data for later use
         self.versioned_data_handler = versioned_data_handler
-        self.extrapolate_threshold = model_settings.get("extrapolate_threshold", 90)
+        self.extrapolate_threshold = model_settings.get("extrapolate_threshold", 75)
         self.min_extrapolating_units = model_settings.get("min_extrapolating_units", 5)
 
         # upper and lower bounds for the quantile regression which define the strata distributions
@@ -100,6 +100,9 @@ class BootstrapElectionModel(BaseElectionModel):
 
         # this is the correlation structure we impose when we sample from the contest level random effects
         self.contest_correlations = model_settings.get("contest_correlations", [])
+
+        # impose perfect correlation in the national summary aggregation
+        self.national_summary_correlation = model_settings.get("national_summary_correlation", False)
 
         # Assume that we have a baseline normalized margin
         # (D^{Y'} - R^{Y'}) / (D^{Y'} + R^{Y'}) is one of the covariates
@@ -805,18 +808,29 @@ class BootstrapElectionModel(BaseElectionModel):
             # get correction mean / std / max / min / count of units used for each correction
 
             def compute_correction_statistics(df):
-                df_filtered = df[df.dist_to_observed < 5]
+                df_filtered = df[(df.dist_to_observed < 5) & (df.est_correction.notnull())]
+                if df_filtered.empty:
+                    return pd.DataFrame({
+                        "est_correction": np.nan,
+                        "est_correction_max": np.nan,
+                        "est_correction_min": np.nan,
+                        "est_correction_std": np.nan,
+                        "est_correction_count": 0
+                    }, index=[df.geographic_unit_fips.iloc[0]])
+                
                 return pd.DataFrame({
-                    "est_correction": df_filtered.est_correction.mean(),
-                    "est_correction_max": df_filtered.est_correction.max(),
-                    "est_correction_min": df_filtered.est_correction.min(),
-                    "est_correction_std": df_filtered.est_correction.std(ddof=1),
+                    "est_correction": np.nanmean(df_filtered.est_correction.values),
+                    "est_correction_max": np.nanmax(df_filtered.est_correction.values),
+                    "est_correction_min": np.nanmin(df_filtered.est_correction.values),
+                    "est_correction_std": np.nanstd(df_filtered.est_correction.values, ddof=1),
                     "est_correction_count": df_filtered.est_correction.count()
                 }, index=[df.geographic_unit_fips.iloc[0]])
             
             corrections = grouped_est_corrections.apply(compute_correction_statistics).reset_index()
             all_corrections.append(corrections)
 
+        if len(all_corrections) == 0:
+            return np.nan * np.ones((nonreporting_units.shape[0], 1)), np.nan * np.ones((nonreporting_units.shape[0], 1))
         all_corrections = pd.concat(all_corrections, axis=0)
 
         nonreporting_units = nonreporting_units.merge(
@@ -828,7 +842,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         nonreporting_units["pred_extrapolate"] = nonreporting_units.results_normalized_margin + nonreporting_units.est_correction
 
-        return nonreporting_units.pred_extrapolate.values.reshape(-1,1), nonreporting_units.est_correction_max.values.reshape(-1,1) - nonreporting_units.est_correction_min.values.reshape(-1,1)
+        return nonreporting_units.pred_extrapolate.values.reshape(-1,1), nonreporting_units.est_correction_std.values.reshape(-1,1)#nonreporting_units.est_correction_max.values.reshape(-1,1) - nonreporting_units.est_correction_min.values.reshape(-1,1)
 
     def compute_bootstrap_errors(
         self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, unexpected_units: pd.DataFrame
@@ -1137,9 +1151,7 @@ class BootstrapElectionModel(BaseElectionModel):
         # We can then use our bootstrapped ols_y_B/ols_z_B and our bootstrapped contest level effect
         # (epsilon) to make bootstrapped predictions on our non-reporting units
         # This is \tilde{y_i}^{b} and \tilde{z_i}^{b}
-        y_test_pred_B = (ols_y_B.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat_B)).clip(
-            min=y_partial_reporting_lower, max=y_partial_reporting_upper
-        )
+        y_test_pred_B = (ols_y_B.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat_B))
         z_test_pred_B = (ols_z_B.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat_B)).clip(
             min=z_partial_reporting_lower, max=z_partial_reporting_upper
         )
@@ -1148,8 +1160,8 @@ class BootstrapElectionModel(BaseElectionModel):
         extrap_filter = ~(np.isnan(y_test_pred_extrap) | np.isnan(extrap_std)).flatten()
         model_std = y_test_pred_B.std(axis=1).reshape(-1, 1)
 
-        model_weight = 1 / model_std**2
-        extrap_weight = 1 / extrap_std**2
+        model_weight = 1 / np.clip(model_std**2, 1e-5, None)
+        extrap_weight = 1 / np.clip(extrap_std**2, 1e-5, None)
         model_weight = model_weight / (model_weight + extrap_weight)
 
         y_test_pred_B[extrap_filter] = (model_weight * y_test_pred_B + (1 - model_weight) * y_test_pred_extrap)[extrap_filter]
@@ -1698,6 +1710,20 @@ class BootstrapElectionModel(BaseElectionModel):
         interval_upper, interval_lower = (
             aggregate_dem_vals_pred - np.quantile(aggregate_dem_vals_B, q=[lower_q, upper_q], axis=-1).T
         ).T
+
+        if self.national_summary_correlation:
+            # perfect correlation between the contests for the electoral college
+            agg_pred_margin_dist = (
+                self.aggregate_pred_margin - (self.divided_error_B_1 - self.divided_error_B_2)
+            )
+            upper_outcomes = np.mean(agg_pred_margin_dist > 0, axis=1) > lower_q
+            interval_upper_corr = np.sum(nat_sum_data_dict_sorted_vals * upper_outcomes.reshape(-1, 1))
+
+            lower_outcomes = np.mean(agg_pred_margin_dist < 0, axis=1) > lower_q
+            interval_lower_corr = np.sum(nat_sum_data_dict_sorted_vals * ~lower_outcomes.reshape(-1, 1))
+
+            interval_upper = max(interval_upper, interval_upper_corr)
+            interval_lower = min(interval_lower, interval_lower_corr)
 
         # B_1 and B_2 outcomes should respect called races
         # because we create independent samples for B_1 and B_2 their difference can exaggerate the possible outcomes
