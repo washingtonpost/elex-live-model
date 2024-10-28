@@ -1703,7 +1703,12 @@ class BootstrapElectionModel(BaseElectionModel):
         aggregate_dem_vals_B_2 = nat_sum_data_dict_sorted_vals * aggregate_dem_prob_B_2
 
         # calculate the error in our national aggregate prediction
-        aggregate_dem_vals_B = np.sum(aggregate_dem_vals_B_1, axis=0) - np.sum(aggregate_dem_vals_B_2, axis=0)
+        aggregate_dem_vals_B = np.concatenate(
+            (np.sum(aggregate_dem_vals_B_1, axis=0), np.sum(aggregate_dem_vals_B_2, axis=0))
+        )
+        aggregate_dem_prob_B = np.concatenate(
+            (aggregate_dem_prob_B_1, aggregate_dem_prob_B_2), axis=1
+        )
 
         # we also need a national aggregate point prediction
         if self.hard_threshold:
@@ -1715,21 +1720,30 @@ class BootstrapElectionModel(BaseElectionModel):
 
         lower_q, upper_q = self._get_quantiles(alpha)
 
-        interval_upper, interval_lower = (
-            aggregate_dem_vals_pred - np.quantile(aggregate_dem_vals_B, q=[lower_q, upper_q], axis=-1).T
-        ).T
+        sorted_indices = np.argsort(aggregate_dem_vals_B)
+        quantile_indices = sorted_indices[[int(np.floor(lower_q * self.B * 2)), int(np.ceil(upper_q * self.B * 2))]]
+
+        lower_states, upper_states = (aggregate_dem_prob_B > 0.5)[:,quantile_indices].T.astype(int)
+        pred_states = (aggregate_dem_probs_total > 0.5).astype(int).flatten()
+
+        potential_losses = ((pred_states - lower_states) > 0).astype(int)
+        potential_gains = ((upper_states - pred_states) > 0).astype(int)
 
         if self.national_summary_correlation:
             # perfect correlation between the contests for the electoral college
             agg_pred_margin_dist = self.aggregate_pred_margin - (self.divided_error_B_1 - self.divided_error_B_2)
-            upper_outcomes = np.mean(agg_pred_margin_dist > 0, axis=1) > lower_q
-            interval_upper_corr = np.sum(nat_sum_data_dict_sorted_vals * upper_outcomes.reshape(-1, 1))
 
-            lower_outcomes = np.mean(agg_pred_margin_dist < 0, axis=1) > lower_q
-            interval_lower_corr = np.sum(nat_sum_data_dict_sorted_vals * ~lower_outcomes.reshape(-1, 1))
+            # how many states have lower_q (or more) realizations with Dem victory
+            upper_states = np.mean(agg_pred_margin_dist > 0, axis=1) > lower_q
 
-            interval_upper = max(interval_upper, interval_upper_corr)
-            interval_lower = min(interval_lower, interval_lower_corr)
+            # how many states have lower_q (or more) realizations with GOP victory
+            lower_states = np.mean(agg_pred_margin_dist < 0, axis=1) > lower_q
+
+            potential_losses = pred_states - (~lower_states).astype(int)
+            potential_gains = upper_states.astype(int) - pred_states
+
+        interval_upper = aggregate_dem_vals_pred + np.sum(nat_sum_data_dict_sorted_vals.flatten() * potential_gains)
+        interval_lower = aggregate_dem_vals_pred - np.sum(nat_sum_data_dict_sorted_vals.flatten() * potential_losses)
 
         # B_1 and B_2 outcomes should respect called races
         # because we create independent samples for B_1 and B_2 their difference can exaggerate the possible outcomes
@@ -1739,12 +1753,19 @@ class BootstrapElectionModel(BaseElectionModel):
         lower_bound = min(aggregate_dem_vals_B_1.sum(axis=0).min(), aggregate_dem_vals_B_2.sum(axis=0).min())
         upper_bound = max(aggregate_dem_vals_B_1.sum(axis=0).max(), aggregate_dem_vals_B_2.sum(axis=0).max())
 
-        import pdb; pdb.set_trace()
-        # if self.stop_model_call:
+        interval_lower = max(interval_lower, lower_bound)
+        interval_upper = min(interval_upper, upper_bound)
 
+        if self.stop_model_call:
+            potential_losses[pred_states[self.stop_model_call]] = 1
+            potential_gains[~pred_states[self.stop_model_call]] = 1
+
+            interval_lower = aggregate_dem_vals_pred - np.sum(nat_sum_data_dict_sorted_vals.flatten() * potential_losses)
+            interval_upper = aggregate_dem_vals_pred + np.sum(nat_sum_data_dict_sorted_vals.flatten() * potential_gains)
 
         agg_pred = round(aggregate_dem_vals_pred + base_to_add, 2)
-        agg_lower = round(max(interval_lower, lower_bound) + base_to_add, 2)
-        agg_upper = round(min(interval_upper, upper_bound) + base_to_add, 2)
+        agg_lower = round(interval_lower + base_to_add, 2)
+        agg_upper = round(interval_upper + base_to_add, 2)
+
         national_summary_estimates = {"margin": [agg_pred, agg_lower, agg_upper]}
         return national_summary_estimates
