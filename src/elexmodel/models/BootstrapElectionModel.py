@@ -1646,14 +1646,16 @@ class BootstrapElectionModel(BaseElectionModel):
         # guarantee overlap between the prediction interval and the point prediction
         interval_lower = np.minimum(interval_lower, aggregate_perc_margin_total - 0.001)
         interval_upper = np.maximum(interval_upper, aggregate_perc_margin_total + 0.001)
-        
+
         if self._is_top_level_aggregate(aggregate):
             stop_model_call = kwargs.get("stop_model_call", [])
-            stop_model_call = self._format_called_contests(stop_model_call, [], contests, True, None, False).reshape(-1, 1)
+            stop_model_call = self._format_called_contests(stop_model_call, [], contests, True, None, False).reshape(
+                -1, 1
+            )
             self.stop_model_call = stop_model_call
-            interval_lower = np.where((interval_lower > 0) & (stop_model_call == True), self.rhs_called_threshold, interval_lower)
-            interval_upper = np.where((interval_upper < 0) & (stop_model_call == True), self.lhs_called_threshold, interval_upper)
-        
+            interval_lower = np.where((interval_lower > 0) & stop_model_call, self.rhs_called_threshold, interval_lower)
+            interval_upper = np.where((interval_upper < 0) & stop_model_call, self.lhs_called_threshold, interval_upper)
+
         return PredictionIntervals(interval_lower, interval_upper)
 
     def get_national_summary_estimates(self, nat_sum_data_dict: dict, base_to_add: int | float, alpha: float) -> list:
@@ -1706,9 +1708,7 @@ class BootstrapElectionModel(BaseElectionModel):
         aggregate_dem_vals_B = np.concatenate(
             (np.sum(aggregate_dem_vals_B_1, axis=0), np.sum(aggregate_dem_vals_B_2, axis=0))
         )
-        aggregate_dem_prob_B = np.concatenate(
-            (aggregate_dem_prob_B_1, aggregate_dem_prob_B_2), axis=1
-        )
+        aggregate_dem_prob_B = np.concatenate((aggregate_dem_prob_B_1, aggregate_dem_prob_B_2), axis=1)
 
         # we also need a national aggregate point prediction
         if self.hard_threshold:
@@ -1723,7 +1723,7 @@ class BootstrapElectionModel(BaseElectionModel):
         sorted_indices = np.argsort(aggregate_dem_vals_B)
         quantile_indices = sorted_indices[[int(np.floor(lower_q * self.B * 2)), int(np.ceil(upper_q * self.B * 2))]]
 
-        lower_states, upper_states = (aggregate_dem_prob_B > 0.5)[:,quantile_indices].T.astype(int)
+        lower_states, upper_states = (aggregate_dem_prob_B > 0.5)[:, quantile_indices].T.astype(int)
         pred_states = (aggregate_dem_probs_total > 0.5).astype(int).flatten()
 
         potential_losses = ((pred_states - lower_states) > 0).astype(int)
@@ -1760,7 +1760,9 @@ class BootstrapElectionModel(BaseElectionModel):
             potential_losses[pred_states[self.stop_model_call]] = 1
             potential_gains[~pred_states[self.stop_model_call]] = 1
 
-            interval_lower = aggregate_dem_vals_pred - np.sum(nat_sum_data_dict_sorted_vals.flatten() * potential_losses)
+            interval_lower = aggregate_dem_vals_pred - np.sum(
+                nat_sum_data_dict_sorted_vals.flatten() * potential_losses
+            )
             interval_upper = aggregate_dem_vals_pred + np.sum(nat_sum_data_dict_sorted_vals.flatten() * potential_gains)
 
         agg_pred = round(aggregate_dem_vals_pred + base_to_add, 2)
