@@ -67,6 +67,7 @@ class BootstrapElectionModel(BaseElectionModel):
         self.extrapolate_threshold = model_settings.get("extrapolate_threshold", 75)
         self.min_extrapolating_units = model_settings.get("min_extrapolating_units", 5)
         self.extrapolate_std_method = model_settings.get("extrapolate_std_method", "std")
+        self.max_dist_to_observed = model_settings.get("max_dist_to_observed", 5)
 
         # upper and lower bounds for the quantile regression which define the strata distributions
         # these make sure that we can control the worst cases for the distributions in case we
@@ -843,7 +844,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         all_corrections = []
         for postal_code in nonreporting_units[modeling_filter].postal_code.unique():
-            # only extrapolate for the non-reporting units with percent_expected_vote > 50
+
             def _get_filter(df):
                 return df.postal_code == postal_code
 
@@ -880,9 +881,7 @@ class BootstrapElectionModel(BaseElectionModel):
             # get correction mean / std / max / min / count of units used for each correction
 
             def compute_correction_statistics(df):
-                df_filtered = df[
-                    (df.dist_to_observed < 5) & (df.est_correction.notnull())
-                ]  # TODO: probably don't hard code this as 5
+                df_filtered = df[(df.dist_to_observed < self.max_dist_to_observed) & (df.est_correction.notnull())]
                 if df_filtered.empty:
                     return pd.DataFrame(
                         {
