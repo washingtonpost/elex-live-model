@@ -107,7 +107,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         # impose perfect correlation in the national summary aggregation
         self.national_summary_correlation = model_settings.get("national_summary_correlation", False)
-
+        self.stop_model_call = None
         # Assume that we have a baseline normalized margin
         # (D^{Y'} - R^{Y'}) / (D^{Y'} + R^{Y'}) is one of the covariates
         if "baseline_normalized_margin" not in self.features:
@@ -1601,44 +1601,13 @@ class BootstrapElectionModel(BaseElectionModel):
             rhs_called_contests = kwargs.get("rhs_called_contests", [])
             called_contests = self._format_called_contests(lhs_called_contests, rhs_called_contests, contests, 1, 0, -1)
 
-            stop_model_call = kwargs.get("stop_model_call", [])
-            stop_model_call = self._format_called_contests(stop_model_call, [], contests, True, None, False)
-
             interval_upper, interval_lower = (
                 aggregate_perc_margin_total - np.quantile(error_diff, q=[lower_q, upper_q], axis=-1).T
             ).T
 
-            for i, (contest, call, stop_model_call_i) in enumerate(zip(contests, called_contests, stop_model_call)):
+            for i, call in enumerate(called_contests):
                 interval_lower_i = interval_lower[i]
                 interval_upper_i = interval_upper[i]
-
-                if stop_model_call_i:
-                    # if we don't allow the model call, then force the lower interval to be below zero and the upper interval to be above zero
-                    if interval_lower_i > 0:
-                        # if interval_lower_i > 0 then our model thinks the race is called for the LHS party.
-                        # error_diff > 0 means that the lower bound is smaller than the prediction, so for those we set error_diff to be the gap between
-                        # the prediction and the imposed lower bound. This forces the difference between error_diff and the prediction to be exactly the imposed
-                        # lower bound
-                        error_diff[i, error_diff[i] > 0] = (
-                            aggregate_perc_margin_total[i] - self.rhs_called_threshold
-                        ).flatten()
-                        # we are pushing divided_error_B_2 such that divided_error_B_2 is less than zero in 10% of cases (ie. that LHS party wins some simulations)
-                        # there will be a chance that this impacts our electoral college lower bound
-                        divided_error_B_2_quantile = np.quantile(divided_error_B_2[i, :], q=0.1)
-                        if divided_error_B_2_quantile > 0:
-                            divided_error_B_2[i, :] += self.rhs_called_threshold - divided_error_B_2_quantile
-                    if interval_upper_i < 0:
-                        # if interval_upper_i < 0 then our model thinks the race has been called for the RHS party.
-                        # error_diff < 0 means that the upper bound is larger than the prediction, so for those we set error_diff to be the gap between the prediction
-                        # and the imposed upper bound. This forces the difference between error_diff and the prediction to be exactly the imposed upper bound
-                        error_diff[i, error_diff[i] < 0] = (
-                            aggregate_perc_margin_total[i] - self.lhs_called_threshold
-                        ).flatten()
-                        # we are pushing divided error_B_2 such that divided_error_B_2 is greater than zero in 10% of cases (ie. that LHS party wins some simulations)
-                        # there will be some chance that this impacts our electoral college prediction upper bound
-                        divided_error_B_2_quantile = np.quantile(divided_error_B_2[i, :], q=0.9)
-                        if divided_error_B_2_quantile < 0:
-                            divided_error_B_2[i, :] += self.lhs_called_threshold - divided_error_B_2_quantile
 
                 if np.isclose(call, 1):
                     if interval_lower_i < 0:
@@ -1677,7 +1646,14 @@ class BootstrapElectionModel(BaseElectionModel):
         # guarantee overlap between the prediction interval and the point prediction
         interval_lower = np.minimum(interval_lower, aggregate_perc_margin_total - 0.001)
         interval_upper = np.maximum(interval_upper, aggregate_perc_margin_total + 0.001)
-
+        
+        if self._is_top_level_aggregate(aggregate):
+            stop_model_call = kwargs.get("stop_model_call", [])
+            stop_model_call = self._format_called_contests(stop_model_call, [], contests, True, None, False).reshape(-1, 1)
+            self.stop_model_call = stop_model_call
+            interval_lower = np.where((interval_lower > 0) & (stop_model_call == True), self.rhs_called_threshold, interval_lower)
+            interval_upper = np.where((interval_upper < 0) & (stop_model_call == True), self.lhs_called_threshold, interval_upper)
+        
         return PredictionIntervals(interval_lower, interval_upper)
 
     def get_national_summary_estimates(self, nat_sum_data_dict: dict, base_to_add: int | float, alpha: float) -> list:
@@ -1762,6 +1738,10 @@ class BootstrapElectionModel(BaseElectionModel):
         # with the predicted lower and upper bounds.
         lower_bound = min(aggregate_dem_vals_B_1.sum(axis=0).min(), aggregate_dem_vals_B_2.sum(axis=0).min())
         upper_bound = max(aggregate_dem_vals_B_1.sum(axis=0).max(), aggregate_dem_vals_B_2.sum(axis=0).max())
+
+        import pdb; pdb.set_trace()
+        # if self.stop_model_call:
+
 
         agg_pred = round(aggregate_dem_vals_pred + base_to_add, 2)
         agg_lower = round(max(interval_lower, lower_bound) + base_to_add, 2)
