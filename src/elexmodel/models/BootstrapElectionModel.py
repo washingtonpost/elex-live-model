@@ -745,7 +745,51 @@ class BootstrapElectionModel(BaseElectionModel):
         """
         This function will produce the extrapolated predictions for the non-reporting units.
 
+        At a high level, the idea is as follows: 
+
+        We have a set of reporting units that we have observed the results for over time. Even though we 
+        have only seen the reporting unit at a particular set of percent_expected_vote values, we can use 
+        them to come up with an estimate for the normalized margin at any percent_expected_vote value.
+
+        For example, if we saw a reporting county at both 50% and 70% expected vote, we can estimate the normalized 
+        margin at 60% expected vote via
+
+        margin_60 = [margin_50 * 50 + (batch_margin_70) * (60 - 50)] 60
+
+        where batch_margin_70 is the normalized margin of the batch of votes we saw when we recorded the 70%
+        vote for the county.
+
+        Now that we have these estimates for the normalized margin at any percent_expected_vote value, we can
+        use them to estimate how we ought to correct the current normalized margin to estimate the final value.
+
+        For example, let's imagine our non-reporting county is at 60% reporting.
+        For the previous county, we can look at the difference between margin_100 - margin_60 and 
+        that would be our best guess (from that example) for how to correct our extrapolation from the observed
+        normalized margin in the non-reporting county.
+
+        We can repeat this for all the reporting counties and then take the mean of the corrections to get our
+        best guess for how to correct the normalized margin for the non-reporting county.
+
+        The code also includes some additional logic to ensure that this extrapolation step is only used when
+        we can be confident in its validity. 
+        
+        1) We only estimate the correction using counties belonging to the same state. 
+        
+        2) We also only apply this method to a non-reporting county once it has passed a certain threshold of reporting. 
+        
+        3) We also do not use the correction estimate from a reporting county if the closest observed vote to the 
+        percent_expected_vote is too far away.
+
+        4) The correction estimates (obtained using VersionedResultsHandler) are also np.nan when there are 
+        irregularities in the reporting (e.g., there's a correction to the dem/gop vote totals that revises them downwards).
+
+        5) We only run this method in states with at least self.min_extrapolating_units counties available.
         """
+
+        # first we need to concatenate the current reporting/non-reporting units 
+        # to the end of the versioned_results stting sitting in the handler
+        # this is because the versioned_results_handler only sees *previous* runs
+        # of the model and doesn't have the latest set of reporting results 
         all_units = pd.concat([reporting_units, nonreporting_units], axis=0).copy()
         missing_columns = list(set(self.versioned_data_handler.data.columns) - set(all_units.columns))
         all_units[missing_columns] = self.versioned_data_handler.data[missing_columns].max()
@@ -754,15 +798,36 @@ class BootstrapElectionModel(BaseElectionModel):
             [self.versioned_data_handler.data, all_units[self.versioned_data_handler.data.columns]], axis=0
         )
 
+        """
+        The columns of the versioned_estimates dataframe are 
+        (geographic_unit_fips, percent_expected_vote, est_margin, est_correction, nearest_observed_vote)
+
+        TODO: remove the other junk columns
+
+        geographic_unit_fips: the fips code of the geographic unit
+
+        percent_expected_vote: the % expected vote for the geographic unit
+
+        est_margin: our estimate of the normalized margin at the value of percent_expected_vote
+
+        est_correction: the difference between the latest value of normalized margin and our estimate
+        we would use this value to "correct" our estimate of the normalized margin
+
+        nearest_observed_vote: the nearest observed vote to the percent_expected_vote that we used to
+        derive our estimate`
+        """ 
         versioned_estimates = self.versioned_data_handler.compute_versioned_margin_estimate()
 
         versioned_estimates["dist_to_observed"] = (
             versioned_estimates.percent_expected_vote - versioned_estimates.nearest_observed_vote
         ).abs()
 
+        # we are only going to use this method for county units whose current reporting is above
+        # the threshold
         modeling_filter = nonreporting_units.percent_expected_vote >= self.extrapolate_threshold
         modeling_filter &= nonreporting_units.geographic_unit_type == "county"
 
+        # we should only use counties that have reported to understand how we should extrapolate
         reporting_units_county = reporting_units[reporting_units.geographic_unit_type == "county"]
 
         # get the versioned results for the reporting units
@@ -770,14 +835,13 @@ class BootstrapElectionModel(BaseElectionModel):
             versioned_estimates.geographic_unit_fips.isin(reporting_units_county.geographic_unit_fips)
         ].copy()
 
+        # merge is to get postal_code information for the versioned units
         reporting_versioned_estimates = reporting_versioned_estimates.merge(
             reporting_units[["geographic_unit_fips", "postal_code"]], on="geographic_unit_fips", how="left"
         )
 
-        from tqdm import tqdm
-
         all_corrections = []
-        for postal_code in tqdm(nonreporting_units[modeling_filter].postal_code.unique()):
+        for postal_code in nonreporting_units[modeling_filter].postal_code.unique():
             # only extrapolate for the non-reporting units with percent_expected_vote > 50
             def _get_filter(df):
                 return df.postal_code == postal_code
@@ -785,17 +849,23 @@ class BootstrapElectionModel(BaseElectionModel):
             # if there are fewer than k reporting units, we can't extrapolate
             if _get_filter(reporting_units_county).sum() < self.min_extrapolating_units:
                 continue
-
+                
+            # filters for the units we are interested in
             reporting_filter = _get_filter(reporting_versioned_estimates)
             nonreporting_filter = _get_filter(nonreporting_units) & modeling_filter
 
             state_reporting_estimates = reporting_versioned_estimates[reporting_filter]
 
+            # get the percent_expected_vote for the nonreporting units we are looking to 
+            # extrapolate for
             nonreporting_merge = nonreporting_units.loc[
                 nonreporting_filter, ["geographic_unit_fips", "percent_expected_vote"]
             ].copy()
+            # round this value so that we can match to the values in state_reporting_estimates
             nonreporting_merge["percent_expected_vote"] = nonreporting_merge.percent_expected_vote.round()
 
+            # for each non-reporting unit, we have now identified the reporting units (and est. margin / correction)
+            # we will use to extrapolate the normalized margin
             est_corrections_df = pd.merge(
                 nonreporting_merge,
                 state_reporting_estimates,
@@ -809,7 +879,7 @@ class BootstrapElectionModel(BaseElectionModel):
             # get correction mean / std / max / min / count of units used for each correction
 
             def compute_correction_statistics(df):
-                df_filtered = df[(df.dist_to_observed < 5) & (df.est_correction.notnull())]
+                df_filtered = df[(df.dist_to_observed < 5) & (df.est_correction.notnull())] # TODO: probably don't hard code this as 5
                 if df_filtered.empty:
                     return pd.DataFrame(
                         {
@@ -836,12 +906,17 @@ class BootstrapElectionModel(BaseElectionModel):
             corrections = grouped_est_corrections.apply(compute_correction_statistics).reset_index()
             all_corrections.append(corrections)
 
+        # if no states have enough reporting units to extrapolate, return nans
         if len(all_corrections) == 0:
             return np.nan * np.ones((nonreporting_units.shape[0], 1)), np.nan * np.ones(
                 (nonreporting_units.shape[0], 1)
             )
+        
+        # concatenate all the corrections together (since we did it state-by-state)
         all_corrections = pd.concat(all_corrections, axis=0)
 
+        # merge correction data back into the nonreporting units so we can use add it
+        # to the current normalized margin and obtain our extrapolating prediction
         nonreporting_units = nonreporting_units.merge(
             all_corrections[
                 [
@@ -863,6 +938,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         prediction = nonreporting_units.pred_extrapolate.values.reshape(-1, 1)
 
+        # need to report an error estimate so we can ensemble this prediction with the OLS prediction
         if self.extrapolate_std_method == "std":
             prediction_std = nonreporting_units.est_correction_std.values.reshape(-1, 1)
         elif self.extrapolate_std_method == "max_min":
@@ -1756,7 +1832,7 @@ class BootstrapElectionModel(BaseElectionModel):
         interval_lower = max(interval_lower, lower_bound)
         interval_upper = min(interval_upper, upper_bound)
 
-        if self.stop_model_call:
+        if self.stop_model_call is not None:
             potential_losses[pred_states[self.stop_model_call]] = 1
             potential_gains[~pred_states[self.stop_model_call]] = 1
 

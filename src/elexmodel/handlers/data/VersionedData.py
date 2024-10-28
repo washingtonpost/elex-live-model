@@ -84,7 +84,7 @@ class VersionedDataHandler:
         margin_88 = [margin_80 + (batch_margin) * (88 - 80)] / 88
 
         This function does this for all percent reportings and all geographic units in the
-        versioned dataset. The final dataframe
+        versioned dataset. 
         """
         # Fill NaNs with 0
         if data is None:
@@ -93,7 +93,8 @@ class VersionedDataHandler:
             results = data
         results.fillna(0, inplace=True)
 
-        # Function to compute estimated margins for each group
+        # Function to compute estimated margins for each group defined by the geographic_unit_fips
+        # so you can think of this df as a dataframe of versioned results for one particular county
         def compute_estimated_margin(df):
             # Convert columns to NumPy arrays for faster computation
             results_turnout = df["results_turnout"].values
@@ -102,12 +103,14 @@ class VersionedDataHandler:
             results_gop = df["results_gop"].values
             results_weights = df["results_weights"].values
 
-            # Percent expected vote correction using NumPy
+            # sometimes the percent_expected_vote we have recorded is non-monotonic 
+            # because the AP adjusted its model after the fact. We correct for this here.
+            # we recompute the percent_expected_vote using the last reported value as the max
             perc_expected_vote_corr = np.divide(
                 results_turnout, results_turnout[-1], out=np.zeros_like(results_turnout), where=results_turnout[-1] != 0
             )
 
-            # check if perc_expected_vote_corr is monotone increasing
+            # check if perc_expected_vote_corr is monotone increasing (if not, give up and don't try to estimate a margin)
             if not np.all(np.diff(perc_expected_vote_corr) >= 0):
                 return pd.DataFrame(
                     {
@@ -117,12 +120,18 @@ class VersionedDataHandler:
                     }
                 )
 
+            # perc_expected_vote_corr is a value living in the unit interval [0, 1] - we want to rescale it to [0, 100]
+            # or [0, 93] or whatever the latest percent_expected_vote value is
             df["percent_expected_vote"] = perc_expected_vote_corr * percent_expected_vote[-1]
 
             # Compute batch_margin using NumPy
+            # this is the difference in dem_votes - the difference in gop_votes divided by the difference in total votes
+            # that is, this is the normalized margin in the batch of votes recorded between versions
             batch_margin = (
                 np.diff(results_dem, append=results_dem[-1]) - np.diff(results_gop, append=results_gop[-1])
             ) / np.diff(results_weights, append=results_weights[-1])
+
+            # nan values in batch_margin are due to div-by-zero since there's no change in votes
             batch_margin[np.isnan(batch_margin)] = 0  # Set NaN margins to 0
             df["batch_margin"] = batch_margin
 
@@ -135,6 +144,14 @@ class VersionedDataHandler:
                         "est_margin": np.nan * np.ones(101),
                     }
                 )
+            
+            # Compute margin estimates using the formula in the block comment above this function
+            # this is a bit hard to read because it's vectorized, but note that "perc" here is the
+            # percent_expected_vote we want to estimate the margin at and we are trying to identify
+            # both the normalized margin at the closest percent_expected_vote less than perc
+            # and the batch_margin that got us to the next percent_expected_vote (above perc)
+            # there are some subtleties here about handling the case where perc < the earliest recorded
+            # percent_expected_vote - I'll call them out below
 
             # Extract relevant data as NumPy arrays
             percent_vote = df["percent_expected_vote"].to_numpy()
@@ -150,6 +167,9 @@ class VersionedDataHandler:
             clipped_indices = np.clip(obs_indices, 0, len(percent_vote) - 1)  # Ensure valid indices
 
             # Vectorized calculation of est_margin
+            # when obs_indices = -1, this means that perc < the earliest recorded percent_expected_vote
+            # then we will "pretend" that the nearest_observed_vote is 0
+            # and then the est_margin should just be equal to the earliest recorded norm_margin
             observed_vote = np.where(obs_indices == -1, 0, percent_vote[clipped_indices])
             observed_norm_margin = np.where(obs_indices == -1, norm_margin[0], norm_margin[clipped_indices])
             observed_batch_margin = np.where(obs_indices == -1, norm_margin[0], batch_margin[clipped_indices])
