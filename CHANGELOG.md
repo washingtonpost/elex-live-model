@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.2.0-beta (10/28/2024)
+- feat: margin and turnout outler model [#114](https://github.com/washingtonpost/elex-live-model/pull/114)
+- feat: improved epsilon sampling [#116](https://github.com/washingtonpost/elex-live-model/pull/116)
+- feat: fit separate model for some states [#117](https://github.com/washingtonpost/elex-live-model/pull/117)
+- chore: shrink logging for non-modeled units [#120](https://github.com/washingtonpost/elex-live-model/pull/120)
+- fix: fix to outlier detection and separate states [#121](https://github.com/washingtonpost/elex-live-model/pull/121)
+
 ## 2.1.2 (10/24/2024)
 - feat: `agg_model_hard_threshold` now defaults to `True`
 - feat: using cross-validation to find the optimal OLS `lambda` for use in the `BootstrapElectionModel` is now optional due to the `lambda_` model parameter [#115](https://github.com/washingtonpost/elex-live-model/pull/115)
