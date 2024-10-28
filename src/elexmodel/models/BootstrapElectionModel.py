@@ -1842,8 +1842,8 @@ class BootstrapElectionModel(BaseElectionModel):
         interval_upper = min(interval_upper, upper_bound)
 
         if self.stop_model_call is not None:
-            potential_losses[pred_states[self.stop_model_call]] = 1
-            potential_gains[~pred_states[self.stop_model_call]] = 1
+            potential_losses[pred_states.astype(bool) & self.stop_model_call.flatten()] = 1
+            potential_gains[~pred_states.astype(bool) & self.stop_model_call.flatten()] = 1
 
             interval_lower = aggregate_dem_vals_pred - np.sum(
                 nat_sum_data_dict_sorted_vals.flatten() * potential_losses
