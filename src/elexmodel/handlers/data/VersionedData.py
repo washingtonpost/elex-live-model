@@ -84,7 +84,7 @@ class VersionedDataHandler:
         margin_88 = [margin_80 + (batch_margin) * (88 - 80)] / 88
 
         This function does this for all percent reportings and all geographic units in the
-        versioned dataset. 
+        versioned dataset.
         """
         # Fill NaNs with 0
         if data is None:
@@ -103,7 +103,7 @@ class VersionedDataHandler:
             results_gop = df["results_gop"].values
             results_weights = df["results_weights"].values
 
-            # sometimes the percent_expected_vote we have recorded is non-monotonic 
+            # sometimes the percent_expected_vote we have recorded is non-monotonic
             # because the AP adjusted its model after the fact. We correct for this here.
             # we recompute the percent_expected_vote using the last reported value as the max
             perc_expected_vote_corr = np.divide(
@@ -144,7 +144,7 @@ class VersionedDataHandler:
                         "est_margin": np.nan * np.ones(101),
                     }
                 )
-            
+
             # Compute margin estimates using the formula in the block comment above this function
             # this is a bit hard to read because it's vectorized, but note that "perc" here is the
             # percent_expected_vote we want to estimate the margin at and we are trying to identify

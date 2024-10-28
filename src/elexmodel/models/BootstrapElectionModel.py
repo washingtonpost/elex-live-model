@@ -745,13 +745,13 @@ class BootstrapElectionModel(BaseElectionModel):
         """
         This function will produce the extrapolated predictions for the non-reporting units.
 
-        At a high level, the idea is as follows: 
+        At a high level, the idea is as follows:
 
-        We have a set of reporting units that we have observed the results for over time. Even though we 
-        have only seen the reporting unit at a particular set of percent_expected_vote values, we can use 
+        We have a set of reporting units that we have observed the results for over time. Even though we
+        have only seen the reporting unit at a particular set of percent_expected_vote values, we can use
         them to come up with an estimate for the normalized margin at any percent_expected_vote value.
 
-        For example, if we saw a reporting county at both 50% and 70% expected vote, we can estimate the normalized 
+        For example, if we saw a reporting county at both 50% and 70% expected vote, we can estimate the normalized
         margin at 60% expected vote via
 
         margin_60 = [margin_50 * 50 + (batch_margin_70) * (60 - 50)] 60
@@ -763,7 +763,7 @@ class BootstrapElectionModel(BaseElectionModel):
         use them to estimate how we ought to correct the current normalized margin to estimate the final value.
 
         For example, let's imagine our non-reporting county is at 60% reporting.
-        For the previous county, we can look at the difference between margin_100 - margin_60 and 
+        For the previous county, we can look at the difference between margin_100 - margin_60 and
         that would be our best guess (from that example) for how to correct our extrapolation from the observed
         normalized margin in the non-reporting county.
 
@@ -771,25 +771,25 @@ class BootstrapElectionModel(BaseElectionModel):
         best guess for how to correct the normalized margin for the non-reporting county.
 
         The code also includes some additional logic to ensure that this extrapolation step is only used when
-        we can be confident in its validity. 
-        
-        1) We only estimate the correction using counties belonging to the same state. 
-        
-        2) We also only apply this method to a non-reporting county once it has passed a certain threshold of reporting. 
-        
-        3) We also do not use the correction estimate from a reporting county if the closest observed vote to the 
+        we can be confident in its validity.
+
+        1) We only estimate the correction using counties belonging to the same state.
+
+        2) We also only apply this method to a non-reporting county once it has passed a certain threshold of reporting.
+
+        3) We also do not use the correction estimate from a reporting county if the closest observed vote to the
         percent_expected_vote is too far away.
 
-        4) The correction estimates (obtained using VersionedResultsHandler) are also np.nan when there are 
+        4) The correction estimates (obtained using VersionedResultsHandler) are also np.nan when there are
         irregularities in the reporting (e.g., there's a correction to the dem/gop vote totals that revises them downwards).
 
         5) We only run this method in states with at least self.min_extrapolating_units counties available.
         """
 
-        # first we need to concatenate the current reporting/non-reporting units 
+        # first we need to concatenate the current reporting/non-reporting units
         # to the end of the versioned_results stting sitting in the handler
         # this is because the versioned_results_handler only sees *previous* runs
-        # of the model and doesn't have the latest set of reporting results 
+        # of the model and doesn't have the latest set of reporting results
         all_units = pd.concat([reporting_units, nonreporting_units], axis=0).copy()
         missing_columns = list(set(self.versioned_data_handler.data.columns) - set(all_units.columns))
         all_units[missing_columns] = self.versioned_data_handler.data[missing_columns].max()
@@ -799,7 +799,7 @@ class BootstrapElectionModel(BaseElectionModel):
         )
 
         """
-        The columns of the versioned_estimates dataframe are 
+        The columns of the versioned_estimates dataframe are
         (geographic_unit_fips, percent_expected_vote, est_margin, est_correction, nearest_observed_vote)
 
         TODO: remove the other junk columns
@@ -815,7 +815,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         nearest_observed_vote: the nearest observed vote to the percent_expected_vote that we used to
         derive our estimate`
-        """ 
+        """
         versioned_estimates = self.versioned_data_handler.compute_versioned_margin_estimate()
 
         versioned_estimates["dist_to_observed"] = (
@@ -849,14 +849,14 @@ class BootstrapElectionModel(BaseElectionModel):
             # if there are fewer than k reporting units, we can't extrapolate
             if _get_filter(reporting_units_county).sum() < self.min_extrapolating_units:
                 continue
-                
+
             # filters for the units we are interested in
             reporting_filter = _get_filter(reporting_versioned_estimates)
             nonreporting_filter = _get_filter(nonreporting_units) & modeling_filter
 
             state_reporting_estimates = reporting_versioned_estimates[reporting_filter]
 
-            # get the percent_expected_vote for the nonreporting units we are looking to 
+            # get the percent_expected_vote for the nonreporting units we are looking to
             # extrapolate for
             nonreporting_merge = nonreporting_units.loc[
                 nonreporting_filter, ["geographic_unit_fips", "percent_expected_vote"]
@@ -879,7 +879,9 @@ class BootstrapElectionModel(BaseElectionModel):
             # get correction mean / std / max / min / count of units used for each correction
 
             def compute_correction_statistics(df):
-                df_filtered = df[(df.dist_to_observed < 5) & (df.est_correction.notnull())] # TODO: probably don't hard code this as 5
+                df_filtered = df[
+                    (df.dist_to_observed < 5) & (df.est_correction.notnull())
+                ]  # TODO: probably don't hard code this as 5
                 if df_filtered.empty:
                     return pd.DataFrame(
                         {
@@ -911,7 +913,7 @@ class BootstrapElectionModel(BaseElectionModel):
             return np.nan * np.ones((nonreporting_units.shape[0], 1)), np.nan * np.ones(
                 (nonreporting_units.shape[0], 1)
             )
-        
+
         # concatenate all the corrections together (since we did it state-by-state)
         all_corrections = pd.concat(all_corrections, axis=0)
 
