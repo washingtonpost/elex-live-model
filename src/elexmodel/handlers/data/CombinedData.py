@@ -48,6 +48,7 @@ class CombinedDataHandler:
             data.update(data[result_cols].fillna(value=0))
             data.loc[indices_with_null_val, "percent_expected_vote"] = 0
 
+        self.n_minimum_for_outlier_detection_model = 20
         self.data = data
 
     def get_units(
@@ -204,7 +205,9 @@ class CombinedDataHandler:
             fixed_effect for fixed_effect in fixed_effects if fixed_effect in reporting_units.columns
         ]
         featurizer = Featurizer(features=features_to_use, fixed_effects=fixed_effects_to_use)
-        x_data = featurizer.prepare_data(reporting_units)
+        x_data = featurizer.prepare_data(
+            reporting_units, center_features=False, scale_features=False, add_intercept=True
+        )
         y = reporting_units[response_variable]
         qr = QuantileRegressionSolver()
         qr.fit(x_data.values, y.values, weights=reporting_units["baseline_weights"].values, taus=[0.5])
@@ -245,7 +248,7 @@ class CombinedDataHandler:
 
         non_modeled_units_list = [units_blocklisted, units_with_zero_baseline, units_with_strange_turnout_factor]
 
-        if fit_turnout_outlier_model:
+        if fit_turnout_outlier_model and reporting_units.shape[0] > self.n_minimum_for_outlier_detection_model:
             units_with_strange_turnout_factor_modeled = self._fit_outlier_detection_model(
                 reporting_units, "turnout_factor", outlier_z_threshold
             )
@@ -253,7 +256,7 @@ class CombinedDataHandler:
             non_modeled_units_list.append(units_with_strange_turnout_factor_modeled)
 
         if "margin" in self.estimands:
-            if fit_margin_outlier_model:
+            if fit_margin_outlier_model and reporting_units.shape[0] > self.n_minimum_for_outlier_detection_model:
                 units_with_strange_margin_change_modeled = self._fit_outlier_detection_model(
                     reporting_units, "results_normalized_margin", outlier_z_threshold
                 )

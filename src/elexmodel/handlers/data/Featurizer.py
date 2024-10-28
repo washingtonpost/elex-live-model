@@ -67,6 +67,22 @@ class Featurizer:
         """
         return [x for x in list_ if x.startswith(fe)]
 
+    def _sort_features(self, features: list) -> list:
+        """
+        Sort features by custom order
+        """
+        # this makes sure that the intercept comes first and the baseline_normalize_margin(s) come next
+        # which we need to tell the model which features not to regularize
+        custom_order = ["intercept", "baseline_normalized_margin"]
+        return list(
+            sorted(
+                features,
+                key=lambda x: custom_order.index(next((start for start in custom_order if x.startswith(start)), None))
+                if any(x.startswith(start) for start in custom_order)
+                else len(custom_order),
+            )
+        )
+
     def prepare_data(
         self, df: pd.DataFrame, center_features: bool = True, scale_features: bool = True, add_intercept: bool = True
     ) -> pd.DataFrame:
@@ -88,6 +104,10 @@ class Featurizer:
         # and we zero out the original feature column for those states
         additional_state_features = []
         for state in self.states_for_separate_model:
+            # this makes sure that we produce these columns for reporting states only, otherwise
+            # the entire column for that state_feature will be zero
+            if state not in df[np.isclose(df.reporting, 1)].postal_code.unique():
+                continue
             mask = df.postal_code == state
             for feature in self.features:
                 state_feature = f"{feature}_{state}"
@@ -110,13 +130,6 @@ class Featurizer:
             # and we zero out the original intercept column for those stattes
             for state in self.states_for_separate_model:
                 mask = df.postal_code == state
-                # if we have a postal code fixed effect then we do not want a separate intercept column for that state
-                # because the fixed effect takes the role of that column (ie. those would be linearly dependent)
-                # but we still want to zero out the original intercept for those states.
-                if "postal_code" not in self.fixed_effect_cols:
-                    state_intercept = f"intercept_{state}"
-                    df[state_intercept] = df["intercept"].where(mask, 0)
-                    self.complete_features.append(state_intercept)
                 df.loc[mask, "intercept"] = 0
 
             # if fixed effects are on then we have redundant with the state specific intercepts
@@ -172,9 +185,11 @@ class Featurizer:
         # (so all fixed effect values in the complete data excluding the ones dropped for multicolinearity)
         self.complete_features += self.features + additional_state_features + self.expanded_fixed_effects
         self.active_features += self.features + additional_state_features + self.active_fixed_effects
-        df = df[self.complete_features]
 
-        return df
+        self.complete_features = self._sort_features(self.complete_features)
+        self.active_features = self._sort_features(self.active_features)
+
+        return df[self.complete_features]
 
     def filter_to_active_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """

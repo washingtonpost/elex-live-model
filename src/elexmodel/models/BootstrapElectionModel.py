@@ -145,7 +145,7 @@ class BootstrapElectionModel(BaseElectionModel):
                     lambda_=lambda_,
                     fit_intercept=True,
                     regularize_intercept=False,
-                    n_feat_ignore_reg=1,
+                    n_feat_ignore_reg=1 + len(self.states_for_separate_model),
                 )
                 y_hat_lambda = ols_lambda.predict(x_test)
                 # error is the weighted sum of squares of the residual between
@@ -911,7 +911,7 @@ class BootstrapElectionModel(BaseElectionModel):
             lambda_=optimal_lambda_y,
             fit_intercept=True,
             regularize_intercept=False,
-            n_feat_ignore_reg=1,
+            n_feat_ignore_reg=1 + len(self.states_for_separate_model),
         )
         ols_z = OLSRegressionSolver()
         ols_z.fit(
@@ -921,7 +921,7 @@ class BootstrapElectionModel(BaseElectionModel):
             lambda_=optimal_lambda_z,
             fit_intercept=True,
             regularize_intercept=False,
-            n_feat_ignore_reg=1,
+            n_feat_ignore_reg=1 + len(self.states_for_separate_model),
         )
 
         # step 2) calculate the fitted values
@@ -1015,7 +1015,7 @@ class BootstrapElectionModel(BaseElectionModel):
             normal_eqs=ols_y.normal_eqs,
             fit_intercept=True,
             regularize_intercept=False,
-            n_feat_ignore_reg=1,
+            n_feat_ignore_reg=1 + len(self.states_for_separate_model),
         )
         ols_z_B = OLSRegressionSolver()
         ols_z_B.fit(
@@ -1025,9 +1025,9 @@ class BootstrapElectionModel(BaseElectionModel):
             normal_eqs=ols_z.normal_eqs,
             fit_intercept=True,
             regularize_intercept=False,
-            n_feat_ignore_reg=1,
+            n_feat_ignore_reg=1 + len(self.states_for_separate_model),
         )
-
+        LOG.info("features: \n %s", self.featurizer.active_features)
         LOG.info("orig. ols coefficients, normalized margin: \n %s", ols_y.coefficients.flatten())
         LOG.info("boot. ols coefficients, normalized margin: \n %s", ols_y_B.coefficients.mean(axis=-1))
 
