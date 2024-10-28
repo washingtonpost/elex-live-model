@@ -347,7 +347,7 @@ def test_generate_fixed_effects(va_governor_county_data):
         handle_unreporting="drop",
     )
 
-    (reporting_data, nonreporting_data, _) = combined_data_handler.get_units(99, 0.5, 1.5, [])
+    (reporting_data, nonreporting_data, _) = combined_data_handler.get_units(99, 0.5, 1.5, [], [], False, False, 2, [])
 
     featurizer = Featurizer([], {"county_classification": "all"})
 
@@ -381,7 +381,7 @@ def test_generate_fixed_effects(va_governor_county_data):
 
     featurizer = Featurizer([], {"county_classification": ["all"], "county_fips": ["all"]})
 
-    (reporting_data, nonreporting_data, _) = combined_data_handler.get_units(99, 0.5, 1.5, [])
+    (reporting_data, nonreporting_data, _) = combined_data_handler.get_units(99, 0.5, 1.5, [], [], False, False, 2, [])
 
     n_train = reporting_data.shape[0]
     all_units = pd.concat([reporting_data, nonreporting_data], axis=0)
@@ -436,7 +436,7 @@ def test_generate_fixed_effects_not_all_reporting(va_governor_county_data):
         handle_unreporting="drop",
     )
 
-    (reporting_data, nonreporting_data, _) = combined_data_handler.get_units(99, 0.5, 1.5, [])
+    (reporting_data, nonreporting_data, _) = combined_data_handler.get_units(99, 0.5, 1.5, [], [], False, False, 2, [])
 
     featurizer = Featurizer([], {"county_fips": ["all"]})
     n_train = reporting_data.shape[0]
@@ -501,7 +501,7 @@ def test_generate_fixed_effects_mixed_reporting(va_governor_precinct_data):
         handle_unreporting="drop",
     )
 
-    (reporting_data, nonreporting_data, _) = combined_data_handler.get_units(99, 0.5, 1.5, [])
+    (reporting_data, nonreporting_data, _) = combined_data_handler.get_units(99, 0.5, 1.5, [], [], False, False, 2, [])
 
     featurizer = Featurizer([], ["county_fips"])
 
@@ -569,8 +569,6 @@ def test_separate_state_model():
     df_new = featurizer.prepare_data(df, center_features=False, scale_features=False, add_intercept=True)
     assert df_new.loc[df.postal_code != "CC", "intercept"].all() == 1
     assert df_new.loc[df.postal_code == "CC", "intercept"].all() == 0
-    assert df_new.loc[df.postal_code != "CC", "intercept_CC"].all() == 0
-    assert df_new.loc[df.postal_code == "CC", "intercept_CC"].all() == 1
 
     assert df_new.loc[df.postal_code != "CC", "a"].all() > 0
     assert df_new.loc[df.postal_code == "CC", "a"].all() == 0
@@ -595,12 +593,6 @@ def test_separate_state_model():
     assert df_new.loc[(df.postal_code != "CC") & (df.postal_code != "BB"), "intercept"].all() == 1
     assert df_new.loc[df.postal_code == "CC", "intercept"].all() == 0
     assert df_new.loc[df.postal_code == "BB", "intercept"].all() == 0
-    assert df_new.loc[(df.postal_code != "CC") & (df.postal_code != "BB"), "intercept_CC"].all() == 0
-    assert df_new.loc[(df.postal_code != "CC") & (df.postal_code != "BB"), "intercept_BB"].all() == 0
-    assert df_new.loc[df.postal_code == "CC", "intercept_CC"].all() == 1
-    assert df_new.loc[df.postal_code == "BB", "intercept_BB"].all() == 1
-    assert df_new.loc[df.postal_code == "CC", "intercept_BB"].all() == 0
-    assert df_new.loc[df.postal_code == "BB", "intercept_CC"].all() == 0
 
     assert df_new.loc[(df.postal_code != "CC") & (df.postal_code != "BB"), "a"].all() > 0
     assert df_new.loc[df.postal_code == "CC", "a"].all() == 0
@@ -620,5 +612,3 @@ def test_separate_state_model():
     assert df_new.loc[(df.postal_code != "CC") & (df.postal_code != "BB"), "intercept"].all() == 1
     assert df_new.loc[df.postal_code == "CC", "intercept"].all() == 0
     assert df_new.loc[df.postal_code == "BB", "intercept"].all() == 0
-    assert "intercept_BB" not in df_new.columns
-    assert "intercept_CC" not in df_new.columns

@@ -60,6 +60,7 @@ class BootstrapElectionModel(BaseElectionModel):
             "agg_model_hard_threshold", True
         )  # use sigmoid or hard thresold when calculating agg model
         self.district_election = model_settings.get("district_election", False)
+        self.lambda_ = model_settings.get("lambda_", None)  # regularization parameter for OLS
 
         # save versioned data for later use
         self.versioned_data_handler = versioned_data_handler
@@ -153,7 +154,7 @@ class BootstrapElectionModel(BaseElectionModel):
                     lambda_=lambda_,
                     fit_intercept=True,
                     regularize_intercept=False,
-                    n_feat_ignore_reg=1,
+                    n_feat_ignore_reg=1 + len(self.states_for_separate_model),
                 )
                 y_hat_lambda = ols_lambda.predict(x_test)
                 # error is the weighted sum of squares of the residual between
@@ -1109,8 +1110,14 @@ class BootstrapElectionModel(BaseElectionModel):
         )
 
         # we use k-fold cross validation to find the optimal lambda for our OLS regression
-        optimal_lambda_y = self.cv_lambda(x_train, y_train, np.logspace(-3, 2, 20), weights=weights_train)
-        optimal_lambda_z = self.cv_lambda(x_train, z_train, np.logspace(-3, 2, 20), weights=weights_train)
+        if self.lambda_ is None:
+            optimal_lambda_y = self.cv_lambda(x_train, y_train, np.logspace(-3, 2, 20), weights=weights_train)
+            optimal_lambda_z = self.cv_lambda(x_train, z_train, np.logspace(-3, 2, 20), weights=weights_train)
+            LOG.info(f"Optimal lambda for y: {optimal_lambda_y}, Optimal lambda for z: {optimal_lambda_z}")
+        else:
+            optimal_lambda_y = self.lambda_
+            optimal_lambda_z = self.lambda_
+            LOG.info(f"Using user provided lambda: {self.lambda_}")
 
         # step 1) fit the initial model
         # we don't want to regularize the intercept or the coefficient for baseline_normalized_margin
@@ -1122,7 +1129,7 @@ class BootstrapElectionModel(BaseElectionModel):
             lambda_=optimal_lambda_y,
             fit_intercept=True,
             regularize_intercept=False,
-            n_feat_ignore_reg=1,
+            n_feat_ignore_reg=1 + len(self.states_for_separate_model),
         )
         ols_z = OLSRegressionSolver()
         ols_z.fit(
@@ -1132,7 +1139,7 @@ class BootstrapElectionModel(BaseElectionModel):
             lambda_=optimal_lambda_z,
             fit_intercept=True,
             regularize_intercept=False,
-            n_feat_ignore_reg=1,
+            n_feat_ignore_reg=1 + len(self.states_for_separate_model),
         )
 
         # step 2) calculate the fitted values
@@ -1226,7 +1233,7 @@ class BootstrapElectionModel(BaseElectionModel):
             normal_eqs=ols_y.normal_eqs,
             fit_intercept=True,
             regularize_intercept=False,
-            n_feat_ignore_reg=1,
+            n_feat_ignore_reg=1 + len(self.states_for_separate_model),
         )
         ols_z_B = OLSRegressionSolver()
         ols_z_B.fit(
@@ -1236,9 +1243,9 @@ class BootstrapElectionModel(BaseElectionModel):
             normal_eqs=ols_z.normal_eqs,
             fit_intercept=True,
             regularize_intercept=False,
-            n_feat_ignore_reg=1,
+            n_feat_ignore_reg=1 + len(self.states_for_separate_model),
         )
-
+        LOG.info("features: \n %s", self.featurizer.active_features)
         LOG.info("orig. ols coefficients, normalized margin: \n %s", ols_y.coefficients.flatten())
         LOG.info("boot. ols coefficients, normalized margin: \n %s", ols_y_B.coefficients.mean(axis=-1))
 
