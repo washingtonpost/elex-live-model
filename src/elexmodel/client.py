@@ -1,5 +1,4 @@
 import logging
-import pprint
 from collections import defaultdict
 
 import numpy as np
@@ -377,13 +376,14 @@ class ModelClient:
             There are {n_nonreporting_units} nonreporting units."""
         )
         if len(non_modeled_units) > 0:
-            non_modeled_units = (
-                non_modeled_units.groupby("unit_category")[["postal_code", "geographic_unit_fips"]]
-                .apply(lambda x: list(x.itertuples(index=False, name=None)))
-                .to_dict()
-            )
-            non_modeled_units_pprint = pprint.pformat(non_modeled_units)
-            LOG.info(f"non-modeled units:\n{non_modeled_units_pprint}")
+            for unit_category in sorted(set(non_modeled_units["unit_category"])):
+                category_non_modeled_units = (
+                    non_modeled_units[non_modeled_units["unit_category"] == unit_category]
+                    .groupby("postal_code")
+                    .agg({"geographic_unit_fips": list})
+                    .to_dict()["geographic_unit_fips"]
+                )
+                LOG.info(f"{unit_category}: {category_non_modeled_units}")
 
         if n_reporting_expected_units < minimum_reporting_units_max:
             raise ModelNotEnoughSubunitsException(
