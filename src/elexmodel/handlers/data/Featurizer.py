@@ -130,13 +130,6 @@ class Featurizer:
             # and we zero out the original intercept column for those stattes
             for state in self.states_for_separate_model:
                 mask = df.postal_code == state
-                # if we have a postal code fixed effect then we do not want a separate intercept column for that state
-                # because the fixed effect takes the role of that column (ie. those would be linearly dependent)
-                # but we still want to zero out the original intercept for those states.
-                if "postal_code" not in self.fixed_effect_cols:
-                    state_intercept = f"intercept_{state}"
-                    df[state_intercept] = df["intercept"].where(mask, 0)
-                    self.complete_features.append(state_intercept)
                 df.loc[mask, "intercept"] = 0
 
             # if fixed effects are on then we have redundant with the state specific intercepts
