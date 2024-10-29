@@ -1273,9 +1273,9 @@ class BootstrapElectionModel(BaseElectionModel):
             extrap_filter = ~(np.isnan(y_test_pred_extrap) | np.isnan(extrap_std)).flatten()
             model_std = y_test_pred_B.std(axis=1).reshape(-1, 1)
 
-            model_weight = 1 / np.clip(model_std**2, 1e-5, None)
-            extrap_weight = 1 / np.clip(extrap_std**2, 1e-5, None)
-            model_weight = model_weight / (model_weight + extrap_weight)
+            model_var = np.clip(model_std**2, 1e-5, None)
+            extrap_var = np.clip(extrap_std**2, 1e-5, None)
+            model_weight = extrap_var / (model_var + extrap_var)
 
             y_test_pred_B[extrap_filter] = (model_weight * y_test_pred_B + (1 - model_weight) * y_test_pred_extrap)[
                 extrap_filter
