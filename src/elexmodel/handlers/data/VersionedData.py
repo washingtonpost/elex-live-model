@@ -60,6 +60,8 @@ class VersionedDataHandler:
 
         if self.election_id.startswith("2020-11-03_USA_G"):
             path = "elex-models-prod/2020-general/results/pres/current.csv"
+        elif self.election_id.startswith("2024-11-05_USA_G"):
+            path = f"{S3_FILE_PATH}/{self.election_id}/results/{self.office_id}/{self.geographic_unit_type}/current_counties.csv"
         else:
             path = f"{S3_FILE_PATH}/{self.election_id}/results/{self.office_id}/{self.geographic_unit_type}/current.csv"
 
