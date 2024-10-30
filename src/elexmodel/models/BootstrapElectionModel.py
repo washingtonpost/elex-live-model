@@ -1653,12 +1653,12 @@ class BootstrapElectionModel(BaseElectionModel):
         aggregate_error_B_4 = aggregate_z_total_pred
 
         # (sum_{i = 1}^N w_i * \tilde_{y_i}^b * \tilde_{z_i}^b) /  (\sum_{i = 1}^N w_i * \tilde_{z_i}^b)
-        divided_error_B_1 = np.nan_to_num(aggregate_error_B_1 / aggregate_error_B_3)
+        self.divided_error_B_1 = np.nan_to_num(aggregate_error_B_1 / aggregate_error_B_3)
 
         # (\sum_{i = 1}^N w_i * (\hat_{y_i} + \residual_{y, i}^b) *
         # (\hat{z_i} + \residual_{z, i}^b)) /
         # (\sum_{i = 1}^N w_i * (\hat{z_i} + \residual_{z, i}^b))
-        divided_error_B_2 = np.nan_to_num(aggregate_error_B_2 / aggregate_error_B_4)
+        self.divided_error_B_2 = np.nan_to_num(aggregate_error_B_2 / aggregate_error_B_4)
 
         # we also need to re-compute our aggregate prediction to add to our error to get the prediction interval
         # first the turnout component
@@ -1671,54 +1671,14 @@ class BootstrapElectionModel(BaseElectionModel):
         )
         # calculate normalized margin in the aggregate prediction
         # turnout prediction could be zero, so convert NaN -> 0
-        aggregate_perc_margin_total = np.nan_to_num(aggregate_yz_total / aggregate_z_total).reshape(-1, 1)
+        if self._is_top_level_aggregate(aggregate):
+            aggregate_perc_margin_total = self.aggregate_pred_margin
+        else:
+            aggregate_perc_margin_total = np.nan_to_num(aggregate_yz_total / aggregate_z_total).reshape(-1, 1)
 
         lower_q, upper_q = self._get_quantiles(alpha)
 
-        error_diff = divided_error_B_1 - divided_error_B_2
-
-        # saves the aggregate errors in case we want to generate somem form of national predictions (like ecv)
-        if self._is_top_level_aggregate(aggregate):
-            aggregate_perc_margin_total = self.aggregate_pred_margin
-
-            lhs_called_contests = kwargs.get("lhs_called_contests", [])
-            rhs_called_contests = kwargs.get("rhs_called_contests", [])
-            called_contests = self._format_called_contests(lhs_called_contests, rhs_called_contests, contests, 1, 0, -1)
-
-            interval_upper, interval_lower = (
-                aggregate_perc_margin_total - np.quantile(error_diff, q=[lower_q, upper_q], axis=-1).T
-            ).T
-
-            for i, call in enumerate(called_contests):
-                interval_lower_i = interval_lower[i]
-                interval_upper_i = interval_upper[i]
-
-                if np.isclose(call, 1):
-                    if interval_lower_i < 0:
-                        # if a contest has been called for the LHS party but the interval_lower is below zero (ie. our model does not think that this is called)
-                        # error_diff > 0 means that lower bound is smaller than the prediction, so for those we set the error_diff to be the gap between the prediction
-                        # and the imposed lower bound. This forces the difference between the error_diff and the prediction to be exactly the imposed lower bound
-                        error_diff[i, error_diff[i] > 0] = (
-                            aggregate_perc_margin_total[i] - self.lhs_called_threshold
-                        ).flatten()
-                    # for error_B_1 and error_B_2 we can set all of them to the imposed lower bound, because we no longer care about doing inference on the intervals
-                    # ie. the winner is fixed now so we no longer care about doing inference on the margin
-                    # NOTE: we cannot do this for error_diff because we still want the upper bound in case to be what it would be without the race call
-                    divided_error_B_1[i, :] = self.lhs_called_threshold
-                    divided_error_B_2[i, :] = self.lhs_called_threshold
-                elif np.isclose(call, 0):
-                    if interval_upper_i > 0:
-                        # if a contest has been called for the RHS party but the interval_upper is larger than zero (ie. our model does not think this is called)
-                        # error_diff < 0 means that the upper bound is larger than the prediction, so for those we set error_diff to be the gap between the prediction
-                        # and the imposed upper bound. This forces the difference between the error diff and the prediction to be the imposed upper bound
-                        error_diff[i, error_diff[i] < 0] = (
-                            self.rhs_called_threshold - aggregate_perc_margin_total[i]
-                        ).flatten()
-                    divided_error_B_1[i, :] = self.rhs_called_threshold
-                    divided_error_B_2[i, :] = self.rhs_called_threshold
-
-            self.divided_error_B_1 = divided_error_B_1
-            self.divided_error_B_2 = divided_error_B_2
+        error_diff = self.divided_error_B_1 - self.divided_error_B_2
 
         interval_upper, interval_lower = (
             aggregate_perc_margin_total - np.quantile(error_diff, q=[lower_q, upper_q], axis=-1).T
@@ -1732,6 +1692,24 @@ class BootstrapElectionModel(BaseElectionModel):
         interval_upper = np.maximum(interval_upper, aggregate_perc_margin_total + 0.001)
 
         if self._is_top_level_aggregate(aggregate):
+            # adjust intervals for called contests if necessary
+            lhs_called_contests = kwargs.get("lhs_called_contests", [])
+            rhs_called_contests = kwargs.get("rhs_called_contests", [])
+            called_contests = self._format_called_contests(lhs_called_contests, rhs_called_contests, contests, 1, 0, -1)
+            self.called_contests = called_contests.reshape(-1, 1)
+            interval_lower = np.where(
+                (interval_lower < 0)
+                & np.isclose(self.called_contests, 1),  # current bound is lower than 0 but called for dems
+                self.lhs_called_threshold,  # replace with left lower bound
+                interval_lower,  # otherwise keep the same
+            )
+            interval_upper = np.where(
+                (interval_upper > 0)
+                & np.isclose(self.called_contests, 0),  # current bound is higher than 0 but called for gop
+                self.rhs_called_threshold,  # replace with right upper bound
+                interval_upper,  # otherwise keep the same
+            )
+
             stop_model_call = kwargs.get("stop_model_call", [])
             stop_model_call = self._format_called_contests(stop_model_call, [], contests, True, None, False).reshape(
                 -1, 1
@@ -1839,6 +1817,11 @@ class BootstrapElectionModel(BaseElectionModel):
 
         interval_lower = max(interval_lower, lower_bound)
         interval_upper = min(interval_upper, upper_bound)
+
+        if self.called_contests is not None:
+            # if there is a call, there is no uncertainty in the outcome
+            potential_losses[~np.isclose(self.called_contests.flatten(), -1)] = 0
+            potential_gains[~np.isclose(self.called_contests.flatten(), -1)] = 0
 
         if self.stop_model_call is not None:
             potential_losses[pred_states.astype(bool) & self.stop_model_call.flatten()] = 1
