@@ -1,9 +1,9 @@
 from __future__ import annotations  # pylint: disable=too-many-lines
 
 import logging
+from datetime import timedelta
 from itertools import combinations
 
-from datetime import timedelta
 import numpy as np
 import pandas as pd
 from elexsolver.OLSRegressionSolver import OLSRegressionSolver
@@ -796,8 +796,8 @@ class BootstrapElectionModel(BaseElectionModel):
         all_units = pd.concat([reporting_units, nonreporting_units], axis=0).copy()
         missing_columns = list(set(self.versioned_data_handler.data.columns) - set(all_units.columns))
         all_units[missing_columns] = self.versioned_data_handler.data[missing_columns].max()
-        all_units['last_modified'] = self.versioned_data_handler.data['last_modified'].max() + timedelta(seconds=1)
-        
+        all_units["last_modified"] = self.versioned_data_handler.data["last_modified"].max() + timedelta(seconds=1)
+
         self.versioned_data_handler.data = pd.concat(
             [self.versioned_data_handler.data, all_units[self.versioned_data_handler.data.columns]], axis=0
         )

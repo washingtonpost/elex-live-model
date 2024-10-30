@@ -105,7 +105,11 @@ class S3VersionUtil:
         if "Versions" in response:
             versions = response["Versions"]
 
-        if response["IsTruncated"] and len(versions) > 0 and (self.start_date is None or versions[-1]["LastModified"] >= self.start_date):
+        if (
+            response["IsTruncated"]
+            and len(versions) > 0
+            and (self.start_date is None or versions[-1]["LastModified"] >= self.start_date)
+        ):
             versions += self.list_versions(
                 path,
                 KeyMarker=response["NextKeyMarker"],

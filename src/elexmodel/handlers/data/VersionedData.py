@@ -1,7 +1,8 @@
+from datetime import datetime
+
 import numpy as np
 import pandas as pd
 from dateutil import tz
-from datetime import datetime
 
 from elexmodel.handlers import s3
 from elexmodel.handlers.data.Estimandizer import Estimandizer
@@ -183,7 +184,7 @@ class VersionedDataHandler:
             est_margins = np.divide(
                 est_margins, percs, where=percs != 0, out=np.zeros_like(est_margins)
             )  # Handle div-by-zero
-                
+
             # Return a DataFrame with the multi-index (geographic_unit_fips, perc)
             return pd.DataFrame(
                 {
