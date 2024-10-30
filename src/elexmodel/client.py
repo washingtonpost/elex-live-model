@@ -9,6 +9,7 @@ from elexmodel.handlers.config import ConfigHandler
 from elexmodel.handlers.data.CombinedData import CombinedDataHandler
 from elexmodel.handlers.data.ModelResults import ModelResultsHandler
 from elexmodel.handlers.data.PreprocessedData import PreprocessedDataHandler
+from elexmodel.handlers.data.VersionedData import VersionedDataHandler
 from elexmodel.logging import initialize_logging
 from elexmodel.models.BootstrapElectionModel import BootstrapElectionModel
 from elexmodel.models.ConformalElectionModel import ConformalElectionModel
@@ -108,14 +109,6 @@ class ModelClient:
                 not isinstance(model_parameters["lambda_"], (float, int)) or model_parameters["lambda_"] < 0
             ):
                 raise ValueError("lambda is not valid. It has to be numeric and greater than zero.")
-            if "turnout_factor_lower" in model_parameters and not isinstance(
-                model_parameters["turnout_factor_lower"], (float, int)
-            ):
-                raise ValueError("turnout_factor_lower is not valid. Has to be a float.")
-            if "turnout_factor_upper" in model_parameters and not isinstance(
-                model_parameters["turnout_factor_upper"], (float, int)
-            ):
-                raise ValueError("turnout_factor_upper is not valid. Has to be a float.")
             if pi_method == "gaussian":
                 if "beta" in model_parameters and not isinstance(model_parameters["beta"], (int, float)):
                     raise ValueError("beta is not valid. Has to be either an integer or a float.")
@@ -233,7 +226,8 @@ class ModelClient:
         turnout_factor_z_threshold = kwargs.get("turnout_factor_z", 4.75)
 
         district_election = False
-        if office in {"H", "Y", "Z"}:
+        # if office starts with one of these letters
+        if office.startswith("H") or office.startswith("Y") or office.startswith("Z"):
             district_election = True
 
         model_settings = {
@@ -297,9 +291,45 @@ class ModelClient:
             handle_unreporting=handle_unreporting,
         )
 
+        unit_blocklist = model_parameters.get("unit_blocklist", [])
+        postal_code_blocklist = model_parameters.get("postal_code_blocklist", [])
+        fit_margin_outlier_model = model_parameters.get("fit_margin_outlier_model", True)
+        fit_turnout_outlier_model = model_parameters.get("fit_turnout_outlier_model", True)
+        outlier_z_threshold = model_parameters.get("outlier_z_threshold", 2.0)
+
         (reporting_units, nonreporting_units, unexpected_units) = data.get_units(
-            percent_reporting_threshold, aggregates, turnout_factor_z_threshold
+            percent_reporting_threshold,
+            unit_blocklist,
+            postal_code_blocklist,
+            fit_margin_outlier_model,
+            fit_turnout_outlier_model,
+            outlier_z_threshold,
+            aggregates,
+            turnout_factor_z_threshold,
         )
+
+        if model_parameters.get("extrapolation", False):
+            LOG.info("Getting versioned data for extrapolation rule")
+            versioned_data_handler = VersionedDataHandler(
+                self.election_id,
+                self.office,
+                self.geographic_unit_type,
+                estimands,
+                start_date=model_parameters.get("versioned_start_date", None),
+                end_date=model_parameters.get("versioned_end_date", None),
+            )
+            LOG.info(
+                "Fetching versioned data between %s and %s",
+                versioned_data_handler.start_date,
+                versioned_data_handler.end_date,
+            )
+            versioned_results = versioned_data_handler.get_versioned_results(
+                model_settings.get("versioned_filepath", None)
+            )
+            if versioned_results is None:
+                versioned_data_handler = None
+        else:
+            versioned_data_handler = None
 
         LOG.info(
             "Model parameters: \n prediction intervals: %s, percent reporting threshold: %s, \
@@ -316,7 +346,9 @@ class ModelClient:
         elif pi_method == "gaussian":
             self.model = GaussianElectionModel(model_settings=model_settings)
         elif pi_method == "bootstrap":
-            self.model = BootstrapElectionModel(model_settings=model_settings)
+            self.model = BootstrapElectionModel(
+                model_settings=model_settings, versioned_data_handler=versioned_data_handler
+            )
 
         minimum_reporting_units_max = 0
         for alpha in prediction_intervals:
@@ -327,7 +359,7 @@ class ModelClient:
         if APP_ENV != "local" and self.save_results:
             data.write_data(self.election_id, self.office)
 
-        non_modeled_units = unexpected_units[unexpected_units["unit_category"] == "non-modeled"]
+        non_modeled_units = unexpected_units[unexpected_units["unit_category"].str.startswith("non-modeled")]
         n_reporting_expected_units = reporting_units.shape[0]
         n_unexpected_units = len(unexpected_units[unexpected_units["unit_category"] == "unexpected"])
         n_nonreporting_units = nonreporting_units.shape[0]
@@ -340,8 +372,14 @@ class ModelClient:
             There are {n_nonreporting_units} nonreporting units."""
         )
         if len(non_modeled_units) > 0:
-            non_modeled_units = non_modeled_units.groupby("postal_code")["geographic_unit_fips"].apply(list).to_dict()
-            LOG.info(f"non-modeled units:\n{non_modeled_units}")
+            for unit_category in sorted(set(non_modeled_units["unit_category"])):
+                category_non_modeled_units = (
+                    non_modeled_units[non_modeled_units["unit_category"] == unit_category]
+                    .groupby("postal_code")
+                    .agg({"geographic_unit_fips": list})
+                    .to_dict()["geographic_unit_fips"]
+                )
+                LOG.info(f"{unit_category}: {category_non_modeled_units}")
 
         if n_reporting_expected_units < minimum_reporting_units_max:
             raise ModelNotEnoughSubunitsException(

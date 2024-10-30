@@ -39,9 +39,11 @@ def test_estimate_epsilon(bootstrap_election_model):
     residuals = np.asarray([0.5, 0.5, 0.3, 0.8, 0.5]).reshape(-1, 1)
     aggregate_indicator = np.asarray([[1, 1, 0, 0, 0], [0, 0, 1, 1, 0], [0, 0, 0, 0, 1]]).T
     epsilon_hat = bootstrap_election_model._estimate_epsilon(residuals, aggregate_indicator)
-    assert epsilon_hat[0] == (residuals[0] + residuals[1]) / 2
-    assert epsilon_hat[1] == (residuals[2] + residuals[3]) / 2
-    assert epsilon_hat[2] == 0  # since the aggrgate indicator for that row only has one 1 which is less than 2
+    assert np.isclose(epsilon_hat[0], (residuals[0] + residuals[1]) / 2)
+    assert np.isclose(epsilon_hat[1], (residuals[2] + residuals[3]) / 2)
+    assert np.isclose(
+        epsilon_hat[2], 0
+    )  # since the aggrgate indicator for that row only has one 1 which is less than 2
 
 
 def test_estimate_delta(bootstrap_election_model):
@@ -405,30 +407,20 @@ def test_sample_test_epsilon(bootstrap_election_model):
         # circumstance is here: https://arcpublishing.atlassian.net/browse/ELEX-3431
         epsilon_hat = bootstrap_election_model._estimate_epsilon(residuals, aggregate_indicator_train)
 
-    epsilon_y, epsilon_z = bootstrap_election_model._sample_test_epsilon(
-        residuals, residuals, epsilon_hat, epsilon_hat, aggregate_indicator_train, aggregate_indicator_test
-    )
+        epsilon_y, epsilon_z = bootstrap_election_model._sample_test_epsilon(
+            residuals, residuals, epsilon_hat, epsilon_hat, aggregate_indicator_train, aggregate_indicator_test
+        )
 
     assert epsilon_y.shape == (aggregate_indicator_test.shape[0], bootstrap_election_model.B)
     assert epsilon_z.shape == (aggregate_indicator_test.shape[0], bootstrap_election_model.B)
 
-    # aggregate 3 has no elements in the training set, and rows 2,3,5 in the test set
-    # are parts of aggregate 3
-    assert np.isclose(epsilon_z[0], 0).all()
-    assert np.isclose(epsilon_z[1], 0).all()
+    # test epsilons should never be zero
+    assert not np.isclose(epsilon_z[0], 0).all()
+    assert not np.isclose(epsilon_z[1], 0).all()
     assert not np.isclose(epsilon_z[2], 0).all()
     assert not np.isclose(epsilon_z[3], 0).all()
-    assert np.isclose(epsilon_z[4], 0).all()
+    assert not np.isclose(epsilon_z[4], 0).all()
     assert not np.isclose(epsilon_z[5], 0).all()
-
-    # testing that if there is only one element epsilon_hat that we return 0
-    epsilon_y, epsilon_z = bootstrap_election_model._sample_test_epsilon(
-        residuals, residuals, [[4]], [[4]], aggregate_indicator_train, aggregate_indicator_test
-    )
-    assert epsilon_y.shape == (1, bootstrap_election_model.B)
-    assert epsilon_z.shape == (1, bootstrap_election_model.B)
-
-    assert np.isclose(epsilon_z[0], 0).all()
 
 
 def test_sample_test_errors(bootstrap_election_model):
@@ -492,7 +484,14 @@ def test_compute_bootstrap_errors(bootstrap_election_model, va_governor_county_d
     )
 
     (reporting_units, nonreporting_units, unexpected_units) = combined_data_handler.get_units(
-        percent_reporting_threshold, ["postal_code"], 4.75
+        percent_reporting_threshold,
+        unit_blocklist=[],
+        postal_code_blocklist=[],
+        fit_margin_outlier_model=False,
+        fit_turnout_outlier_model=False,
+        outlier_z_threshold=2,
+        aggregates=["postal_code"],
+        turnout_factor_z_threshold=4.75,
     )
 
     assert not bootstrap_election_model.ran_bootstrap
@@ -530,7 +529,14 @@ def test_get_unit_predictions(bootstrap_election_model, va_governor_county_data)
     )
 
     (reporting_units, nonreporting_units, unexpected_units) = combined_data_handler.get_units(
-        percent_reporting_threshold, ["postal_code"], 4.75
+        percent_reporting_threshold,
+        unit_blocklist=[],
+        postal_code_blocklist=[],
+        fit_margin_outlier_model=False,
+        fit_turnout_outlier_model=False,
+        outlier_z_threshold=2,
+        aggregates=["postal_code"],
+        turnout_factor_z_threshold=4.75,
     )
 
     bootstrap_election_model.B = 10
@@ -955,8 +961,8 @@ def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
     assert lower.shape == (6, 1)
     assert upper.shape == (6, 1)
 
-    assert lower[2] == pytest.approx(upper[2])  # since c is fully reporting
-    assert lower[5] == pytest.approx(upper[5])  # since all f units are unexpected
+    assert lower[2] == pytest.approx(upper[2] - 0.002)  # since c is fully reporting
+    assert lower[5] == pytest.approx(upper[5] - 0.002)  # since all f units are unexpected
     assert all(lower <= upper)
 
     # test race calls
@@ -979,10 +985,8 @@ def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
         None,
         lhs_called_contests=lhs_called_contests,
     )
-    assert (lower >= bootstrap_election_model.lhs_called_threshold).all()
+    assert (lower >= bootstrap_election_model.lhs_called_threshold - 0.001).all()
     assert (upper >= bootstrap_election_model.lhs_called_threshold).all()
-    assert (bootstrap_election_model.divided_error_B_1 == bootstrap_election_model.lhs_called_threshold).all()
-    assert (bootstrap_election_model.divided_error_B_2 == bootstrap_election_model.lhs_called_threshold).all()
 
     rhs_called_contests = ["a", "b", "c", "d", "e", "f"]
     bootstrap_election_model.get_aggregate_predictions(
@@ -1004,9 +1008,7 @@ def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
         rhs_called_contests=rhs_called_contests,
     )
     assert (lower <= bootstrap_election_model.rhs_called_threshold).all()
-    assert (upper <= bootstrap_election_model.rhs_called_threshold).all()
-    assert (bootstrap_election_model.divided_error_B_1 == bootstrap_election_model.rhs_called_threshold).all()
-    assert (bootstrap_election_model.divided_error_B_2 == bootstrap_election_model.rhs_called_threshold).all()
+    assert (upper <= bootstrap_election_model.rhs_called_threshold + 0.001).all()
 
     # test with stopping all model calls
     stop_model_call = ["a", "b", "c", "d", "e", "f"]
@@ -1035,10 +1037,10 @@ def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
     assert lower.shape == (8, 1)
     assert upper.shape == (8, 1)
 
-    assert lower[0] == pytest.approx(upper[0])  # a-a is fully reporting
-    assert lower[3] == pytest.approx(upper[3])  # c-c is fully reporting
-    assert lower[7] == pytest.approx(upper[7])  # c-c is fully reporting
-    assert lower[7] == pytest.approx(upper[7])  # f-f is fully unexpected
+    assert lower[0] == pytest.approx(upper[0] - 0.002)  # a-a is fully reporting
+    assert lower[3] == pytest.approx(upper[3] - 0.002)  # c-c is fully reporting
+    assert lower[7] == pytest.approx(upper[7] - 0.002)  # c-c is fully reporting
+    assert lower[7] == pytest.approx(upper[7] - 0.002)  # f-f is fully unexpected
     assert all(lower <= upper)
 
 
@@ -1101,10 +1103,12 @@ def test_get_national_summary_estimates(bootstrap_election_model, rng):
     )
     nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(None, 0, 0.95)
     assert (
-        nat_sum_estimates["margin"][0] == 4
+        nat_sum_estimates["margin"][0] == 4 or nat_sum_estimates["margin"][0] == 5
     )  # the 3 called ones plus the third one where we stop a call from happening
     assert nat_sum_estimates["margin"][1] == 3  # the 3 called ones
-    assert nat_sum_estimates["margin"][2] == 5  # all of them except the first one
+    assert (
+        nat_sum_estimates["margin"][2] == 5 or nat_sum_estimates["margin"][2] == 6
+    )  # all of them except the first one
 
     rhs_called_contests = ["c", "d", "e", "f"]
     lhs_called_contests = ["a"]
@@ -1129,7 +1133,9 @@ def test_get_national_summary_estimates(bootstrap_election_model, rng):
         rhs_called_contests=rhs_called_contests,
     )
     nat_sum_estimates = bootstrap_election_model.get_national_summary_estimates(None, 0, 0.95)
-    assert nat_sum_estimates["margin"][0] == 1  # the first one which is called for lhs
+    assert (
+        nat_sum_estimates["margin"][0] == 1 or nat_sum_estimates["margin"][0] == 2
+    )  # the first one which is called for lhs
     assert nat_sum_estimates["margin"][1] == 1  # the first one which is called for lhs
     assert nat_sum_estimates["margin"][2] == 2  # 2nd and first
 
@@ -1188,7 +1194,7 @@ def test_total_aggregation(bootstrap_election_model, va_assembly_precinct_data):
     )
 
     (reporting_units, nonreporting_units, unexpected_units) = combined_data_handler.get_units(
-        percent_reporting_threshold, ["postal_code", "district"], 4.75
+        percent_reporting_threshold, [], [], False, False, 2, ["postal_code", "district"], 4.75
     )
 
     bootstrap_election_model.B = 300

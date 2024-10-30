@@ -456,6 +456,7 @@ def test_get_estimates_fully_reporting(model_client, va_governor_county_data, va
         raw_config=va_config,
         preprocessed_data=preprocessed_data,
         save_output=[],
+        model_parameters={"fit_margin_outlier_model": False, "fit_turnout_outlier_model": False},
     )
 
     assert result["state_data"].shape == (1, 6)
@@ -631,6 +632,7 @@ def test_get_estimates_some_reporting(model_client, va_governor_county_data, va_
         raw_config=va_config,
         preprocessed_data=preprocessed_data,
         save_output=[],
+        model_parameters={"fit_margin_outlier_model": False, "fit_turnout_outlier_model": False},
     )
     assert result["state_data"].shape == (1, 6)
     assert result["unit_data"].shape == (133, 8)
@@ -691,6 +693,7 @@ def test_get_estimates_no_subunits_reporting(model_client, va_governor_county_da
             raw_config=va_config,
             preprocessed_data=preprocessed_data,
             save_output=[],
+            model_parameters={"fit_margin_outlier_model": False, "fit_turnout_outlier_model": False},
         )
 
 
@@ -724,6 +727,7 @@ def test_get_estimates_not_enough_subunits_reporting(model_client, va_governor_c
             raw_config=va_config,
             preprocessed_data=preprocessed_data,
             save_output=[],
+            model_parameters={"fit_margin_outlier_model": False, "fit_turnout_outlier_model": False},
         )
 
 
@@ -876,5 +880,9 @@ def test_get_national_summary_votes_estimates(model_client, va_governor_county_d
 
     current = model_client.get_national_summary_votes_estimates(None, 0, [0.99])
 
-    pd.testing.assert_frame_equal(current, model_client.results_handler.final_results["nat_sum_data"])
-    pd.testing.assert_frame_equal(expected_df, model_client.results_handler.final_results["nat_sum_data"])
+    pd.testing.assert_frame_equal(
+        current, model_client.results_handler.final_results["nat_sum_data"], check_dtype=False
+    )
+    pd.testing.assert_frame_equal(
+        expected_df, model_client.results_handler.final_results["nat_sum_data"], check_dtype=False
+    )

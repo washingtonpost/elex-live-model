@@ -107,9 +107,12 @@ Some model types have specific model parameters that can be included.
 
 | Name                              | Type    | Acceptable values                | model           |
 |-----------------------------------|---------|----------------------------------|-----------------|
-| lambda                            | numeric | regularization constant          | all             |
+| lambda_                           | numeric | regularization constant          | all             |
 | turnout_factor_lower              | numeric | drop units with < turnout factor | all             |
 | turnout_factor_upper              | numeric | drop units with < turnout factor | all             |
+| margin_change_threshold           | numeric | drop units with > margin_chnage  | all             |
+| unit_blocklist                    | list    | units that should not be modeled | all             |
+| postal_code_blocklist             | list    | states that should not be modeled| all             |
 | robust                            | boolean | larger prediction intervals      | `nonparametric` |
 | beta                              | numeric | variance inflation               | `gaussian`      |
 | winsorize                         | boolean | winsorize std estimate           | `gaussian`      |
@@ -126,6 +129,7 @@ Some model types have specific model parameters that can be included.
 | percent_expected_vote_error_bound | numeric | error tolerance on expected vote | `bootstrap`     |
 | z_unobserved_lower_bound          | numeric | lower bound for turnout factor   | `bootstrap`     |
 | z_unobserved_upper_bound          | numeric | upper bound for turnout factor   | `bootstrap`     |
+| states_for_separate_model         | list    | states with separate model fit   | `bootstrap`     |
 
 This is the class and function that invokes the general function to generate estimates. You can install `elex-model` as a Python package and use this code snippet in other projects.
 

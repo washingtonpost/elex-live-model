@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.2 (10/24/2024)
+- feat: `agg_model_hard_threshold` now defaults to `True`
+- feat: using cross-validation to find the optimal OLS `lambda` for use in the `BootstrapElectionModel` is now optional due to the `lambda_` model parameter [#115](https://github.com/washingtonpost/elex-live-model/pull/115)
+
 ## 2.1.1 (10/10/2024)
 - fix: allow multiple `alpha` values passed in to `ModelClient.get_national_summary_votes_estimates()` and change that method to return a `pandas.DataFrame` [#111](https://github.com/washingtonpost/elex-live-model/pull/111)
 
