@@ -109,7 +109,7 @@ class BootstrapElectionModel(BaseElectionModel):
         self.contest_correlations = model_settings.get("contest_correlations", [])
 
         # impose perfect correlation in the national summary aggregation
-        self.national_summary_correlation = model_settings.get("national_summary_correlation", False)
+        self.national_summary_correlation = model_settings.get("national_summary_correlation", True)
         self.stop_model_call = None
         # Assume that we have a baseline normalized margin
         # (D^{Y'} - R^{Y'}) / (D^{Y'} + R^{Y'}) is one of the covariates
