@@ -993,8 +993,6 @@ def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
     )
     assert (lower >= bootstrap_election_model.lhs_called_threshold - 0.001).all()
     assert (upper >= bootstrap_election_model.lhs_called_threshold).all()
-    assert (bootstrap_election_model.divided_error_B_1 == bootstrap_election_model.lhs_called_threshold).all()
-    assert (bootstrap_election_model.divided_error_B_2 == bootstrap_election_model.lhs_called_threshold).all()
 
     rhs_called_contests = ["a", "b", "c", "d", "e", "f"]
     bootstrap_election_model.get_aggregate_predictions(
@@ -1017,8 +1015,6 @@ def test_get_aggregate_prediction_intervals(bootstrap_election_model, rng):
     )
     assert (lower <= bootstrap_election_model.rhs_called_threshold).all()
     assert (upper <= bootstrap_election_model.rhs_called_threshold + 0.001).all()
-    assert (bootstrap_election_model.divided_error_B_1 == bootstrap_election_model.rhs_called_threshold).all()
-    assert (bootstrap_election_model.divided_error_B_2 == bootstrap_election_model.rhs_called_threshold).all()
 
     # test with stopping all model calls
     stop_model_call = ["a", "b", "c", "d", "e", "f"]

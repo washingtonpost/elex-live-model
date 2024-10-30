@@ -275,3 +275,18 @@ class CombinedDataHandler:
         # put csv in s3
         path = f"{S3_FILE_PATH}/{election_id}/results/{office}/{self.geographic_unit_type}/current.csv"
         s3_client.put(path, csv_data)
+
+        # save another file with no precincts
+        _keep_counties = ~self.current_data["geographic_unit_fips"].str.contains(
+            "_"
+        )  # filter includes fips with no "_"
+        _keep_counties |= self.current_data["geographic_unit_fips"].str.startswith("23")  # filter includes Maine CDs
+        _keep_counties |= self.current_data["geographic_unit_fips"].str.startswith("31")  # filter includes Nebraska CDs
+
+        csv_data_counties = self.current_data[_keep_counties]
+
+        # convert df to csv
+        csv_data_counties = convert_df_to_csv(csv_data_counties)
+        # put csv in s3
+        path = f"{S3_FILE_PATH}/{election_id}/results/{office}/{self.geographic_unit_type}/current_counties.csv"
+        s3_client.put(path, csv_data_counties)

@@ -51,9 +51,9 @@ class BootstrapElectionModel(BaseElectionModel):
     and the epsilons are contest (state/district) level random effects.
     """
 
-    def __init__(self, model_settings={}):
+    def __init__(self, model_settings={}, versioned_data_handler=None):
         super().__init__(model_settings)
-        self.B = model_settings.get("B", 2000)  # number of bootstrap samples
+        self.B = model_settings.get("B", 500)  # number of bootstrap samples
         self.strata = model_settings.get("strata", ["county_classification"])  # columns to stratify the data by
         self.T = model_settings.get("T", 5000)  # temperature for aggregate model
         self.hard_threshold = model_settings.get(
@@ -61,6 +61,13 @@ class BootstrapElectionModel(BaseElectionModel):
         )  # use sigmoid or hard thresold when calculating agg model
         self.district_election = model_settings.get("district_election", False)
         self.lambda_ = model_settings.get("lambda_", None)  # regularization parameter for OLS
+
+        # save versioned data for later use
+        self.versioned_data_handler = versioned_data_handler
+        self.extrapolate_threshold = model_settings.get("extrapolate_threshold", 75)
+        self.min_extrapolating_units = model_settings.get("min_extrapolating_units", 5)
+        self.extrapolate_std_method = model_settings.get("extrapolate_std_method", "std")
+        self.max_dist_to_observed = model_settings.get("max_dist_to_observed", 5)
 
         # upper and lower bounds for the quantile regression which define the strata distributions
         # these make sure that we can control the worst cases for the distributions in case we
@@ -100,6 +107,9 @@ class BootstrapElectionModel(BaseElectionModel):
         # this is the correlation structure we impose when we sample from the contest level random effects
         self.contest_correlations = model_settings.get("contest_correlations", [])
 
+        # impose perfect correlation in the national summary aggregation
+        self.national_summary_correlation = model_settings.get("national_summary_correlation", False)
+        self.stop_model_call = None
         # Assume that we have a baseline normalized margin
         # (D^{Y'} - R^{Y'}) / (D^{Y'} + R^{Y'}) is one of the covariates
         if "baseline_normalized_margin" not in self.features:
@@ -733,6 +743,213 @@ class BootstrapElectionModel(BaseElectionModel):
         x_test_strata = strata_all[n_train:]
         return x_train_strata, x_test_strata
 
+    def _extrapolate_unit_margin(self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame):
+        """
+        This function will produce the extrapolated predictions for the non-reporting units.
+
+        At a high level, the idea is as follows:
+
+        We have a set of reporting units that we have observed the results for over time. Even though we
+        have only seen the reporting unit at a particular set of percent_expected_vote values, we can use
+        them to come up with an estimate for the normalized margin at any percent_expected_vote value.
+
+        For example, if we saw a reporting county at both 50% and 70% expected vote, we can estimate the normalized
+        margin at 60% expected vote via
+
+        margin_60 = [margin_50 * 50 + (batch_margin_70) * (60 - 50)] 60
+
+        where batch_margin_70 is the normalized margin of the batch of votes we saw when we recorded the 70%
+        vote for the county.
+
+        Now that we have these estimates for the normalized margin at any percent_expected_vote value, we can
+        use them to estimate how we ought to correct the current normalized margin to estimate the final value.
+
+        For example, let's imagine our non-reporting county is at 60% reporting.
+        For the previous county, we can look at the difference between margin_100 - margin_60 and
+        that would be our best guess (from that example) for how to correct our extrapolation from the observed
+        normalized margin in the non-reporting county.
+
+        We can repeat this for all the reporting counties and then take the mean of the corrections to get our
+        best guess for how to correct the normalized margin for the non-reporting county.
+
+        The code also includes some additional logic to ensure that this extrapolation step is only used when
+        we can be confident in its validity.
+
+        1) We only estimate the correction using counties belonging to the same state.
+
+        2) We also only apply this method to a non-reporting county once it has passed a certain threshold of reporting.
+
+        3) We also do not use the correction estimate from a reporting county if the closest observed vote to the
+        percent_expected_vote is too far away.
+
+        4) The correction estimates (obtained using VersionedResultsHandler) are also np.nan when there are
+        irregularities in the reporting (e.g., there's a correction to the dem/gop vote totals that revises them downwards).
+
+        5) We only run this method in states with at least self.min_extrapolating_units counties available.
+        """
+
+        # first we need to concatenate the current reporting/non-reporting units
+        # to the end of the versioned_results stting sitting in the handler
+        # this is because the versioned_results_handler only sees *previous* runs
+        # of the model and doesn't have the latest set of reporting results
+        all_units = pd.concat([reporting_units, nonreporting_units], axis=0).copy()
+        missing_columns = list(set(self.versioned_data_handler.data.columns) - set(all_units.columns))
+        all_units[missing_columns] = self.versioned_data_handler.data[missing_columns].max()
+
+        self.versioned_data_handler.data = pd.concat(
+            [self.versioned_data_handler.data, all_units[self.versioned_data_handler.data.columns]], axis=0
+        )
+
+        """
+        The columns of the versioned_estimates dataframe are
+        (geographic_unit_fips, percent_expected_vote, est_margin, est_correction, nearest_observed_vote)
+
+        TODO: remove the other junk columns
+
+        geographic_unit_fips: the fips code of the geographic unit
+
+        percent_expected_vote: the % expected vote for the geographic unit
+
+        est_margin: our estimate of the normalized margin at the value of percent_expected_vote
+
+        est_correction: the difference between the latest value of normalized margin and our estimate
+        we would use this value to "correct" our estimate of the normalized margin
+
+        nearest_observed_vote: the nearest observed vote to the percent_expected_vote that we used to
+        derive our estimate`
+        """
+        versioned_estimates = self.versioned_data_handler.compute_versioned_margin_estimate()
+
+        versioned_estimates["dist_to_observed"] = (
+            versioned_estimates.percent_expected_vote - versioned_estimates.nearest_observed_vote
+        ).abs()
+
+        # we are only going to use this method for county units whose current reporting is above
+        # the threshold
+        modeling_filter = nonreporting_units.percent_expected_vote >= self.extrapolate_threshold
+        modeling_filter &= nonreporting_units.geographic_unit_type == "county"
+
+        # we should only use counties that have reported to understand how we should extrapolate
+        reporting_units_county = reporting_units[reporting_units.geographic_unit_type == "county"]
+
+        # get the versioned results for the reporting units
+        reporting_versioned_estimates = versioned_estimates[
+            versioned_estimates.geographic_unit_fips.isin(reporting_units_county.geographic_unit_fips)
+        ].copy()
+
+        # merge is to get postal_code information for the versioned units
+        reporting_versioned_estimates = reporting_versioned_estimates.merge(
+            reporting_units[["geographic_unit_fips", "postal_code"]], on="geographic_unit_fips", how="left"
+        )
+
+        all_corrections = []
+        for postal_code in nonreporting_units[modeling_filter].postal_code.unique():
+
+            def _get_filter(df):
+                return df.postal_code == postal_code
+
+            # if there are fewer than k reporting units, we can't extrapolate
+            if _get_filter(reporting_units_county).sum() < self.min_extrapolating_units:
+                continue
+
+            # filters for the units we are interested in
+            reporting_filter = _get_filter(reporting_versioned_estimates)
+            nonreporting_filter = _get_filter(nonreporting_units) & modeling_filter
+
+            state_reporting_estimates = reporting_versioned_estimates[reporting_filter]
+
+            # get the percent_expected_vote for the nonreporting units we are looking to
+            # extrapolate for
+            nonreporting_merge = nonreporting_units.loc[
+                nonreporting_filter, ["geographic_unit_fips", "percent_expected_vote"]
+            ].copy()
+            # round this value so that we can match to the values in state_reporting_estimates
+            nonreporting_merge["percent_expected_vote"] = nonreporting_merge.percent_expected_vote.round()
+
+            # for each non-reporting unit, we have now identified the reporting units (and est. margin / correction)
+            # we will use to extrapolate the normalized margin
+            est_corrections_df = pd.merge(
+                nonreporting_merge,
+                state_reporting_estimates,
+                on="percent_expected_vote",
+                how="left",
+                suffixes=("", "_reporting"),
+            )
+
+            grouped_est_corrections = est_corrections_df.groupby("geographic_unit_fips")
+
+            # get correction mean / std / max / min / count of units used for each correction
+
+            def compute_correction_statistics(df):
+                df_filtered = df[(df.dist_to_observed < self.max_dist_to_observed) & (df.est_correction.notnull())]
+                if df_filtered.empty:
+                    return pd.DataFrame(
+                        {
+                            "est_correction": np.nan,
+                            "est_correction_max": np.nan,
+                            "est_correction_min": np.nan,
+                            "est_correction_std": np.nan,
+                            "est_correction_count": 0,
+                        },
+                        index=[df.geographic_unit_fips.iloc[0]],
+                    )
+
+                return pd.DataFrame(
+                    {
+                        "est_correction": np.nanmean(df_filtered.est_correction.values),
+                        "est_correction_max": np.nanmax(df_filtered.est_correction.values),
+                        "est_correction_min": np.nanmin(df_filtered.est_correction.values),
+                        "est_correction_std": np.nanstd(df_filtered.est_correction.values, ddof=1),
+                        "est_correction_count": df_filtered.est_correction.count(),
+                    },
+                    index=[df.geographic_unit_fips.iloc[0]],
+                )
+
+            corrections = grouped_est_corrections.apply(compute_correction_statistics).reset_index()
+            all_corrections.append(corrections)
+
+        # if no states have enough reporting units to extrapolate, return nans
+        if len(all_corrections) == 0:
+            return np.nan * np.ones((nonreporting_units.shape[0], 1)), np.nan * np.ones(
+                (nonreporting_units.shape[0], 1)
+            )
+
+        # concatenate all the corrections together (since we did it state-by-state)
+        all_corrections = pd.concat(all_corrections, axis=0)
+
+        # merge correction data back into the nonreporting units so we can use add it
+        # to the current normalized margin and obtain our extrapolating prediction
+        nonreporting_units = nonreporting_units.merge(
+            all_corrections[
+                [
+                    "geographic_unit_fips",
+                    "est_correction",
+                    "est_correction_max",
+                    "est_correction_min",
+                    "est_correction_std",
+                    "est_correction_count",
+                ]
+            ],
+            how="left",
+            on="geographic_unit_fips",
+        )
+
+        nonreporting_units["pred_extrapolate"] = (
+            nonreporting_units.results_normalized_margin + nonreporting_units.est_correction
+        )
+
+        prediction = nonreporting_units.pred_extrapolate.values.reshape(-1, 1)
+
+        # need to report an error estimate so we can ensemble this prediction with the OLS prediction
+        if self.extrapolate_std_method == "std":
+            prediction_std = nonreporting_units.est_correction_std.values.reshape(-1, 1)
+        elif self.extrapolate_std_method == "max_min":
+            prediction_std = (
+                nonreporting_units.est_correction_max.values - nonreporting_units.est_correction_min.values
+            ).reshape(-1, 1)
+
+        return prediction, prediction_std
+
     def compute_bootstrap_errors(
         self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, unexpected_units: pd.DataFrame
     ):
@@ -1046,12 +1263,25 @@ class BootstrapElectionModel(BaseElectionModel):
         # We can then use our bootstrapped ols_y_B/ols_z_B and our bootstrapped contest level effect
         # (epsilon) to make bootstrapped predictions on our non-reporting units
         # This is \tilde{y_i}^{b} and \tilde{z_i}^{b}
-        y_test_pred_B = (ols_y_B.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat_B)).clip(
-            min=y_partial_reporting_lower, max=y_partial_reporting_upper
-        )
+        y_test_pred_B = ols_y_B.predict(x_test) + (aggregate_indicator_test @ epsilon_y_hat_B)
         z_test_pred_B = (ols_z_B.predict(x_test) + (aggregate_indicator_test @ epsilon_z_hat_B)).clip(
             min=z_partial_reporting_lower, max=z_partial_reporting_upper
         )
+
+        if self.versioned_data_handler is not None:
+            y_test_pred_extrap, extrap_std = self._extrapolate_unit_margin(reporting_units, nonreporting_units)
+            extrap_filter = ~(np.isnan(y_test_pred_extrap) | np.isnan(extrap_std)).flatten()
+            model_std = y_test_pred_B.std(axis=1).reshape(-1, 1)
+
+            model_var = np.clip(model_std**2, 1e-5, None)
+            extrap_var = np.clip(extrap_std**2, 1e-5, None)
+            model_weight = extrap_var / (model_var + extrap_var)
+
+            y_test_pred_B[extrap_filter] = (model_weight * y_test_pred_B + (1 - model_weight) * y_test_pred_extrap)[
+                extrap_filter
+            ]
+
+        y_test_pred_B = y_test_pred_B.clip(min=y_partial_reporting_lower, max=y_partial_reporting_upper)
 
         # \tilde{y_i}^{b} * \tilde{z_i}^{b}
         yz_test_pred_B = y_test_pred_B * z_test_pred_B
@@ -1423,12 +1653,12 @@ class BootstrapElectionModel(BaseElectionModel):
         aggregate_error_B_4 = aggregate_z_total_pred
 
         # (sum_{i = 1}^N w_i * \tilde_{y_i}^b * \tilde_{z_i}^b) /  (\sum_{i = 1}^N w_i * \tilde_{z_i}^b)
-        divided_error_B_1 = np.nan_to_num(aggregate_error_B_1 / aggregate_error_B_3)
+        self.divided_error_B_1 = np.nan_to_num(aggregate_error_B_1 / aggregate_error_B_3)
 
         # (\sum_{i = 1}^N w_i * (\hat_{y_i} + \residual_{y, i}^b) *
         # (\hat{z_i} + \residual_{z, i}^b)) /
         # (\sum_{i = 1}^N w_i * (\hat{z_i} + \residual_{z, i}^b))
-        divided_error_B_2 = np.nan_to_num(aggregate_error_B_2 / aggregate_error_B_4)
+        self.divided_error_B_2 = np.nan_to_num(aggregate_error_B_2 / aggregate_error_B_4)
 
         # we also need to re-compute our aggregate prediction to add to our error to get the prediction interval
         # first the turnout component
@@ -1441,85 +1671,14 @@ class BootstrapElectionModel(BaseElectionModel):
         )
         # calculate normalized margin in the aggregate prediction
         # turnout prediction could be zero, so convert NaN -> 0
-        aggregate_perc_margin_total = np.nan_to_num(aggregate_yz_total / aggregate_z_total).reshape(-1, 1)
+        if self._is_top_level_aggregate(aggregate):
+            aggregate_perc_margin_total = self.aggregate_pred_margin
+        else:
+            aggregate_perc_margin_total = np.nan_to_num(aggregate_yz_total / aggregate_z_total).reshape(-1, 1)
 
         lower_q, upper_q = self._get_quantiles(alpha)
 
-        error_diff = divided_error_B_1 - divided_error_B_2
-
-        # saves the aggregate errors in case we want to generate somem form of national predictions (like ecv)
-        if self._is_top_level_aggregate(aggregate):
-            aggregate_perc_margin_total = self.aggregate_pred_margin
-
-            lhs_called_contests = kwargs.get("lhs_called_contests", [])
-            rhs_called_contests = kwargs.get("rhs_called_contests", [])
-            called_contests = self._format_called_contests(lhs_called_contests, rhs_called_contests, contests, 1, 0, -1)
-
-            stop_model_call = kwargs.get("stop_model_call", [])
-            stop_model_call = self._format_called_contests(stop_model_call, [], contests, True, None, False)
-
-            interval_upper, interval_lower = (
-                aggregate_perc_margin_total - np.quantile(error_diff, q=[lower_q, upper_q], axis=-1).T
-            ).T
-
-            for i, (contest, call, stop_model_call_i) in enumerate(zip(contests, called_contests, stop_model_call)):
-                interval_lower_i = interval_lower[i]
-                interval_upper_i = interval_upper[i]
-
-                if stop_model_call_i:
-                    # if we don't allow the model call, then force the lower interval to be below zero and the upper interval to be above zero
-                    if interval_lower_i > 0:
-                        # if interval_lower_i > 0 then our model thinks the race is called for the LHS party.
-                        # error_diff > 0 means that the lower bound is smaller than the prediction, so for those we set error_diff to be the gap between
-                        # the prediction and the imposed lower bound. This forces the difference between error_diff and the prediction to be exactly the imposed
-                        # lower bound
-                        error_diff[i, error_diff[i] > 0] = (
-                            aggregate_perc_margin_total[i] - self.rhs_called_threshold
-                        ).flatten()
-                        # we are pushing divided_error_B_2 such that divided_error_B_2 is less than zero in 10% of cases (ie. that LHS party wins some simulations)
-                        # there will be a chance that this impacts our electoral college lower bound
-                        divided_error_B_2_quantile = np.quantile(divided_error_B_2[i, :], q=0.1)
-                        if divided_error_B_2_quantile > 0:
-                            divided_error_B_2[i, :] += self.rhs_called_threshold - divided_error_B_2_quantile
-                    if interval_upper_i < 0:
-                        # if interval_upper_i < 0 then our model thinks the race has been called for the RHS party.
-                        # error_diff < 0 means that the upper bound is larger than the prediction, so for those we set error_diff to be the gap between the prediction
-                        # and the imposed upper bound. This forces the difference between error_diff and the prediction to be exactly the imposed upper bound
-                        error_diff[i, error_diff[i] < 0] = (
-                            aggregate_perc_margin_total[i] - self.lhs_called_threshold
-                        ).flatten()
-                        # we are pushing divided error_B_2 such that divided_error_B_2 is greater than zero in 10% of cases (ie. that LHS party wins some simulations)
-                        # there will be some chance that this impacts our electoral college prediction upper bound
-                        divided_error_B_2_quantile = np.quantile(divided_error_B_2[i, :], q=0.9)
-                        if divided_error_B_2_quantile < 0:
-                            divided_error_B_2[i, :] += self.lhs_called_threshold - divided_error_B_2_quantile
-
-                if np.isclose(call, 1):
-                    if interval_lower_i < 0:
-                        # if a contest has been called for the LHS party but the interval_lower is below zero (ie. our model does not think that this is called)
-                        # error_diff > 0 means that lower bound is smaller than the prediction, so for those we set the error_diff to be the gap between the prediction
-                        # and the imposed lower bound. This forces the difference between the error_diff and the prediction to be exactly the imposed lower bound
-                        error_diff[i, error_diff[i] > 0] = (
-                            aggregate_perc_margin_total[i] - self.lhs_called_threshold
-                        ).flatten()
-                    # for error_B_1 and error_B_2 we can set all of them to the imposed lower bound, because we no longer care about doing inference on the intervals
-                    # ie. the winner is fixed now so we no longer care about doing inference on the margin
-                    # NOTE: we cannot do this for error_diff because we still want the upper bound in case to be what it would be without the race call
-                    divided_error_B_1[i, :] = self.lhs_called_threshold
-                    divided_error_B_2[i, :] = self.lhs_called_threshold
-                elif np.isclose(call, 0):
-                    if interval_upper_i > 0:
-                        # if a contest has been called for the RHS party but the interval_upper is larger than zero (ie. our model does not think this is called)
-                        # error_diff < 0 means that the upper bound is larger than the prediction, so for those we set error_diff to be the gap between the prediction
-                        # and the imposed upper bound. This forces the difference between the error diff and the prediction to be the imposed upper bound
-                        error_diff[i, error_diff[i] < 0] = (
-                            self.rhs_called_threshold - aggregate_perc_margin_total[i]
-                        ).flatten()
-                    divided_error_B_1[i, :] = self.rhs_called_threshold
-                    divided_error_B_2[i, :] = self.rhs_called_threshold
-
-            self.divided_error_B_1 = divided_error_B_1
-            self.divided_error_B_2 = divided_error_B_2
+        error_diff = self.divided_error_B_1 - self.divided_error_B_2
 
         interval_upper, interval_lower = (
             aggregate_perc_margin_total - np.quantile(error_diff, q=[lower_q, upper_q], axis=-1).T
@@ -1531,6 +1690,33 @@ class BootstrapElectionModel(BaseElectionModel):
         # guarantee overlap between the prediction interval and the point prediction
         interval_lower = np.minimum(interval_lower, aggregate_perc_margin_total - 0.001)
         interval_upper = np.maximum(interval_upper, aggregate_perc_margin_total + 0.001)
+
+        if self._is_top_level_aggregate(aggregate):
+            # adjust intervals for called contests if necessary
+            lhs_called_contests = kwargs.get("lhs_called_contests", [])
+            rhs_called_contests = kwargs.get("rhs_called_contests", [])
+            called_contests = self._format_called_contests(lhs_called_contests, rhs_called_contests, contests, 1, 0, -1)
+            self.called_contests = called_contests.reshape(-1, 1)
+            interval_lower = np.where(
+                (interval_lower < 0)
+                & np.isclose(self.called_contests, 1),  # current bound is lower than 0 but called for dems
+                self.lhs_called_threshold,  # replace with left lower bound
+                interval_lower,  # otherwise keep the same
+            )
+            interval_upper = np.where(
+                (interval_upper > 0)
+                & np.isclose(self.called_contests, 0),  # current bound is higher than 0 but called for gop
+                self.rhs_called_threshold,  # replace with right upper bound
+                interval_upper,  # otherwise keep the same
+            )
+
+            stop_model_call = kwargs.get("stop_model_call", [])
+            stop_model_call = self._format_called_contests(stop_model_call, [], contests, True, None, False).reshape(
+                -1, 1
+            )
+            self.stop_model_call = stop_model_call
+            interval_lower = np.where((interval_lower > 0) & stop_model_call, self.rhs_called_threshold, interval_lower)
+            interval_upper = np.where((interval_upper < 0) & stop_model_call, self.lhs_called_threshold, interval_upper)
 
         return PredictionIntervals(interval_lower, interval_upper)
 
@@ -1581,7 +1767,10 @@ class BootstrapElectionModel(BaseElectionModel):
         aggregate_dem_vals_B_2 = nat_sum_data_dict_sorted_vals * aggregate_dem_prob_B_2
 
         # calculate the error in our national aggregate prediction
-        aggregate_dem_vals_B = np.sum(aggregate_dem_vals_B_1, axis=0) - np.sum(aggregate_dem_vals_B_2, axis=0)
+        aggregate_dem_vals_B = np.concatenate(
+            (np.sum(aggregate_dem_vals_B_1, axis=0), np.sum(aggregate_dem_vals_B_2, axis=0))
+        )
+        aggregate_dem_prob_B = np.concatenate((aggregate_dem_prob_B_1, aggregate_dem_prob_B_2), axis=1)
 
         # we also need a national aggregate point prediction
         if self.hard_threshold:
@@ -1593,9 +1782,30 @@ class BootstrapElectionModel(BaseElectionModel):
 
         lower_q, upper_q = self._get_quantiles(alpha)
 
-        interval_upper, interval_lower = (
-            aggregate_dem_vals_pred - np.quantile(aggregate_dem_vals_B, q=[lower_q, upper_q], axis=-1).T
-        ).T
+        sorted_indices = np.argsort(aggregate_dem_vals_B)
+        quantile_indices = sorted_indices[[int(np.floor(lower_q * self.B * 2)), int(np.ceil(upper_q * self.B * 2))]]
+
+        lower_states, upper_states = (aggregate_dem_prob_B > 0.5)[:, quantile_indices].T.astype(int)
+        pred_states = (aggregate_dem_probs_total > 0.5).astype(int).flatten()
+
+        potential_losses = ((pred_states - lower_states) > 0).astype(int)
+        potential_gains = ((upper_states - pred_states) > 0).astype(int)
+
+        if self.national_summary_correlation:
+            # perfect correlation between the contests for the electoral college
+            agg_pred_margin_dist = self.aggregate_pred_margin - (self.divided_error_B_1 - self.divided_error_B_2)
+
+            # how many states have lower_q (or more) realizations with Dem victory
+            upper_states = np.mean(agg_pred_margin_dist > 0, axis=1) > lower_q
+
+            # how many states have lower_q (or more) realizations with GOP victory
+            lower_states = np.mean(agg_pred_margin_dist < 0, axis=1) > lower_q
+
+            potential_losses = pred_states - (~lower_states).astype(int)
+            potential_gains = upper_states.astype(int) - pred_states
+
+        interval_upper = aggregate_dem_vals_pred + np.sum(nat_sum_data_dict_sorted_vals.flatten() * potential_gains)
+        interval_lower = aggregate_dem_vals_pred - np.sum(nat_sum_data_dict_sorted_vals.flatten() * potential_losses)
 
         # B_1 and B_2 outcomes should respect called races
         # because we create independent samples for B_1 and B_2 their difference can exaggerate the possible outcomes
@@ -1605,8 +1815,26 @@ class BootstrapElectionModel(BaseElectionModel):
         lower_bound = min(aggregate_dem_vals_B_1.sum(axis=0).min(), aggregate_dem_vals_B_2.sum(axis=0).min())
         upper_bound = max(aggregate_dem_vals_B_1.sum(axis=0).max(), aggregate_dem_vals_B_2.sum(axis=0).max())
 
+        interval_lower = max(interval_lower, lower_bound)
+        interval_upper = min(interval_upper, upper_bound)
+
+        if self.called_contests is not None:
+            # if there is a call, there is no uncertainty in the outcome
+            potential_losses[~np.isclose(self.called_contests.flatten(), -1)] = 0
+            potential_gains[~np.isclose(self.called_contests.flatten(), -1)] = 0
+
+        if self.stop_model_call is not None:
+            potential_losses[pred_states.astype(bool) & self.stop_model_call.flatten()] = 1
+            potential_gains[~pred_states.astype(bool) & self.stop_model_call.flatten()] = 1
+
+            interval_lower = aggregate_dem_vals_pred - np.sum(
+                nat_sum_data_dict_sorted_vals.flatten() * potential_losses
+            )
+            interval_upper = aggregate_dem_vals_pred + np.sum(nat_sum_data_dict_sorted_vals.flatten() * potential_gains)
+
         agg_pred = round(aggregate_dem_vals_pred + base_to_add, 2)
-        agg_lower = round(max(interval_lower, lower_bound) + base_to_add, 2)
-        agg_upper = round(min(interval_upper, upper_bound) + base_to_add, 2)
+        agg_lower = round(interval_lower + base_to_add, 2)
+        agg_upper = round(interval_upper + base_to_add, 2)
+
         national_summary_estimates = {"margin": [agg_pred, agg_lower, agg_upper]}
         return national_summary_estimates
