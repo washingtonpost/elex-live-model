@@ -105,7 +105,11 @@ class S3VersionUtil:
         if "Versions" in response:
             versions = response["Versions"]
 
-        if response["IsTruncated"] and len(versions) > 0 and versions[-1]["LastModified"] >= self.start_date:
+        if (
+            response["IsTruncated"]
+            and len(versions) > 0
+            and (self.start_date is None or versions[-1]["LastModified"] >= self.start_date)
+        ):
             versions += self.list_versions(
                 path,
                 KeyMarker=response["NextKeyMarker"],
@@ -145,7 +149,8 @@ class S3VersionUtil:
     def get(self, path, sample=2):
         versions = self.list_versions(path)
         if len(versions) == 0:
-            raise ValueError(f"No versions found for {path}")
+            LOG.info(f"No versions found for {path}")
+            return None
 
         # Instead of asking for the results of downloads synchronously, we're
         # queuing the futures and then waiting for them to complete.

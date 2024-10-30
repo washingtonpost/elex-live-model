@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import numpy as np
 import pandas as pd
 from dateutil import tz
@@ -30,9 +32,8 @@ class VersionedDataHandler:
             target_bucket = "elex-models-prod"
         else:
             target_bucket = TARGET_BUCKET
-
-        start_date = start_date.astimezone(tz=tz.gettz("UTC")) if start_date else None
-        end_date = end_date.astimezone(tz=tz.gettz("UTC")) if start_date else None
+        start_date = datetime.fromisoformat(start_date).astimezone(tz=tz.gettz("UTC")) if start_date else None
+        end_date = datetime.fromisoformat(end_date).astimezone(tz=tz.gettz("UTC")) if start_date else None
         # versioned results natively are in UTC but we'll convert it back to timezone in tzinfo
         self.s3_client = s3.S3VersionUtil(target_bucket, start_date, end_date, tzinfo)
 
@@ -66,6 +67,9 @@ class VersionedDataHandler:
             path = f"{S3_FILE_PATH}/{self.election_id}/results/{self.office_id}/{self.geographic_unit_type}/current.csv"
 
         data = self.s3_client.get(path, self.sample)
+        if data is None:
+            self.data = data
+            return data
         estimandizer = Estimandizer()
         data, _ = estimandizer.add_estimand_results(data, self.estimands, False)
         self.data = data.sort_values("last_modified")
