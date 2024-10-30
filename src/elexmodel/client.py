@@ -9,7 +9,6 @@ from elexmodel.handlers.config import ConfigHandler
 from elexmodel.handlers.data.CombinedData import CombinedDataHandler
 from elexmodel.handlers.data.ModelResults import ModelResultsHandler
 from elexmodel.handlers.data.PreprocessedData import PreprocessedDataHandler
-from elexmodel.handlers.data.VersionedData import VersionedDataHandler
 from elexmodel.logging import initialize_logging
 from elexmodel.models.BootstrapElectionModel import BootstrapElectionModel
 from elexmodel.models.ConformalElectionModel import ConformalElectionModel
@@ -318,23 +317,6 @@ class ModelClient:
             aggregates,
         )
 
-        if model_parameters.get("extrapolation", False):
-            LOG.info("Getting versioned data for extrapolation rule")
-            versioned_data_handler = VersionedDataHandler(
-                self.election_id,
-                self.office,
-                self.geographic_unit_type,
-                estimands,
-                start_date=model_parameters.get("versioned_start_date", None),
-                end_date=model_parameters.get("versioned_end_date", None),
-            )
-            print(
-                "Fetching versioned data between ", versioned_data_handler.start_date, versioned_data_handler.end_date
-            )
-            versioned_data_handler.get_versioned_results(model_settings.get("versioned_filepath", None))
-        else:
-            versioned_data_handler = None
-
         LOG.info(
             "Model parameters: \n prediction intervals: %s, percent reporting threshold: %s, \
                 pi_method: %s, aggregates: %s, model settings: %s",
@@ -350,9 +332,7 @@ class ModelClient:
         elif pi_method == "gaussian":
             self.model = GaussianElectionModel(model_settings=model_settings)
         elif pi_method == "bootstrap":
-            self.model = BootstrapElectionModel(
-                model_settings=model_settings, versioned_data_handler=versioned_data_handler
-            )
+            self.model = BootstrapElectionModel(model_settings=model_settings)
 
         minimum_reporting_units_max = 0
         for alpha in prediction_intervals:
