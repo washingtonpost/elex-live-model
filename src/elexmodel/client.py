@@ -328,10 +328,12 @@ class ModelClient:
                 start_date=model_parameters.get("versioned_start_date", None),
                 end_date=model_parameters.get("versioned_end_date", None),
             )
-            print(
-                "Fetching versioned data between ", versioned_data_handler.start_date, versioned_data_handler.end_date
+            LOG.info(
+                "Fetching versioned data between %s and %s", versioned_data_handler.start_date, versioned_data_handler.end_date
             )
-            versioned_data_handler.get_versioned_results(model_settings.get("versioned_filepath", None))
+            versioned_results = versioned_data_handler.get_versioned_results(model_settings.get("versioned_filepath", None))
+            if versioned_results is None:
+                versioned_data_handler = None
         else:
             versioned_data_handler = None
 
