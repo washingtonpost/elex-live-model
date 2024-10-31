@@ -1,10 +1,10 @@
 import json
-import logging
 from pathlib import Path
 
+from elexmodel.logger import getModelLogger
 from elexmodel.utils.file_utils import create_directory, get_directory_path
 
-LOG = logging.getLogger(__name__)
+LOG = getModelLogger()
 
 
 class ConfigHandler:

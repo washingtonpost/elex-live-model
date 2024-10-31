@@ -1,4 +1,3 @@
-import logging
 from datetime import datetime
 
 import numpy as np
@@ -7,9 +6,10 @@ from dateutil import tz
 
 from elexmodel.handlers import s3
 from elexmodel.handlers.data.Estimandizer import Estimandizer
+from elexmodel.logger import getModelLogger
 from elexmodel.utils.file_utils import S3_FILE_PATH, TARGET_BUCKET
 
-LOG = logging.getLogger(__name__)
+LOG = getModelLogger()
 
 
 class VersionedDataHandler:
