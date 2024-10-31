@@ -1,4 +1,3 @@
-import logging
 import math
 import warnings
 from abc import ABC
@@ -16,7 +15,9 @@ warnings.filterwarnings("error", category=UserWarning, module="cvxpy")
 
 PredictionIntervals = namedtuple("PredictionIntervals", ["lower", "upper", "conformalization"], defaults=(None,) * 3)
 
-LOG = logging.getLogger(__name__)
+from elexmodel.logger import getModelLogger
+
+LOG = getModelLogger()
 
 
 class ConformalElectionModel(BaseElectionModel.BaseElectionModel, ABC):

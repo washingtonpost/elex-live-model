@@ -1,12 +1,12 @@
-import logging
 import math
 
 import numpy as np
 from scipy.stats import bootstrap
 from scipy.stats.mstats import winsorize
 
-LOG = logging.getLogger()
+from elexmodel.logger import getModelLogger
 
+LOG = getModelLogger()
 
 def compute_inflate(x):
     """

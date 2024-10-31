@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 import numpy as np
@@ -8,6 +9,7 @@ from elexmodel.handlers import s3
 from elexmodel.handlers.data.Estimandizer import Estimandizer
 from elexmodel.utils.file_utils import S3_FILE_PATH, TARGET_BUCKET
 
+LOG = logging.getLogger(__name__)
 
 class VersionedDataHandler:
     def __init__(
@@ -67,6 +69,7 @@ class VersionedDataHandler:
             path = f"{S3_FILE_PATH}/{self.election_id}/results/{self.office_id}/{self.geographic_unit_type}/current.csv"
 
         data = self.s3_client.get(path, self.sample)
+        LOG.info("Loaded versioned results from S3")
         if data is None:
             self.data = data
             return data

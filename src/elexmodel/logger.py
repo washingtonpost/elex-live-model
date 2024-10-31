@@ -5,7 +5,7 @@ import os
 LOGGING_CONFIG = {
     "version": 1,
     "disable_existing_loggers": True,
-    "formatters": {"default": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"}},
+    "formatters": {"default": {"format": "%(asctime)s %(levelname)s %(name)s | %(message)s"}},
     "handlers": {
         "default": {
             "level": "DEBUG",
@@ -33,3 +33,6 @@ def initialize_logging(logging_config=None):
         logging_config = LOGGING_CONFIG
     logging.config.dictConfig(logging_config)
     logging.captureWarnings(True)
+
+def getModelLogger():
+    return logging.getLogger("elexmodel")

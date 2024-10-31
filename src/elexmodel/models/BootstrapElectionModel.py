@@ -1,6 +1,5 @@
 from __future__ import annotations  # pylint: disable=too-many-lines
 
-import logging
 from datetime import timedelta
 from itertools import combinations
 
@@ -14,8 +13,9 @@ from scipy.special import expit
 from elexmodel.handlers.data.Featurizer import Featurizer
 from elexmodel.models.BaseElectionModel import BaseElectionModel, PredictionIntervals
 
-LOG = logging.getLogger(__name__)
+from elexmodel.logger import getModelLogger
 
+LOG = getModelLogger()
 
 class BootstrapElectionModelException(Exception):
     pass

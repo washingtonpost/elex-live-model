@@ -1,9 +1,10 @@
-import logging
 import os
 import pathlib
 from io import StringIO
 
-LOG = logging.getLogger(__name__)
+from elexmodel.logger import getModelLogger
+
+LOG = getModelLogger()
 
 APP_ENV = os.getenv("APP_ENV")
 DATA_ENV = os.getenv("DATA_ENV")
