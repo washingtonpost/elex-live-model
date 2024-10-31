@@ -1,4 +1,3 @@
-import logging
 import math
 import warnings
 from abc import ABC
@@ -10,13 +9,15 @@ import pandas as pd
 from elexsolver.QuantileRegressionSolver import QuantileRegressionSolver
 
 from elexmodel.handlers.data.Featurizer import Featurizer
+from elexmodel.logger import getModelLogger
 from elexmodel.models import BaseElectionModel
 
 warnings.filterwarnings("error", category=UserWarning, module="cvxpy")
 
 PredictionIntervals = namedtuple("PredictionIntervals", ["lower", "upper", "conformalization"], defaults=(None,) * 3)
 
-LOG = logging.getLogger(__name__)
+
+LOG = getModelLogger()
 
 
 class ConformalElectionModel(BaseElectionModel.BaseElectionModel, ABC):
