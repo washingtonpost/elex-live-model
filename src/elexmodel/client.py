@@ -353,7 +353,7 @@ class ModelClient:
         LOG.info("LHS called contests: %s", lhs_called_contests)
         LOG.info("RHS called contests: %s", rhs_called_contests)
         LOG.info("Stop model call contests: %s", stop_model_call)
-        
+
         if pi_method == "nonparametric":
             self.model = NonparametricElectionModel(model_settings=model_settings)
         elif pi_method == "gaussian":

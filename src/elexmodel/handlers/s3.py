@@ -174,7 +174,7 @@ class S3VersionUtil:
                 expected_col = f"results_{col}"
             if col in df.columns and expected_col not in df.columns:
                 df[expected_col] = df[col].copy()
-        
+
         LOG.info("Fetched %s versions", len(versions))
 
         return df
