@@ -1,6 +1,5 @@
 import io
 import json
-import logging
 import queue
 
 import boto3
@@ -10,9 +9,10 @@ from dateutil import tz
 from s3transfer.manager import TransferManager
 from s3transfer.subscribers import BaseSubscriber
 
+from elexmodel.logger import getModelLogger
 from elexmodel.utils.file_utils import S3_FILE_PATH
 
-LOG = logging.getLogger(__name__)
+LOG = getModelLogger()
 
 
 class S3Util:
@@ -147,6 +147,7 @@ class S3VersionUtil:
         return version, data, future
 
     def get(self, path, sample=2):
+        LOG.info("Fetching versions from %s/%s", self.bucket_name, path)
         versions = self.list_versions(path)
         if len(versions) == 0:
             LOG.info(f"No versions found for {path}")
@@ -173,6 +174,8 @@ class S3VersionUtil:
                 expected_col = f"results_{col}"
             if col in df.columns and expected_col not in df.columns:
                 df[expected_col] = df[col].copy()
+
+        LOG.info("Fetched %s versions", len(versions))
 
         return df
 

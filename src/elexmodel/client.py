@@ -1,4 +1,3 @@
-import logging
 from collections import defaultdict
 
 import numpy as np
@@ -10,7 +9,7 @@ from elexmodel.handlers.data.CombinedData import CombinedDataHandler
 from elexmodel.handlers.data.ModelResults import ModelResultsHandler
 from elexmodel.handlers.data.PreprocessedData import PreprocessedDataHandler
 from elexmodel.handlers.data.VersionedData import VersionedDataHandler
-from elexmodel.logging import initialize_logging
+from elexmodel.logger import getModelLogger, initialize_logging
 from elexmodel.models.BootstrapElectionModel import BootstrapElectionModel
 from elexmodel.models.ConformalElectionModel import ConformalElectionModel
 from elexmodel.models.GaussianElectionModel import GaussianElectionModel
@@ -21,7 +20,7 @@ from elexmodel.utils.math_utils import compute_error, compute_frac_within_pi, co
 
 initialize_logging()
 
-LOG = logging.getLogger(__name__)
+LOG = getModelLogger()
 
 
 class ModelClientException(Exception):
@@ -344,6 +343,9 @@ class ModelClient:
             aggregates,
             model_settings,
         )
+        LOG.info("LHS called contests: %s", lhs_called_contests)
+        LOG.info("RHS called contests: %s", rhs_called_contests)
+        LOG.info("Stop model call contests: %s", stop_model_call)
 
         if pi_method == "nonparametric":
             self.model = NonparametricElectionModel(model_settings=model_settings)
