@@ -129,6 +129,9 @@ Some model types have specific model parameters that can be included.
 | z_unobserved_lower_bound          | numeric | lower bound for turnout factor   | `bootstrap`     |
 | z_unobserved_upper_bound          | numeric | upper bound for turnout factor   | `bootstrap`     |
 | states_for_separate_model         | list    | states with separate model fit   | `bootstrap`     |
+| extrapolation                     | bool    | run with extrapolation rule      | `bootstrap`     |
+| versioned_start_date              | str     | timestamp string                 | `bootstrap`     |
+| versioned_end_date                | str     | timestamp string                 | `bootstrap`     |
 
 This is the class and function that invokes the general function to generate estimates. You can install `elex-model` as a Python package and use this code snippet in other projects.
 
