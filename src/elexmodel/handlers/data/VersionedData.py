@@ -33,7 +33,7 @@ class VersionedDataHandler:
         else:
             target_bucket = TARGET_BUCKET
         start_date = datetime.fromisoformat(start_date).astimezone(tz=tz.gettz("UTC")) if start_date else None
-        end_date = datetime.fromisoformat(end_date).astimezone(tz=tz.gettz("UTC")) if start_date else None
+        end_date = datetime.fromisoformat(end_date).astimezone(tz=tz.gettz("UTC")) if end_date else None
         # versioned results natively are in UTC but we'll convert it back to timezone in tzinfo
         self.s3_client = s3.S3VersionUtil(target_bucket, start_date, end_date, tzinfo)
 
