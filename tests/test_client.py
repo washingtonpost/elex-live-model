@@ -7,7 +7,7 @@ import pytest
 from elexmodel.client import ModelNotEnoughSubunitsException
 from elexmodel.handlers.config import ConfigHandler
 from elexmodel.handlers.data.LiveData import MockLiveDataHandler
-from elexmodel.logging import initialize_logging
+from elexmodel.logger import initialize_logging
 from elexmodel.utils import math_utils
 
 initialize_logging()
