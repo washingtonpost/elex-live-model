@@ -34,5 +34,6 @@ def initialize_logging(logging_config=None):
     logging.config.dictConfig(logging_config)
     logging.captureWarnings(True)
 
+
 def getModelLogger():
     return logging.getLogger("elexmodel")

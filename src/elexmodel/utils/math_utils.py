@@ -8,6 +8,7 @@ from elexmodel.logger import getModelLogger
 
 LOG = getModelLogger()
 
+
 def compute_inflate(x):
     """
     Compute inflation factor. sum of squared divided by square of sum

@@ -11,6 +11,7 @@ from elexmodel.utils.file_utils import S3_FILE_PATH, TARGET_BUCKET
 
 LOG = logging.getLogger(__name__)
 
+
 class VersionedDataHandler:
     def __init__(
         self,

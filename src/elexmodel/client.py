@@ -1,4 +1,3 @@
-from elexmodel.logger import getModelLogger
 from collections import defaultdict
 
 import numpy as np
@@ -10,7 +9,7 @@ from elexmodel.handlers.data.CombinedData import CombinedDataHandler
 from elexmodel.handlers.data.ModelResults import ModelResultsHandler
 from elexmodel.handlers.data.PreprocessedData import PreprocessedDataHandler
 from elexmodel.handlers.data.VersionedData import VersionedDataHandler
-from elexmodel.logger import initialize_logging
+from elexmodel.logger import getModelLogger, initialize_logging
 from elexmodel.models.BootstrapElectionModel import BootstrapElectionModel
 from elexmodel.models.ConformalElectionModel import ConformalElectionModel
 from elexmodel.models.GaussianElectionModel import GaussianElectionModel

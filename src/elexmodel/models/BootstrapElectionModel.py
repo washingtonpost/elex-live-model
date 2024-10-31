@@ -11,11 +11,11 @@ from scipy.linalg import block_diag
 from scipy.special import expit
 
 from elexmodel.handlers.data.Featurizer import Featurizer
+from elexmodel.logger import getModelLogger
 from elexmodel.models.BaseElectionModel import BaseElectionModel, PredictionIntervals
 
-from elexmodel.logger import getModelLogger
-
 LOG = getModelLogger()
+
 
 class BootstrapElectionModelException(Exception):
     pass

@@ -9,11 +9,11 @@ from dateutil import tz
 from s3transfer.manager import TransferManager
 from s3transfer.subscribers import BaseSubscriber
 
+from elexmodel.logger import getModelLogger
 from elexmodel.utils.file_utils import S3_FILE_PATH
 
-from elexmodel.logger import getModelLogger
-
 LOG = getModelLogger()
+
 
 class S3Util:
     def __init__(self, bucket_name, client=None):
@@ -174,7 +174,7 @@ class S3VersionUtil:
                 expected_col = f"results_{col}"
             if col in df.columns and expected_col not in df.columns:
                 df[expected_col] = df[col].copy()
-        
+
         LOG.info("Fetched %s versions", len(versions))
 
         return df
