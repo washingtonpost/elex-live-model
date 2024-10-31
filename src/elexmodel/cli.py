@@ -103,13 +103,6 @@ class PythonLiteralOption(click.Option):
     is_flag=True,
     help="When not running a historical election, output results aggregated to the national level.",
 )
-@click.option(
-    "--turnout_factor_z",
-    "turnout_factor_z",
-    default=4.75,
-    type=float,
-    help="z-score threshold to use for turnout factor outlier detection.",
-)
 def cli(
     election_id, estimands, office_id, prediction_intervals, percent_reporting_threshold, geographic_unit_type, **kwargs
 ):

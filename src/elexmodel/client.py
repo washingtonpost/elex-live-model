@@ -156,6 +156,10 @@ class ModelClient:
                     model_parameters["z_unobserved_lower_bound"], (float, int)
                 ):
                     raise ValueError("z_unobserved_lower_bound is not valid. Has to be a float.")
+                if "turnout_factor_z" in model_parameters and not isinstance(
+                    model_parameters["turnout_factor_z"], (float, int)
+                ):
+                    raise ValueError("turnout_factor_z is not valid. Has to be a float.")
         if handle_unreporting not in {"drop", "zero"}:
             raise ValueError("handle_unreporting must be either `drop` or `zero`")
 
@@ -223,7 +227,6 @@ class ModelClient:
         # saving conformalization data only makes sense if a ConformalElectionModel is used
         save_conformalization = "conformalization" in save_output
         handle_unreporting = kwargs.get("handle_unreporting", "drop")
-        turnout_factor_z_threshold = kwargs.get("turnout_factor_z", 4.75)
 
         district_election = False
         # if office starts with one of these letters
@@ -296,6 +299,7 @@ class ModelClient:
         fit_margin_outlier_model = model_parameters.get("fit_margin_outlier_model", True)
         fit_turnout_outlier_model = model_parameters.get("fit_turnout_outlier_model", True)
         outlier_z_threshold = model_parameters.get("outlier_z_threshold", 2.0)
+        turnout_factor_z_threshold = model_parameters.get("turnout_factor_z", 4.75)
 
         (reporting_units, nonreporting_units, unexpected_units) = data.get_units(
             percent_reporting_threshold,
