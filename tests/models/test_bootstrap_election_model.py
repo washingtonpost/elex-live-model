@@ -907,6 +907,7 @@ def test_get_unit_prediction_intervals(bootstrap_election_model, rng):
     bootstrap_election_model.weighted_yz_test_pred = rng.normal(scale=1, size=(n, 1))
     bootstrap_election_model.errors_B_1 = rng.normal(scale=s, size=(n, B))
     bootstrap_election_model.errors_B_2 = rng.normal(scale=s, size=(n, B))
+    bootstrap_election_model.B = B
     lower, upper = bootstrap_election_model.get_unit_prediction_intervals(
         reporting_units, nonreporting_units, alpha, "margin"
     )
