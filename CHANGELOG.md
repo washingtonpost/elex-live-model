@@ -1,4 +1,7 @@
-	# Changelog
+# Changelog
+
+# 2.2.1 (11/1/2024)
+- chore: downgrade botocore and s3transfer as per live team dependency [#128](https://github.com/washingtonpost/elex-live-model/pull/128)
 
 ## 2.2.0 (11/1/2024)
 - chore: condensed logging of non-modeled units [#120](https://github.com/washingtonpost/elex-live-model/pull/120)

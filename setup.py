@@ -10,8 +10,8 @@ INSTALL_REQUIRES = (
     "boto3>=1.34",
     "python-dotenv>=1.0",
     "scipy>=1.14",
-    "s3transfer>=0.10.2",
-    "botocore>=1.35.18",
+    "s3transfer>=0.9.0",
+    "botocore>=1.34.162",
 )
 
 THIS_FILE_DIR = os.path.dirname(__file__)
@@ -22,7 +22,7 @@ with open(os.path.join(THIS_FILE_DIR, "README.md"), encoding="utf-8") as f:
     LONG_DESCRIPTION = f.read()
 
 # The full version, including alpha/beta/rc tags
-RELEASE = "2.2.0"
+RELEASE = "2.2.1"
 # The short X.Y version
 VERSION = ".".join(RELEASE.split(".")[:2])
 
