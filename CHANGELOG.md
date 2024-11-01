@@ -1,4 +1,10 @@
-# Changelog
+	# Changelog
+
+## 2.2.0 (11/1/2024)
+- chore: condensed logging of non-modeled units [#120](https://github.com/washingtonpost/elex-live-model/pull/120)
+- feat: improvements to margin outlier detection [#121](https://github.com/washingtonpost/elex-live-model/pull/121)
+- feat: extrapolation rule and improvements to called contest handling [#122](https://github.com/washingtonpost/elex-live-model/pull/122), [#123](https://github.com/washingtonpost/elex-live-model/pull/123), [#124](https://github.com/washingtonpost/elex-live-model/pull/124)
+- feat: remove min/max during electoral votes estimation [#125](https://github.com/washingtonpost/elex-live-model/pull/125)
 
 ## 2.1.2 (10/24/2024)
 - feat: `agg_model_hard_threshold` now defaults to `True`
