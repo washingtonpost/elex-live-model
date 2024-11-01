@@ -1815,9 +1815,7 @@ class BootstrapElectionModel(BaseElectionModel):
             potential_losses[pred_states.astype(bool) & self.stop_model_call.flatten()] = 1
             potential_gains[~pred_states.astype(bool) & self.stop_model_call.flatten()] = 1
 
-        interval_lower = aggregate_dem_vals_pred - np.sum(
-            nat_sum_data_dict_sorted_vals.flatten() * potential_losses
-        )
+        interval_lower = aggregate_dem_vals_pred - np.sum(nat_sum_data_dict_sorted_vals.flatten() * potential_losses)
         interval_upper = aggregate_dem_vals_pred + np.sum(nat_sum_data_dict_sorted_vals.flatten() * potential_gains)
 
         agg_pred = round(aggregate_dem_vals_pred + base_to_add, 2)
