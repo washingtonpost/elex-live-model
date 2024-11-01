@@ -7,7 +7,7 @@ class Featurizer:
     Featurizer. Normalizes features, add intercept, expands fixed effects
     """
 
-    def __init__(self, features: list, fixed_effects: list):
+    def __init__(self, features: list, fixed_effects: list, states_for_separate_model: list = []):
         self.features = features
         # fixed effects can be a list, in which case every value of a fixed effect gets its own column
         if isinstance(fixed_effects, list):
@@ -39,6 +39,8 @@ class Featurizer:
         # active features are features + active fixed effects
         self.active_features = []
 
+        self.states_for_separate_model = states_for_separate_model
+
     def _expand_fixed_effects(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Convert fixed effect columns into dummy variables.
@@ -65,6 +67,22 @@ class Featurizer:
         """
         return [x for x in list_ if x.startswith(fe)]
 
+    def _sort_features(self, features: list) -> list:
+        """
+        Sort features by custom order
+        """
+        # this makes sure that the intercept comes first and the baseline_normalize_margin(s) come next
+        # which we need to tell the model which features not to regularize
+        custom_order = ["intercept", "baseline_normalized_margin"]
+        return list(
+            sorted(
+                features,
+                key=lambda x: custom_order.index(next((start for start in custom_order if x.startswith(start)), None))
+                if any(x.startswith(start) for start in custom_order)
+                else len(custom_order),
+            )
+        )
+
     def prepare_data(
         self, df: pd.DataFrame, center_features: bool = True, scale_features: bool = True, add_intercept: bool = True
     ) -> pd.DataFrame:
@@ -81,6 +99,23 @@ class Featurizer:
         if add_intercept is true an intercept column is added to the features and one fixed effect value is dropped
         """
         df = df.copy()  # create copy so we can do things to the values
+
+        # if a state is in the states for separate model, then we add separate feature columns for that state
+        # and we zero out the original feature column for those states
+        additional_state_features = []
+        for state in self.states_for_separate_model:
+            # this makes sure that we produce these columns for reporting states only, otherwise
+            # the entire column for that state_feature will be zero
+            if state not in df[np.isclose(df.reporting, 1)].postal_code.unique():
+                continue
+            mask = df.postal_code == state
+            for feature in self.features:
+                state_feature = f"{feature}_{state}"
+                df[state_feature] = df[feature].where(mask, 0)
+                df.loc[mask, feature] = 0
+                additional_state_features.append(state_feature)
+
+        df = df.copy()  # create copy so we can do things to the values
         if center_features:
             df[self.features] -= df[self.features].mean()
         if scale_features:
@@ -90,6 +125,14 @@ class Featurizer:
             self.complete_features += ["intercept"]
             self.active_features += ["intercept"]
             df["intercept"] = 1
+
+            # if a state is in the states for separate model, then we add separate intercept columns for that state
+            # and we zero out the original intercept column for those stattes
+            for state in self.states_for_separate_model:
+                mask = df.postal_code == state
+                df.loc[mask, "intercept"] = 0
+
+            # if fixed effects are on then we have redundant with the state specific intercepts
 
         if len(self.fixed_effect_cols) > 0:
             df = self._expand_fixed_effects(df)
@@ -140,11 +183,13 @@ class Featurizer:
         # all features that the model will be fit on
         # these are all the features + the expanded fixed effects
         # (so all fixed effect values in the complete data excluding the ones dropped for multicolinearity)
-        self.complete_features += self.features + self.expanded_fixed_effects
-        self.active_features += self.features + self.active_fixed_effects
-        df = df[self.complete_features]
+        self.complete_features += self.features + additional_state_features + self.expanded_fixed_effects
+        self.active_features += self.features + additional_state_features + self.active_fixed_effects
 
-        return df
+        self.complete_features = self._sort_features(self.complete_features)
+        self.active_features = self._sort_features(self.active_features)
+
+        return df[self.complete_features]
 
     def filter_to_active_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """

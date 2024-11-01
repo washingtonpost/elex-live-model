@@ -1,11 +1,18 @@
+import io
 import json
-import logging
+import queue
 
 import boto3
+import pandas as pd
+from botocore.session import get_session
+from dateutil import tz
+from s3transfer.manager import TransferManager
+from s3transfer.subscribers import BaseSubscriber
 
+from elexmodel.logger import getModelLogger
 from elexmodel.utils.file_utils import S3_FILE_PATH
 
-LOG = logging.getLogger(__name__)
+LOG = getModelLogger()
 
 
 class S3Util:
@@ -75,3 +82,111 @@ class S3CsvUtil(S3Util):
         data = super().get(filename, **kwargs)
         csv = data.read().decode("utf-8")
         return csv
+
+
+class S3VersionUtil:
+    def __init__(self, bucket_name, start_date=None, end_date=None, tz="America/New_York"):
+        self.bucket_name = bucket_name
+        self.s3_client = get_session().create_client("s3")
+        self.manager = TransferManager(self.s3_client)
+
+        self.start_date = start_date
+        self.end_date = end_date
+        self.tz = tz
+
+    def list_versions(self, path, **kwargs):
+        """
+        path here is the full path - constucted via f"{base_path}/{path}"
+        in previous implementations of this
+        """
+        response = self.s3_client.list_object_versions(Bucket=self.bucket_name, Prefix=path, **kwargs)
+
+        versions = []
+        if "Versions" in response:
+            versions = response["Versions"]
+
+        if (
+            response["IsTruncated"]
+            and len(versions) > 0
+            and (self.start_date is None or versions[-1]["LastModified"] >= self.start_date)
+        ):
+            versions += self.list_versions(
+                path,
+                KeyMarker=response["NextKeyMarker"],
+                VersionIdMarker=response["NextVersionIdMarker"],
+            )
+        if self.start_date is not None:
+            versions = list(filter(lambda v: v["LastModified"] >= self.start_date, versions))
+        if self.end_date is not None:
+            versions = list(filter(lambda v: v["LastModified"] <= self.end_date, versions))
+        return versions
+
+    def wait_for_versions(self, q):
+        while not q.empty():
+            version, data, future = q.get()
+
+            try:
+                future.result()
+                yield version, data
+            except Exception as e:
+                LOG.error(f"Error downloading {version['VersionId']}: {e}")
+
+            q.task_done()
+
+    def make_request(self, path, *, version=None, **kwargs):
+        subscribers = []
+        if version is not None:
+            # Because we know the size of the version already, we can supply that
+            # to the download manager to save a HEAD request.
+            subscribers = [ProvideSizeSubscriber(version["Size"])]
+            kwargs.setdefault("VersionId", version["VersionId"])
+
+        data = io.BytesIO()
+        future = self.manager.download(self.bucket_name, path, data, extra_args=kwargs, subscribers=subscribers)
+
+        return version, data, future
+
+    def get(self, path, sample=2):
+        LOG.info("Fetching versions from %s/%s", self.bucket_name, path)
+        versions = self.list_versions(path)
+        if len(versions) == 0:
+            LOG.info(f"No versions found for {path}")
+            return None
+
+        # Instead of asking for the results of downloads synchronously, we're
+        # queuing the futures and then waiting for them to complete.
+        q = queue.Queue()
+        for version in versions[::sample]:
+            q.put(self.make_request(path, version=version), block=False)
+
+        csvs = []
+        for version, data in self.wait_for_versions(q):
+            data.seek(0)
+            csv_rows = pd.read_csv(data, dtype={"geographic_unit_fips": str})
+            csv_rows["last_modified"] = pd.to_datetime(version["LastModified"]).astimezone(tz=tz.gettz(self.tz))
+            csvs.append(csv_rows)
+
+        df = pd.concat(csvs)
+        for col in ["dem", "gop", "total"]:
+            if col == "total":
+                expected_col = "results_turnout"
+            else:
+                expected_col = f"results_{col}"
+            if col in df.columns and expected_col not in df.columns:
+                df[expected_col] = df[col].copy()
+
+        LOG.info("Fetched %s versions", len(versions))
+
+        return df
+
+
+class ProvideSizeSubscriber(BaseSubscriber):
+    """
+    A subscriber which provides the transfer size before it's queued.
+    """
+
+    def __init__(self, size):
+        self.size = size
+
+    def on_queued(self, future, **kwargs):
+        future.meta.provide_transfer_size(self.size)

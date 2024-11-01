@@ -1,11 +1,12 @@
-import logging
 from abc import ABC
 from collections import namedtuple
 
 import numpy as np
 import pandas as pd
 
-LOG = logging.getLogger(__name__)
+from elexmodel.logger import getModelLogger
+
+LOG = getModelLogger()
 
 PredictionIntervals = namedtuple("PredictionIntervals", ["lower", "upper"], defaults=(None,) * 2)
 
