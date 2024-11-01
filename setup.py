@@ -10,6 +10,8 @@ INSTALL_REQUIRES = (
     "boto3>=1.34",
     "python-dotenv>=1.0",
     "scipy>=1.14",
+    "s3transfer>=0.10.2",
+    "botocore>=1.35.18"
 )
 
 THIS_FILE_DIR = os.path.dirname(__file__)
