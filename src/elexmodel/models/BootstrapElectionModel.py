@@ -1806,20 +1806,6 @@ class BootstrapElectionModel(BaseElectionModel):
             potential_losses = pred_states - (~lower_states).astype(int)
             potential_gains = upper_states.astype(int) - pred_states
 
-        interval_upper = aggregate_dem_vals_pred + np.sum(nat_sum_data_dict_sorted_vals.flatten() * potential_gains)
-        interval_lower = aggregate_dem_vals_pred - np.sum(nat_sum_data_dict_sorted_vals.flatten() * potential_losses)
-
-        # B_1 and B_2 outcomes should respect called races
-        # because we create independent samples for B_1 and B_2 their difference can exaggerate the possible outcomes
-        # in the predicted lower and upper bounds.
-        # to undo this, we take the lower bound for B_1 and B_2 and the upper bound for B_1 and B_2 to max/min those
-        # with the predicted lower and upper bounds.
-        lower_bound = min(aggregate_dem_vals_B_1.sum(axis=0).min(), aggregate_dem_vals_B_2.sum(axis=0).min())
-        upper_bound = max(aggregate_dem_vals_B_1.sum(axis=0).max(), aggregate_dem_vals_B_2.sum(axis=0).max())
-
-        interval_lower = max(interval_lower, lower_bound)
-        interval_upper = min(interval_upper, upper_bound)
-
         if self.called_contests is not None:
             # if there is a call, there is no uncertainty in the outcome
             potential_losses[~np.isclose(self.called_contests.flatten(), -1)] = 0
@@ -1829,10 +1815,8 @@ class BootstrapElectionModel(BaseElectionModel):
             potential_losses[pred_states.astype(bool) & self.stop_model_call.flatten()] = 1
             potential_gains[~pred_states.astype(bool) & self.stop_model_call.flatten()] = 1
 
-            interval_lower = aggregate_dem_vals_pred - np.sum(
-                nat_sum_data_dict_sorted_vals.flatten() * potential_losses
-            )
-            interval_upper = aggregate_dem_vals_pred + np.sum(nat_sum_data_dict_sorted_vals.flatten() * potential_gains)
+        interval_lower = aggregate_dem_vals_pred - np.sum(nat_sum_data_dict_sorted_vals.flatten() * potential_losses)
+        interval_upper = aggregate_dem_vals_pred + np.sum(nat_sum_data_dict_sorted_vals.flatten() * potential_gains)
 
         agg_pred = round(aggregate_dem_vals_pred + base_to_add, 2)
         agg_lower = round(interval_lower + base_to_add, 2)
