@@ -122,15 +122,13 @@ class VersionedDataHandler:
 
             # check if perc_expected_vote_corr is monotone increasing (if not, give up and don't try to estimate a margin)
             if not np.all(np.diff(perc_expected_vote_corr) >= 0):
-                LOG.info(
-                    f"Non-monotonic percent_expected_vote in versioned data for {df.geographic_unit_fips.iloc[0]}."
-                )
                 return pd.DataFrame(
                     {
                         "percent_expected_vote": np.arange(101),
                         "nearest_observed_vote": np.nan * np.ones(101),
                         "est_margin": np.nan * np.ones(101),
                         "est_correction": np.nan * np.ones(101),
+                        "error_type": "non-monotone percent expected vote",
                     }
                 )
 
@@ -151,15 +149,13 @@ class VersionedDataHandler:
 
             # batch_margins should be between -1 and 1 (otherwise, there was a data entry issue and we will not use this unit)
             if np.abs(batch_margin).max() > 1:
-                LOG.info(
-                    f"Implausible batch margin {np.abs(batch_margin).max()} in versioned data for {df.geographic_unit_fips.iloc[0]}."
-                )
                 return pd.DataFrame(
                     {
                         "percent_expected_vote": np.arange(101),
                         "nearest_observed_vote": np.nan * np.ones(101),
                         "est_margin": np.nan * np.ones(101),
                         "est_correction": np.nan * np.ones(101),
+                        "error_type": "batch_margin",
                     }
                 )
 
@@ -204,10 +200,17 @@ class VersionedDataHandler:
                     "nearest_observed_vote": percent_vote[np.clip(obs_indices + 1, 0, len(percent_vote) - 1)],
                     "est_margin": est_margins,
                     "est_correction": norm_margin[-1] - est_margins,
+                    "error_type": "none",
                 }
             )
 
         results = results.groupby("geographic_unit_fips").apply(compute_estimated_margin).reset_index()
+
+        for error_type in sorted(set(results["error_type"])):
+            if error_type == "none":
+                continue
+            category_error_type = results[results["error_type"] == error_type].geographic_unit_fips.unique()
+            LOG.info(f"# of versioned units with {error_type} error: {len(category_error_type)}")
         return results
 
     def get_versioned_predictions(self, filepath=None):
