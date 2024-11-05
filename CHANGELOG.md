@@ -1,5 +1,8 @@
 # Changelog
 
+# 2.2.2 (11/5/2024)
+- fix: missing `est_correction` column in `VersionedResults` `DataFrame` in the event of bad data [#131](https://github.com/washingtonpost/elex-live-model/pull/131)
+
 # 2.2.1 (11/1/2024)
 - chore: downgrade botocore and s3transfer as per live team dependency [#128](https://github.com/washingtonpost/elex-live-model/pull/128)
 
