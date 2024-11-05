@@ -122,7 +122,9 @@ class VersionedDataHandler:
 
             # check if perc_expected_vote_corr is monotone increasing (if not, give up and don't try to estimate a margin)
             if not np.all(np.diff(perc_expected_vote_corr) >= 0):
-                LOG.info(f"Non-monotonic percent_expected_vote in versioned data for {df.geographic_unit_fips.iloc[0]}")
+                LOG.info(
+                    f"Non-monotonic percent_expected_vote in versioned data for {df.geographic_unit_fips.iloc[0]}."
+                )
                 return pd.DataFrame(
                     {
                         "percent_expected_vote": np.arange(101),
@@ -150,7 +152,7 @@ class VersionedDataHandler:
             # batch_margins should be between -1 and 1 (otherwise, there was a data entry issue and we will not use this unit)
             if np.abs(batch_margin).max() > 1:
                 LOG.info(
-                    f"Implausible batch margin {np.abs(batch_margin).max()} in versioned data for {df.geographic_unit_fips.iloc[0]}"
+                    f"Implausible batch margin {np.abs(batch_margin).max()} in versioned data for {df.geographic_unit_fips.iloc[0]}."
                 )
                 return pd.DataFrame(
                     {
