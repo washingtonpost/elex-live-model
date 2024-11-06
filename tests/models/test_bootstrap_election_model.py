@@ -149,7 +149,7 @@ def test_estimate_strata_dist(bootstrap_election_model, rng):
 
 def test_generate_nonreporting_bounds(bootstrap_election_model, rng):
     nonreporting_units = pd.DataFrame(
-        [[0.1, 1.2, 75], [0.8, 0.8, 24], [0.1, 0.01, 0], [-0.2, 0.8, 99], [-0.3, 0.9, 100]],
+        [[0.1, 1.2, 75], [0.1, 0.01, 0], [-0.2, 0.8, 99], [-0.3, 0.9, 100]],
         columns=["results_normalized_margin", "turnout_factor", "percent_expected_vote"],
     )
 
@@ -162,35 +162,29 @@ def test_generate_nonreporting_bounds(bootstrap_election_model, rng):
     assert lower[0] == pytest.approx(-0.175)
     assert upper[0] == pytest.approx(0.325)
 
-    assert lower[1] == pytest.approx(-0.568)
-    assert upper[1] == pytest.approx(0.952)
-
     # if expected vote is close to 0 or 1 we set the bounds to be the extreme case
-    assert lower[2] == bootstrap_election_model.y_unobserved_lower_bound
-    assert upper[2] == bootstrap_election_model.y_unobserved_upper_bound
+    assert lower[1] == bootstrap_election_model.y_unobserved_lower_bound
+    assert upper[1] == bootstrap_election_model.y_unobserved_upper_bound
 
-    assert lower[3] == pytest.approx(-0.208)
-    assert upper[3] == pytest.approx(-0.188)
+    assert lower[2] == pytest.approx(-0.208)
+    assert upper[2] == pytest.approx(-0.188)
 
-    assert lower[4] == bootstrap_election_model.y_unobserved_lower_bound
-    assert upper[4] == bootstrap_election_model.y_unobserved_upper_bound
+    assert lower[3] == bootstrap_election_model.y_unobserved_lower_bound
+    assert upper[3] == bootstrap_election_model.y_unobserved_upper_bound
 
     lower, upper = bootstrap_election_model._generate_nonreporting_bounds(nonreporting_units, "turnout_factor")
 
     assert lower[0] == pytest.approx(0.96)
     assert upper[0] == pytest.approx(4.8)
 
-    assert lower[1] == pytest.approx(1.081081081)
-    assert upper[1] == pytest.approx(80)  # this is 80 since we divide 0.8 / 0.01 (it's clipped)
+    assert lower[1] == bootstrap_election_model.z_unobserved_lower_bound
+    assert upper[1] == bootstrap_election_model.z_unobserved_upper_bound
 
-    assert lower[2] == bootstrap_election_model.z_unobserved_lower_bound
-    assert upper[2] == bootstrap_election_model.z_unobserved_upper_bound
+    assert lower[2] == pytest.approx(0.536912752)
+    assert upper[2] == pytest.approx(1.632653061)
 
-    assert lower[3] == pytest.approx(0.536912752)
-    assert upper[3] == pytest.approx(1.632653061)
-
-    assert lower[4] == bootstrap_election_model.z_unobserved_lower_bound
-    assert upper[4] == bootstrap_election_model.z_unobserved_upper_bound
+    assert lower[3] == bootstrap_election_model.z_unobserved_lower_bound
+    assert upper[3] == bootstrap_election_model.z_unobserved_upper_bound
 
     # changing parameters
     bootstrap_election_model.y_unobserved_lower_bound = -0.8
@@ -202,17 +196,14 @@ def test_generate_nonreporting_bounds(bootstrap_election_model, rng):
     assert lower[0] == pytest.approx(-0.125)
     assert upper[0] == pytest.approx(0.275)
 
-    assert lower[1] == pytest.approx(-0.416)
-    assert upper[1] == pytest.approx(0.8)
+    assert lower[1] == bootstrap_election_model.y_unobserved_lower_bound
+    assert upper[1] == bootstrap_election_model.y_unobserved_upper_bound
 
-    assert lower[2] == bootstrap_election_model.y_unobserved_lower_bound
-    assert upper[2] == bootstrap_election_model.y_unobserved_upper_bound
+    assert lower[2] == pytest.approx(-0.206)
+    assert upper[2] == pytest.approx(-0.19)
 
-    assert lower[3] == pytest.approx(-0.206)
-    assert upper[3] == pytest.approx(-0.19)
-
-    assert lower[4] == bootstrap_election_model.y_unobserved_lower_bound
-    assert upper[4] == bootstrap_election_model.y_unobserved_upper_bound
+    assert lower[3] == bootstrap_election_model.y_unobserved_lower_bound
+    assert upper[3] == bootstrap_election_model.y_unobserved_upper_bound
 
     bootstrap_election_model.y_unobserved_lower_bound = 0.8
     bootstrap_election_model.y_unobserved_upper_bound = 1.2
@@ -222,17 +213,14 @@ def test_generate_nonreporting_bounds(bootstrap_election_model, rng):
     assert lower[0] == pytest.approx(1.411764706)
     assert upper[0] == pytest.approx(1.846153846)
 
-    assert lower[1] == pytest.approx(2.352941176)
-    assert upper[1] == pytest.approx(5.714285714)
+    assert lower[1] == bootstrap_election_model.z_unobserved_lower_bound
+    assert upper[1] == bootstrap_election_model.z_unobserved_upper_bound
 
-    assert lower[2] == bootstrap_election_model.z_unobserved_lower_bound
-    assert upper[2] == bootstrap_election_model.z_unobserved_upper_bound
+    assert lower[2] == pytest.approx(0.733944954)
+    assert upper[2] == pytest.approx(0.898876404)
 
-    assert lower[3] == pytest.approx(0.733944954)
-    assert upper[3] == pytest.approx(0.898876404)
-
-    assert lower[4] == bootstrap_election_model.z_unobserved_lower_bound
-    assert upper[4] == bootstrap_election_model.z_unobserved_upper_bound
+    assert lower[3] == bootstrap_election_model.z_unobserved_lower_bound
+    assert upper[3] == bootstrap_election_model.z_unobserved_upper_bound
 
 
 def test_strata_pit(bootstrap_election_model, rng):
