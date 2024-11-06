@@ -1,5 +1,8 @@
 # Changelog
 
+# 2.2.3 (11/5/2024)
+- chore: adding additional log [#135](https://github.com/washingtonpost/elex-live-model/pull/135)
+
 # 2.2.2 (11/5/2024)
 - fix: missing `est_correction` column in `VersionedResults` `DataFrame` in the event of bad data [#131](https://github.com/washingtonpost/elex-live-model/pull/131)
 
