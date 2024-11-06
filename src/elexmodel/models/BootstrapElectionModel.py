@@ -357,10 +357,10 @@ class BootstrapElectionModel(BaseElectionModel):
 
         # if percent reporting is 0 or 1, don't try to compute anything and revert to naive bounds
         lower_bound[
-            np.isclose(nonreporting_expected_vote_frac, 0) | np.isclose(nonreporting_expected_vote_frac, 1)
+            (nonreporting_expected_vote_frac < 0.5) | np.isclose(nonreporting_expected_vote_frac, 1)
         ] = unobserved_lower_bound
         upper_bound[
-            np.isclose(nonreporting_expected_vote_frac, 0) | np.isclose(nonreporting_expected_vote_frac, 1)
+            (nonreporting_expected_vote_frac < 0.5) | np.isclose(nonreporting_expected_vote_frac, 1)
         ] = unobserved_upper_bound
 
         return lower_bound.values.reshape(-1, 1), upper_bound.values.reshape(-1, 1)
