@@ -1,5 +1,8 @@
 # Changelog
 
+# 2.2.4 (11/5/2024)
+- fix: truncation can fail catastrophically when % reporting is too low [#138](https://github.com/washingtonpost/elex-live-model/pull/138)
+
 # 2.2.3 (11/5/2024)
 - chore: adding additional log [#135](https://github.com/washingtonpost/elex-live-model/pull/135)
 
