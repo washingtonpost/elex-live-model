@@ -117,7 +117,11 @@ class VersionedDataHandler:
             # because the AP adjusted its model after the fact. We correct for this here.
             # we recompute the percent_expected_vote using the last reported value as the max
             perc_expected_vote_corr = np.divide(
-                results_turnout, results_turnout[-1], out=np.zeros_like(results_turnout), where=results_turnout[-1] != 0
+                results_turnout,
+                results_turnout[-1],
+                out=np.zeros_like(results_turnout),
+                where=results_turnout[-1] != 0,
+                casting="unsafe",
             )
 
             # check if perc_expected_vote_corr is monotone increasing (if not, give up and don't try to estimate a margin)
@@ -190,7 +194,7 @@ class VersionedDataHandler:
 
             est_margins = observed_norm_margin * observed_vote + observed_batch_margin * (percs - observed_vote)
             est_margins = np.divide(
-                est_margins, percs, where=percs != 0, out=np.zeros_like(est_margins)
+                est_margins, percs, where=percs != 0, out=np.zeros_like(est_margins), casting="unsafe"
             )  # Handle div-by-zero
 
             # Return a DataFrame with the multi-index (geographic_unit_fips, perc)
