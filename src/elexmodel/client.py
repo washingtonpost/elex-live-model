@@ -1,4 +1,5 @@
 from collections import defaultdict
+from io import StringIO
 
 import numpy as np
 import pandas as pd
@@ -339,6 +340,31 @@ class ModelClient:
                 versioned_data_handler = None
         else:
             versioned_data_handler = None
+
+        if model_parameters.get("correct_from_presidential", False):
+            s3_client = s3.S3CsvUtil(TARGET_BUCKET)
+            baseline_path = f"{S3_FILE_PATH}/{self.election_id}/data/P/data_county.csv"
+            results_path = f"{S3_FILE_PATH}/{self.election_id}/results/P/county/current.csv"
+            predictions_path = f"{S3_FILE_PATH}/{self.election_id}/predictions/P/county/unit_data/current.csv"
+            pres_baseline = pd.read_csv(StringIO(s3_client.get(baseline_path)), dtype={"geographic_unit_fips": str})
+            pres_baseline["baseline_normalized_margin"] = (pres_baseline.baseline_dem - pres_baseline.baseline_gop) / (
+                pres_baseline.baseline_dem + pres_baseline.baseline_gop
+            )
+            pres_results = pd.read_csv(StringIO(s3_client.get(results_path)), dtype={"geographic_unit_fips": str})
+            pres_predictions = pd.read_csv(
+                StringIO(s3_client.get(predictions_path)), dtype={"geographic_unit_fips": str}
+            )
+            pres_predictions = pres_predictions.merge(
+                pres_results[["geographic_unit_fips", "results_weights"]], on="geographic_unit_fips", how="left"
+            )
+            pres_predictions = pres_predictions.merge(
+                pres_baseline[["geographic_unit_fips", "baseline_normalized_margin"]],
+                on="geographic_unit_fips",
+                how="left",
+            )
+        else:
+            pres_predictions = None
+
         LOG.info("Running model for %s", self.election_id)
         LOG.info(
             "Model parameters: \n prediction intervals: %s, percent reporting threshold: %s, \
@@ -359,7 +385,9 @@ class ModelClient:
             self.model = GaussianElectionModel(model_settings=model_settings)
         elif pi_method == "bootstrap":
             self.model = BootstrapElectionModel(
-                model_settings=model_settings, versioned_data_handler=versioned_data_handler
+                model_settings=model_settings,
+                versioned_data_handler=versioned_data_handler,
+                pres_predictions=pres_predictions,
             )
 
         minimum_reporting_units_max = 0
