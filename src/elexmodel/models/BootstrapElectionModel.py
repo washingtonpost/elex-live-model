@@ -76,7 +76,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         # save presidenial predictions for later use
         self.pres_predictions = pres_predictions
-        self.correct_from_presidential = model_settings.get("correct_from_presidential", self.office in ("H", "S"))
+        self.correct_from_presidential = model_settings.get("correct_from_presidential", False)
 
         # upper and lower bounds for the quantile regression which define the strata distributions
         # these make sure that we can control the worst cases for the distributions in case we

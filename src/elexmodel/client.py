@@ -341,7 +341,7 @@ class ModelClient:
         else:
             versioned_data_handler = None
 
-        if model_parameters.get("pres_corr", False):
+        if model_parameters.get("correct_from_presidential", False):
             s3_client = s3.S3CsvUtil(TARGET_BUCKET)
             baseline_path = f"{S3_FILE_PATH}/{self.election_id}/data/P/data_county.csv"
             results_path = f"{S3_FILE_PATH}/{self.election_id}/results/P/county/current.csv"
