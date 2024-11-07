@@ -61,9 +61,9 @@ class BootstrapElectionModel(BaseElectionModel):
             "agg_model_hard_threshold", True
         )  # use sigmoid or hard thresold when calculating agg model
         self.district_election = model_settings.get("district_election", False)
-        self.office = model_settings.get("office", None) # office of the election
-        self.election_id = model_settings.get("election_id", None) # election ID
-        self.geographic_unit_type = model_settings.get("geographic_unit_type", None) # geographic unit type
+        self.office = model_settings.get("office", None)  # office of the election
+        self.election_id = model_settings.get("election_id", None)  # election ID
+        self.geographic_unit_type = model_settings.get("geographic_unit_type", None)  # geographic unit type
 
         self.lambda_ = model_settings.get("lambda_", None)  # regularization parameter for OLS
 
@@ -76,6 +76,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         # save presidenial predictions for later use
         self.pres_predictions = pres_predictions
+        self.correct_from_presidential = model_settings.get("correct_from_presidential", self.office in ("H", "S"))
 
         # upper and lower bounds for the quantile regression which define the strata distributions
         # these make sure that we can control the worst cases for the distributions in case we
@@ -102,8 +103,6 @@ class BootstrapElectionModel(BaseElectionModel):
         self.featurizer = Featurizer(
             self.features, self.fixed_effects, states_for_separate_model=self.states_for_separate_model
         )
-
-        self.correct_from_presidential = model_settings.get("correct_from_presidential", self.office in ("H", "S"))
 
         self.seed = model_settings.get("seed", 0)
         self.rng = np.random.default_rng(seed=self.seed)  # used for sampling
@@ -1293,9 +1292,16 @@ class BootstrapElectionModel(BaseElectionModel):
             ]
 
         if self.correct_from_presidential:
-            # self.pres_predictions['geographic_unit_fips'] = self.pres_predictions.geographic_unit_fips.apply(lambda x: x.zfill(5))
-            nonreporting_units['geographic_unit_fips_p'] = nonreporting_units.geographic_unit_fips.apply(lambda x: x.split("_")[1])
-            nonreporting_units = nonreporting_units.merge(self.pres_predictions, left_on="geographic_unit_fips_p", right_on="geographic_unit_fips", how="left", suffixes=("", "_pres"))
+            nonreporting_units["geographic_unit_fips_p"] = nonreporting_units.geographic_unit_fips.apply(
+                lambda x: x.split("_")[1]
+            )
+            nonreporting_units = nonreporting_units.merge(
+                self.pres_predictions,
+                left_on="geographic_unit_fips_p",
+                right_on="geographic_unit_fips",
+                how="left",
+                suffixes=("", "_pres"),
+            )
 
             # adjust results_normalized_margin_pres to account for split counties
 
@@ -1303,17 +1309,31 @@ class BootstrapElectionModel(BaseElectionModel):
                 nonreporting_units.baseline_normalized_margin - nonreporting_units.baseline_normalized_margin_pres
             )
 
-            nonreporting_units["results_normalized_margin_pres"] = nonreporting_units.results_margin_pres / nonreporting_units.results_weights_pres + nonreporting_units.margin_adj
-            nonreporting_units["pred_normalized_margin_pres"] = nonreporting_units.pred_margin / nonreporting_units.pred_turnout + nonreporting_units.margin_adj
+            nonreporting_units["results_normalized_margin_pres"] = (
+                nonreporting_units.results_margin_pres / nonreporting_units.results_weights_pres
+                + nonreporting_units.margin_adj
+            )
+            nonreporting_units["pred_normalized_margin_pres"] = (
+                nonreporting_units.pred_margin / nonreporting_units.pred_turnout + nonreporting_units.margin_adj
+            )
 
-            nonreporting_units["pred_normalized_margin"] = np.mean(y_test_pred_B.clip(min=y_partial_reporting_lower, max=y_partial_reporting_upper), axis=1)
+            nonreporting_units["pred_normalized_margin"] = np.mean(
+                y_test_pred_B.clip(min=y_partial_reporting_lower, max=y_partial_reporting_upper), axis=1
+            )
 
-            nonreporting_units["margin_gap"] = nonreporting_units.results_normalized_margin - nonreporting_units.results_normalized_margin_pres
+            nonreporting_units["margin_gap"] = (
+                nonreporting_units.results_normalized_margin - nonreporting_units.results_normalized_margin_pres
+            )
 
-            nonreporting_units["pred_normalized_margin_new"] = nonreporting_units.pred_normalized_margin_pres + nonreporting_units.margin_gap
-            adjustment = nonreporting_units["pred_normalized_margin_new"].values - nonreporting_units["pred_normalized_margin"].values
-            y_test_pred_B[~np.isnan(adjustment)] += adjustment[~np.isnan(adjustment)].reshape(-1,1)
-        
+            nonreporting_units["pred_normalized_margin_new"] = (
+                nonreporting_units.pred_normalized_margin_pres + nonreporting_units.margin_gap
+            )
+            adjustment = (
+                nonreporting_units["pred_normalized_margin_new"].values
+                - nonreporting_units["pred_normalized_margin"].values
+            )
+            y_test_pred_B[~np.isnan(adjustment)] += adjustment[~np.isnan(adjustment)].reshape(-1, 1)
+
         y_test_pred_B = y_test_pred_B.clip(min=y_partial_reporting_lower, max=y_partial_reporting_upper)
 
         # \tilde{y_i}^{b} * \tilde{z_i}^{b}
