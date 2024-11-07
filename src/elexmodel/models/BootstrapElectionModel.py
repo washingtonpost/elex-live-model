@@ -61,9 +61,6 @@ class BootstrapElectionModel(BaseElectionModel):
             "agg_model_hard_threshold", True
         )  # use sigmoid or hard thresold when calculating agg model
         self.district_election = model_settings.get("district_election", False)
-        self.office = model_settings.get("office", None)  # office of the election
-        self.election_id = model_settings.get("election_id", None)  # election ID
-        self.geographic_unit_type = model_settings.get("geographic_unit_type", None)  # geographic unit type
 
         self.lambda_ = model_settings.get("lambda_", None)  # regularization parameter for OLS
 
