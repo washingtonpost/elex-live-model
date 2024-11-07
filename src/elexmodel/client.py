@@ -365,6 +365,7 @@ class ModelClient:
         else:
             pres_predictions = None
 
+        LOG.info("Running model for %s", self.election_id)
         LOG.info(
             "Model parameters: \n prediction intervals: %s, percent reporting threshold: %s, \
                 pi_method: %s, aggregates: %s, model settings: %s",
