@@ -4,7 +4,7 @@
 - fix: hot fixes for the extrapolation step + using the presidential margins to infer a ticket splitting estimate in each house / senate race [#140](https://github.com/washingtonpost/elex-live-model/pull/140)
 
 # 2.2.4 (11/5/2024)
-- fix: partial reporting bug [#138](https://github.com/washingtonpost/elex-live-model/pull/138)
+- fix: truncation can fail catastrophically when % reporting is too low [#138](https://github.com/washingtonpost/elex-live-model/pull/138)
 
 # 2.2.3 (11/5/2024)
 - chore: adding additional log [#135](https://github.com/washingtonpost/elex-live-model/pull/135)
