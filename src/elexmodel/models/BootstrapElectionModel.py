@@ -1290,7 +1290,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         if self.correct_from_presidential:
             nonreporting_units["geographic_unit_fips_p"] = nonreporting_units.geographic_unit_fips.apply(
-                lambda x: x.split("_")[1]
+                lambda x: x.split("_")[1] if self.district_election else x
             )
             nonreporting_units = nonreporting_units.merge(
                 self.pres_predictions,
