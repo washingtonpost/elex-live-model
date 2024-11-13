@@ -1290,7 +1290,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         if self.correct_from_presidential:
             nonreporting_units["geographic_unit_fips_p"] = nonreporting_units.geographic_unit_fips.apply(
-                lambda x: x.split("_")[1]
+                lambda x: x.split("_")[1] if "_" in x else x
             )
             nonreporting_units = nonreporting_units.merge(
                 self.pres_predictions,
@@ -1301,10 +1301,12 @@ class BootstrapElectionModel(BaseElectionModel):
             )
 
             # adjust results_normalized_margin_pres to account for split counties
-
-            nonreporting_units["margin_adj"] = (
-                nonreporting_units.baseline_normalized_margin - nonreporting_units.baseline_normalized_margin_pres
-            )
+            if self.district_election:
+                nonreporting_units["margin_adj"] = (
+                    nonreporting_units.baseline_normalized_margin - nonreporting_units.baseline_normalized_margin_pres
+                )
+            else:
+                nonreporting_units["margin_adj"] = 0
 
             nonreporting_units["results_normalized_margin_pres"] = (
                 nonreporting_units.results_margin_pres / nonreporting_units.results_weights_pres
