@@ -43,9 +43,13 @@ class S3Util:
 
     def get_file_path(self, file_type, path_info):
         if file_type == "preprocessed":
-            file_path = f'{S3_FILE_PATH}/{path_info["election_id"]}/data/{path_info["office"]}/data_{path_info["geographic_unit_type"]}.csv'
+            csv_file = f'data_{path_info["geographic_unit_type"]}.csv'
+            file_path = f'{S3_FILE_PATH}/{path_info["election_id"]}/data/{path_info["office"]}/{csv_file}'
         elif file_type == "config":
             file_path = f'{S3_FILE_PATH}/{path_info["election_id"]}/config/{path_info["election_id"]}'
+        else:
+            LOG.warning("Unknown file type %s", file_type)
+            file_path = None
         return file_path
 
 
@@ -128,7 +132,7 @@ class S3VersionUtil:
             try:
                 future.result()
                 yield version, data
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 LOG.error(f"Error downloading {version['VersionId']}: {e}")
 
             q.task_done()
