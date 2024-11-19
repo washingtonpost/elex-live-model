@@ -38,7 +38,7 @@ class BaseDataHandler(abc.ABC):
 
     def get_data(self):
         # If local data file is not available, read data from s3
-        if not Path(self.local_file_path).is_file():
+        if not Path(self.file_path).is_file():
             path_info = {
                 "election_id": self.election_id,
                 "office": self.office,
