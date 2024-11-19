@@ -23,13 +23,12 @@ class BaseDataHandler(abc.ABC):
         self.s3_client = s3_client
         self.historical = historical
         self.estimandizer = Estimandizer()
+        self.file_path = self.get_data_path()
 
         if data is not None:
             self.data = self.load_data(data)
         else:
             self.data = self.get_data()
-
-        self.file_path = self.get_data_path()
 
     def get_data_path(self):
         directory_path = get_directory_path()
