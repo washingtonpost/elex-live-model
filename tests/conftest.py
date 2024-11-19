@@ -124,3 +124,21 @@ def az_assembly_precinct_data(get_fixture):
 @pytest.fixture(scope="session")
 def test_path():
     return _TEST_FOLDER
+
+
+@pytest.fixture(scope="function")
+def versioned_data_no_errors(get_fixture):
+    path = os.path.join("data", "2024-11-05_USA_G", "S", "versioned_no_errors.csv")
+    return get_fixture(path, load=False, pandas=True)
+
+
+@pytest.fixture(scope="function")
+def versioned_data_non_monotone(get_fixture):
+    path = os.path.join("data", "2024-11-05_USA_G", "S", "versioned_non_monotone.csv")
+    return get_fixture(path, load=False, pandas=True)
+
+
+@pytest.fixture(scope="function")
+def versioned_data_batch_margin(get_fixture):
+    path = os.path.join("data", "2024-11-05_USA_G", "S", "versioned_batch_margin.csv")
+    return get_fixture(path, load=False, pandas=True)
