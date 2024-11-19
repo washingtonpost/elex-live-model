@@ -14,14 +14,8 @@ class BaseDataHandler(abc.ABC):
     """
 
     def __init__(
-            self,
-            election_id,
-            office,
-            geographic_unit_type,
-            estimands,
-            s3_client=None,
-            historical=False,
-            data=None):
+        self, election_id, office, geographic_unit_type, estimands, s3_client=None, historical=False, data=None
+    ):
         self.election_id = election_id
         self.office = office
         self.geographic_unit_type = geographic_unit_type
