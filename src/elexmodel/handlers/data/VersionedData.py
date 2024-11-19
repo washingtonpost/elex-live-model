@@ -216,7 +216,9 @@ class VersionedDataHandler(BaseDataHandler):
                 }
             )
 
-        results = results.groupby("geographic_unit_fips").apply(compute_estimated_margin).reset_index()
+        results = (
+            results.groupby("geographic_unit_fips").apply(compute_estimated_margin, include_groups=False).reset_index()
+        )
 
         for error_type in sorted(set(results["error_type"])):
             if error_type == "none":
