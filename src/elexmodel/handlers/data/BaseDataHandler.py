@@ -50,7 +50,7 @@ class BaseDataHandler(abc.ABC):
             preprocessed_data = StringIO(csv_data)
         else:
             # read data as a filepath
-            preprocessed_data = self.local_file_path
+            preprocessed_data = self.file_path
 
         data = pd.read_csv(preprocessed_data, dtype={"geographic_unit_fips": str, "county_fips": str, "district": str})
         return self.load_data(data)
