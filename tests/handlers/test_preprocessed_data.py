@@ -10,7 +10,7 @@ def test_save(va_governor_county_data, test_path):
     local_file_path = f"{test_path}/test_dir/data_county.csv"
     if os.path.exists(local_file_path):
         os.remove(local_file_path)
-    data_handler.local_file_path = local_file_path
+    data_handler.file_path = local_file_path
     data_handler.save_data(va_governor_county_data)
 
     assert os.path.exists(local_file_path)

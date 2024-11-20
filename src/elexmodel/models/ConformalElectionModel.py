@@ -22,7 +22,7 @@ LOG = getModelLogger()
 
 class ConformalElectionModel(BaseElectionModel.BaseElectionModel, ABC):
     def __init__(self, model_settings: dict):
-        super(ConformalElectionModel, self).__init__(model_settings)
+        super(ConformalElectionModel, self).__init__(model_settings)  # pylint: disable=super-with-arguments
         self.lambda_ = model_settings.get("lambda_", 0)
 
     @classmethod
@@ -207,5 +207,5 @@ class ConformalElectionModel(BaseElectionModel.BaseElectionModel, ABC):
         """
         raise NotImplementedError
 
-    def get_national_summary_estimates(self, nat_sum_data_dict, called_states, base_to_add, alpha):
+    def get_national_summary_estimates(self, nat_sum_data_dict, base_to_add, alpha):
         raise NotImplementedError()

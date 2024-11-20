@@ -1063,7 +1063,7 @@ def test_get_national_summary_estimates(bootstrap_election_model, rng):
     bootstrap_election_model.get_aggregate_predictions(
         reporting_units, nonreporting_units, unexpected_units, ["postal_code"], "margin"
     )  # race calling for aggregate prediction interval assumes that the point prediction has been set accordingly
-    lower, upper = bootstrap_election_model.get_aggregate_prediction_intervals(
+    _, _ = bootstrap_election_model.get_aggregate_prediction_intervals(
         reporting_units, nonreporting_units, unexpected_units, ["postal_code"], 0.95, None, None
     )
 
@@ -1084,7 +1084,7 @@ def test_get_national_summary_estimates(bootstrap_election_model, rng):
         "margin",
         lhs_called_contests=lhs_called_contests,
     )  # race calling for aggregate prediction interval assumes that the point prediction has been set accordingly
-    lower, upper = bootstrap_election_model.get_aggregate_prediction_intervals(
+    _, _ = bootstrap_election_model.get_aggregate_prediction_intervals(
         reporting_units,
         nonreporting_units,
         unexpected_units,
@@ -1115,7 +1115,7 @@ def test_get_national_summary_estimates(bootstrap_election_model, rng):
         lhs_called_contests=lhs_called_contests,
         rhs_called_contests=rhs_called_contests,
     )  # race calling for aggregate prediction interval assumes that the point prediction has been set accordingly
-    lower, upper = bootstrap_election_model.get_aggregate_prediction_intervals(
+    _, _ = bootstrap_election_model.get_aggregate_prediction_intervals(
         reporting_units,
         nonreporting_units,
         unexpected_units,

@@ -4,14 +4,15 @@ from codecs import open
 from setuptools import find_packages, setup
 
 INSTALL_REQUIRES = (
+    "boto3>=1.34",
+    "botocore>=1.34.162",
     "click>=8.1",
+    "cvxpy~=1.5",
     "elex-solver>=2.1.1",
     "pandas>=2.2",
-    "boto3>=1.34",
     "python-dotenv>=1.0",
     "scipy>=1.14",
     "s3transfer>=0.9.0",
-    "botocore>=1.34.162",
 )
 
 THIS_FILE_DIR = os.path.dirname(__file__)

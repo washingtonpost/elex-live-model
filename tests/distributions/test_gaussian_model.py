@@ -390,7 +390,7 @@ def test_winsorized_intervals():
     lower_n = lower - lower_correction_n[0]
     upper_n = upper + upper_correction_n[0]
 
-    for i in range(len(lower_w)):
+    for i in range(len(lower_w)):  # pylint: disable=consider-using-enumerate
         assert lower_w[i] >= lower_n[i]
         assert upper_w[i] <= upper_n[i]
 
