@@ -1,3 +1,4 @@
+import warnings
 from datetime import datetime
 
 import numpy as np
@@ -64,10 +65,12 @@ class VersionedDataHandler:
 
         if self.election_id.startswith("2020-11-03_USA_G"):
             path = "elex-models-prod/2020-general/results/pres/current.csv"
-        elif self.election_id.startswith("2024-11-05_USA_G"):
-            path = f"{S3_FILE_PATH}/{self.election_id}/results/{self.office_id}/{self.geographic_unit_type}/current_counties.csv"
         else:
-            path = f"{S3_FILE_PATH}/{self.election_id}/results/{self.office_id}/{self.geographic_unit_type}/current.csv"
+            base_dir = f"{S3_FILE_PATH}/{self.election_id}/results/{self.office_id}/{self.geographic_unit_type}"
+            if self.election_id.startswith("2024-11-05_USA_G"):
+                path = base_dir + "/current_counties.csv"
+            else:
+                path = base_dir + "/current.csv"
 
         data = self.s3_client.get(path, self.sample)
         LOG.info("Loaded versioned results from S3")
@@ -124,7 +127,8 @@ class VersionedDataHandler:
                 casting="unsafe",
             )
 
-            # check if perc_expected_vote_corr is monotone increasing (if not, give up and don't try to estimate a margin)
+            # check if perc_expected_vote_corr is monotone increasing
+            # (if not, give up and don't try to estimate a margin)
             if not np.all(np.diff(perc_expected_vote_corr) >= 0):
                 return pd.DataFrame(
                     {
@@ -143,15 +147,18 @@ class VersionedDataHandler:
             # Compute batch_margin using NumPy
             # this is the difference in dem_votes - the difference in gop_votes divided by the difference in total votes
             # that is, this is the normalized margin in the batch of votes recorded between versions
-            batch_margin = (
-                np.diff(results_dem, append=results_dem[-1]) - np.diff(results_gop, append=results_gop[-1])
-            ) / np.diff(results_weights, append=results_weights[-1])
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                batch_margin = (
+                    np.diff(results_dem, append=results_dem[-1]) - np.diff(results_gop, append=results_gop[-1])
+                ) / np.diff(results_weights, append=results_weights[-1])
 
             # nan values in batch_margin are due to div-by-zero since there's no change in votes
             batch_margin[np.isnan(batch_margin)] = 0  # Set NaN margins to 0
             df["batch_margin"] = batch_margin
 
-            # batch_margins should be between -1 and 1 (otherwise, there was a data entry issue and we will not use this unit)
+            # batch_margins should be between -1 and 1
+            # (otherwise, there was a data entry issue and we will not use this unit)
             if np.abs(batch_margin).max() > 1:
                 return pd.DataFrame(
                     {
@@ -208,7 +215,9 @@ class VersionedDataHandler:
                 }
             )
 
-        results = results.groupby("geographic_unit_fips").apply(compute_estimated_margin).reset_index()
+        results = (
+            results.groupby("geographic_unit_fips").apply(compute_estimated_margin, include_groups=False).reset_index()
+        )
 
         for error_type in sorted(set(results["error_type"])):
             if error_type == "none":
@@ -222,9 +231,8 @@ class VersionedDataHandler:
             return pd.read_csv(filepath)
 
         if self.election_id.startswith("2020-11-03_USA_G"):
-            path = "elex-models-prod/2020-general/prediction/pres/current.csv"
             raise ValueError("No versioned predictions available for this election.")
-        else:
-            path = f"{S3_FILE_PATH}/{self.election_id}/predictions/{self.office_id}/{self.geographic_unit_type}/current.csv"
+
+        path = f"{S3_FILE_PATH}/{self.election_id}/predictions/{self.office_id}/{self.geographic_unit_type}/current.csv"
 
         return self.s3_client.get(path, self.sample)
