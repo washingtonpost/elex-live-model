@@ -14,10 +14,10 @@ class BaseDataHandler(abc.ABC):
     """
 
     def __init__(
-        self, election_id, office, geographic_unit_type, estimands, s3_client=None, historical=False, data=None
+        self, election_id, office_id, geographic_unit_type, estimands, s3_client=None, historical=False, data=None
     ):
         self.election_id = election_id
-        self.office = office
+        self.office_id = office_id
         self.geographic_unit_type = geographic_unit_type
         self.estimands = estimands
         self.s3_client = s3_client
@@ -32,7 +32,7 @@ class BaseDataHandler(abc.ABC):
 
     def get_data_path(self):
         directory_path = get_directory_path()
-        path = f"{directory_path}/data/{self.election_id}/{self.office}/data_{self.geographic_unit_type}.csv"
+        path = f"{directory_path}/data/{self.election_id}/{self.office_id}/data_{self.geographic_unit_type}.csv"
         return path
 
     def get_data(self):
@@ -40,7 +40,7 @@ class BaseDataHandler(abc.ABC):
         if not Path(self.file_path).is_file():
             path_info = {
                 "election_id": self.election_id,
-                "office": self.office,
+                "office": self.office_id,
                 "geographic_unit_type": self.geographic_unit_type,
             }
             file_path = self.s3_client.get_file_path("preprocessed", path_info)

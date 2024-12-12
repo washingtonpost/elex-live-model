@@ -15,7 +15,7 @@ class PreprocessedDataHandler(BaseDataHandler):
     def __init__(
         self,
         election_id,
-        office,
+        office_id,
         geographic_unit_type,
         estimands,
         estimand_baselines,
@@ -30,7 +30,13 @@ class PreprocessedDataHandler(BaseDataHandler):
         self.estimand_baselines = estimand_baselines
         self.include_results_estimand = include_results_estimand
         super().__init__(
-            election_id, office, geographic_unit_type, estimands, s3_client=s3_client, historical=historical, data=data
+            election_id,
+            office_id,
+            geographic_unit_type,
+            estimands,
+            s3_client=s3_client,
+            historical=historical,
+            data=data,
         )
 
     def select_rows_in_states(self, data, states_with_election):
@@ -45,7 +51,7 @@ class PreprocessedDataHandler(BaseDataHandler):
         """
         Load preprocessed csv data as df
         """
-        LOG.info("Loading preprocessed data: %s, %s, %s", self.election_id, self.office, self.geographic_unit_type)
+        LOG.info("Loading preprocessed data: %s, %s, %s", self.election_id, self.office_id, self.geographic_unit_type)
         data = self.estimandizer.add_estimand_baselines(
             data,
             self.estimand_baselines,

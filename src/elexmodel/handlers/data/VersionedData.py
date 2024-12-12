@@ -65,7 +65,7 @@ class VersionedDataHandler(BaseDataHandler):
         if self.election_id.startswith("2020-11-03_USA_G"):
             path = "elex-models-prod/2020-general/results/pres/current.csv"
         else:
-            base_dir = f"{S3_FILE_PATH}/{self.election_id}/results/{self.office}/{self.geographic_unit_type}"
+            base_dir = f"{S3_FILE_PATH}/{self.election_id}/results/{self.office_id}/{self.geographic_unit_type}"
             if self.election_id.startswith("2024-11-05_USA_G"):
                 path = base_dir + "/current_counties.csv"
             else:
@@ -237,6 +237,6 @@ class VersionedDataHandler(BaseDataHandler):
         if self.election_id.startswith("2020-11-03_USA_G"):
             raise ValueError("No versioned predictions available for this election.")
 
-        path = f"{S3_FILE_PATH}/{self.election_id}/predictions/{self.office}/{self.geographic_unit_type}/current.csv"
+        path = f"{S3_FILE_PATH}/{self.election_id}/predictions/{self.office_id}/{self.geographic_unit_type}/current.csv"
 
         return self.s3_client.get(path, self.sample)
