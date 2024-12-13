@@ -393,8 +393,7 @@ class ModelClient:
         minimum_reporting_units_max = 0
         for alpha in prediction_intervals:
             minimum_reporting_units = self.model.get_minimum_reporting_units(alpha)
-            if minimum_reporting_units > minimum_reporting_units_max:
-                minimum_reporting_units_max = minimum_reporting_units
+            minimum_reporting_units_max = max(minimum_reporting_units, minimum_reporting_units_max)
 
         if APP_ENV != "local" and self.save_results:
             data.write_data(self.election_id, self.office)
