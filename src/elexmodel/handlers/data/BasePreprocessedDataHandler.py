@@ -8,9 +8,9 @@ from elexmodel.handlers.data.Estimandizer import Estimandizer
 from elexmodel.utils.file_utils import get_directory_path
 
 
-class BaseDataHandler(abc.ABC):
+class BasePreprocessedDataHandler(abc.ABC):
     """
-    Abstract base handler for model data
+    Abstract base handler for preprocessed (input) model data
     """
 
     def __init__(

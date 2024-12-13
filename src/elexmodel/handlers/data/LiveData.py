@@ -3,10 +3,10 @@ import math
 import numpy as np
 import pandas as pd
 
-from elexmodel.handlers.data.BaseDataHandler import BaseDataHandler
+from elexmodel.handlers.data.BasePreprocessedDataHandler import BasePreprocessedDataHandler
 
 
-class MockLiveDataHandler(BaseDataHandler):
+class MockLiveDataHandler(BasePreprocessedDataHandler):
     """
     Handles current data, which we would pull from Dynamo on an election night
     """

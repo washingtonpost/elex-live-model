@@ -1,13 +1,13 @@
 from pathlib import Path
 
-from elexmodel.handlers.data.BaseDataHandler import BaseDataHandler
+from elexmodel.handlers.data.BasePreprocessedDataHandler import BasePreprocessedDataHandler
 from elexmodel.logger import getModelLogger
 from elexmodel.utils.file_utils import create_directory
 
 LOG = getModelLogger()
 
 
-class PreprocessedDataHandler(BaseDataHandler):
+class PreprocessedDataHandler(BasePreprocessedDataHandler):
     """
     Handler for preprocessed data for model
     """
