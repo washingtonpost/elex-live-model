@@ -22,7 +22,7 @@ LOG = getModelLogger()
 
 class ConformalElectionModel(BaseElectionModel.BaseElectionModel, ABC):
     def __init__(self, model_settings: dict):
-        super(ConformalElectionModel, self).__init__(model_settings)  # pylint: disable=super-with-arguments
+        super(ConformalElectionModel, self).__init__(model_settings)
         self.lambda_ = model_settings.get("lambda_", 0)
 
     @classmethod

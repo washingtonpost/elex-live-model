@@ -105,10 +105,8 @@ class BootstrapElectionModel(BaseElectionModel):
         self.rng = np.random.default_rng(seed=self.seed)  # used for sampling
         self.ran_bootstrap = False
 
-        # these are the max/min values for called races. Ie.
-        # if a contest is called for LHS party then the prediction/intervals should be at least lhs_called_threshold
-        # if a contest is called for RHS party then the prediction/interval should be at most rhs_called_threshold
-        # (at most because the values are negative)
+        # these are the max/min values for called races. Ie. if a contest is called for LHS party then the prediction/intervals should be at least lhs_called_threshold
+        # if a contest is called for RHS party then the prediction/interval should be at most rhs_called_threshold (at most because the values are negative)
         self.lhs_called_threshold = 0.005
         self.rhs_called_threshold = -0.005
 
@@ -361,9 +359,6 @@ class BootstrapElectionModel(BaseElectionModel):
             # if 0 percent of the vote is in, the upper bound would be zero if we used the above
             # code. So instead we set it to the naive bound
             upper_bound[np.isclose(upper_bound, 0)] = unobserved_upper_bound
-        else:
-            LOG.warning("Unknown bootstrap estimand %s", bootstrap_estimand)
-            return None, None
 
         # if percent reporting is 0 or 1, don't try to compute anything and revert to naive bounds
         lower_bound[
@@ -644,8 +639,7 @@ class BootstrapElectionModel(BaseElectionModel):
                 1 - aggregate_indicator_train.sum(axis=0) / aggregate_indicator.sum(axis=0)
             ) / aggregate_indicator_train.sum(axis=0)
 
-            # where we have < 2 units in a contest,
-            # we set the variance to the variance of the observed epsilon_hat values
+            # where we have < 2 units in a contest, we set the variance to the variance of the observed epsilon_hat values
             var[np.isnan(var) | np.isinf(var)] = np.var(epsilon[np.nonzero(epsilon)[0]].T, ddof=1)
             return np.sqrt(var)
 
@@ -795,8 +789,7 @@ class BootstrapElectionModel(BaseElectionModel):
         percent_expected_vote is too far away.
 
         4) The correction estimates (obtained using VersionedResultsHandler) are also np.nan when there are
-        irregularities in the reporting
-        (e.g., there's a correction to the dem/gop vote totals that revises them downwards).
+        irregularities in the reporting (e.g., there's a correction to the dem/gop vote totals that revises them downwards).
 
         5) We only run this method in states with at least self.min_extrapolating_units counties available.
         """
@@ -961,9 +954,6 @@ class BootstrapElectionModel(BaseElectionModel):
             prediction_std = (
                 nonreporting_units.est_correction_max.values - nonreporting_units.est_correction_min.values
             ).reshape(-1, 1)
-        else:
-            LOG.warning("Unknown extrapolate standard deviation method %s", self.extrapolate_std_method)
-            prediction_std = 0
 
         return prediction, prediction_std
 
@@ -1454,28 +1444,19 @@ class BootstrapElectionModel(BaseElectionModel):
         lhs_rhs_intersection = set(lhs_called_contests) & set(rhs_called_contests)
         if len(lhs_rhs_intersection) > 0:
             raise BootstrapElectionModelException(
-                (
-                    "You can only call a contest for one party, not for both. "
-                    + f"Currently these contests are called for both parties: {lhs_rhs_intersection}"
-                )
+                f"You can only call a contest for one party, not for both. Currently these contests are called for both parties: {lhs_rhs_intersection}"
             )
 
         lhs_difference_with_contests = set(lhs_called_contests) - set(contests)
         if len(lhs_difference_with_contests) > 0:
             raise BootstrapElectionModelException(
-                (
-                    "You can only call contests that are being run by the model. "
-                    + f"These LHS called contests do not exist: {lhs_difference_with_contests}"
-                )
+                f"You can only call contests that are being run by the model. These LHS called contests do not exist: {lhs_difference_with_contests}"
             )
 
         rhs_difference_with_contests = set(rhs_called_contests) - set(contests)
         if len(rhs_difference_with_contests) > 0:
             raise BootstrapElectionModelException(
-                (
-                    "You can only call contests that are being run by the model. "
-                    + f"These RHS called contests do not exist: {rhs_difference_with_contests}"
-                )
+                f"You can only call contests that are being run by the model. These RHS called contests do not exist: {rhs_difference_with_contests}"
             )
 
         # the order in called_coteests need
@@ -1816,10 +1797,7 @@ class BootstrapElectionModel(BaseElectionModel):
         # (ie. the number of contests) then raise an exception
         if len(nat_sum_data_dict) != self.divided_error_B_1.shape[0]:
             raise BootstrapElectionModelException(
-                (
-                    f"nat_sum_data_dict is of length {len(nat_sum_data_dict)} "
-                    + f"but there are {self.divided_error_B_1.shape[0]} contests"
-                )
+                f"nat_sum_data_dict is of length {len(nat_sum_data_dict)} but there are {self.divided_error_B_1.shape[0]} contests"
             )
 
         # NOTE: This assumes that pd.get_dummies does alphabetical ordering
