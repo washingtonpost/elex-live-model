@@ -173,5 +173,5 @@ class BaseElectionModel(ABC):
         """
         return self.features_to_coefficients
 
-    def get_national_summary_estimates(self, nat_sum_data_dict, called_states, base_to_add, alpha):
+    def get_national_summary_estimates(self, nat_sum_data_dict: dict, base_to_add: int | float, alpha: float):
         raise NotImplementedError()
