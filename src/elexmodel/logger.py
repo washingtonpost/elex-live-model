@@ -18,7 +18,8 @@ LOGGING_CONFIG = {
             "handlers": ["default"],
             "level": "INFO",
             "propagate": True,
-        }
+        },
+        "py.warnings": {"handlers": ["default"], "level": "INFO", "propigate": True},
     },
 }
 
@@ -30,6 +31,7 @@ def initialize_logging(logging_config=None):
     if not logging_config:
         app_log_level = os.getenv("APP_LOG_LEVEL", "INFO")
         LOGGING_CONFIG["loggers"]["elexmodel"]["level"] = app_log_level
+        LOGGING_CONFIG["loggers"]["py.warnings"]["level"] = app_log_level
         logging_config = LOGGING_CONFIG
     logging.config.dictConfig(logging_config)
     logging.captureWarnings(True)
