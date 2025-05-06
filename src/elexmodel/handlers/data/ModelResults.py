@@ -31,6 +31,8 @@ class ModelResultsHandler:
         self.nonreporting_units = nonreporting_units
         self.unexpected_units = unexpected_units
 
+        self.bootstrap_samples = None
+
     def add_unit_predictions(self, estimand, unit_predictions):
         """
         unit_predictions: data frame with unit predictions, as produced by model.get_unit_predictions
@@ -90,6 +92,11 @@ class ModelResultsHandler:
             estimates_df[f"upper_{alpha}_{estimand}"] = agg_interval_predictions[alpha][1]
         self.estimates[aggregate].append(estimates_df)
 
+    def add_bootstrap_samples(self, bootstrap_samples):
+        geographic_unit_fips = self.nonreporting_units["geographic_unit_fips"]
+        self.bootstrap_samples = pd.DataFrame(bootstrap_samples)
+        self.bootstrap_samples["geographic_unit_fips"] = geographic_unit_fips
+
     def process_final_results(self):
         """
         Create final data frames of results
@@ -133,3 +140,11 @@ class ModelResultsHandler:
             csv_data = convert_df_to_csv(value)
             # put csv in s3
             s3_client.put(path, csv_data)
+
+    def write_bootstrap_samples(self, election_id, office, geographic_unit_type):
+        s3_client = s3.S3CsvUtil(TARGET_BUCKET)
+        path = f"{S3_FILE_PATH}/{election_id}/bootstrap/{office}/{geographic_unit_type}/bootstrap_samples.csv"
+        # convert df to csv
+        csv_data = convert_df_to_csv(self.bootstrap_samples)
+        # put csv in s3
+        s3_client.put(path, csv_data)

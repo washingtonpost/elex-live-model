@@ -1398,6 +1398,10 @@ class BootstrapElectionModel(BaseElectionModel):
         self.ran_bootstrap = True
         self.n_contests = contest_indicator.values.shape[1]
 
+        self.unit_margin_samples = self.weighted_yz_test_pred / self.weighted_z_test_pred - (
+            self.errors_B_1 / self.errors_B_3 - self.errors_B_2 / self.errors_B_4
+        )
+
     def get_unit_predictions(
         self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, estimand: str, **kwargs
     ) -> np.ndarray:

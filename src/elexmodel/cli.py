@@ -93,8 +93,8 @@ class PythonLiteralOption(click.Option):
     "save_output",
     default=[],
     multiple=True,
-    type=click.Choice(["results", "data", "config", "conformalization"]),
-    help="options: results, data, config",
+    type=click.Choice(["results", "data", "config", "conformalization", "bootstrap"]),
+    help="options: results, data, config, conformalization, bootstrap",
 )
 @click.option("--handle_unreporting", "handle_unreporting", default="drop", type=click.Choice(["drop", "zero"]))
 @click.option(
