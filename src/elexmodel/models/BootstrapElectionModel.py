@@ -1398,7 +1398,9 @@ class BootstrapElectionModel(BaseElectionModel):
         self.ran_bootstrap = True
         self.n_contests = contest_indicator.values.shape[1]
 
-        self.unit_margin_samples = self.weighted_yz_test_pred / self.weighted_z_test_pred - (self.errors_B_1 / self.errors_B_3 - self.errors_B_2 / self.errors_B_4)
+        self.unit_margin_samples = self.weighted_yz_test_pred / self.weighted_z_test_pred - (
+            self.errors_B_1 / self.errors_B_3 - self.errors_B_2 / self.errors_B_4
+        )
 
     def get_unit_predictions(
         self, reporting_units: pd.DataFrame, nonreporting_units: pd.DataFrame, estimand: str, **kwargs
@@ -1615,7 +1617,7 @@ class BootstrapElectionModel(BaseElectionModel):
 
         interval_upper = interval_upper.reshape(-1, 1)
         interval_lower = interval_lower.reshape(-1, 1)
-            
+
         return PredictionIntervals(interval_lower.round(decimals=0), interval_upper.round(decimals=0))
 
     def get_aggregate_prediction_intervals(

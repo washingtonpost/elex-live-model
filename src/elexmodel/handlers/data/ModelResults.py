@@ -140,7 +140,7 @@ class ModelResultsHandler:
             csv_data = convert_df_to_csv(value)
             # put csv in s3
             s3_client.put(path, csv_data)
-           
+
     def write_bootstrap_samples(self, election_id, office, geographic_unit_type):
         s3_client = s3.S3CsvUtil(TARGET_BUCKET)
         path = f"{S3_FILE_PATH}/{election_id}/bootstrap/{office}/{geographic_unit_type}/bootstrap_samples.csv"
