@@ -191,6 +191,7 @@ class ModelClient:
             self.results_handler.write_data(
                 self.election_id, self.office, self.geographic_unit_type, keys=["nat_sum_data"]
             )
+
         return self.results_handler.final_results["nat_sum_data"]
 
     def get_estimates(
@@ -230,6 +231,7 @@ class ModelClient:
         save_config = "config" in save_output
         # saving conformalization data only makes sense if a ConformalElectionModel is used
         save_conformalization = "conformalization" in save_output
+        save_bootstrap_samples = "bootstrap" in save_output
         handle_unreporting = kwargs.get("handle_unreporting", "drop")
 
         district_election = False
@@ -244,7 +246,7 @@ class ModelClient:
             "district_election": district_election,
             "features": features,
             "fixed_effects": fixed_effects,
-            "save_conformalization": save_conformalization,
+            "save_conformalization": save_conformalization
         }
         model_settings.update(model_parameters)
 
@@ -435,6 +437,7 @@ class ModelClient:
             aggregates, prediction_intervals, reporting_units, nonreporting_units, unexpected_units
         )
 
+        bootstrapped_samples = None
         for estimand in estimands:
             unit_predictions, unit_turnout_predictions = self.model.get_unit_predictions(
                 reporting_units, nonreporting_units, estimand, unexpected_units=unexpected_units
@@ -455,6 +458,9 @@ class ModelClient:
                     ] = self.model.get_all_conformalization_data_unit()
 
             self.results_handler.add_unit_intervals(estimand, alpha_to_unit_prediction_intervals)
+            
+            if save_bootstrap_samples:
+                self.results_handler.add_bootstrap_samples(self.model.unit_margin_samples)
 
             for aggregate in self.results_handler.aggregates:
                 aggregate_list = self.get_aggregate_list(self.office, aggregate)
@@ -494,8 +500,10 @@ class ModelClient:
         self.results_handler.process_final_results()
 
         if APP_ENV != "local" and self.save_results:
-            self.results_handler.write_data(self.election_id, self.office, self.geographic_unit_type)
-
+            self.results_handler.write_data(self.election_id, self.office, self.geographic_unit_type)            
+        if APP_ENV != "local" and save_bootstrap_samples:
+            self.results_handler.write_bootstrap_samples(self.election_id, self.office, self.geographic_unit_type)
+            
         return self.results_handler.final_results
 
 
